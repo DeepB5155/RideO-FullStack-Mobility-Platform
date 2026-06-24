@@ -1,0 +1,73 @@
+import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../api/axios';
+
+// Define the shape of our User
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  userType: string;
+}
+
+interface AuthContextData {
+  user: User | null;
+  isLoading: boolean;
+  login: (token: string, userData: User) => Promise<void>;
+  logout: () => Promise<void>;
+}
+
+export const AuthContext = createContext<AuthContextData>({} as AuthContextData);
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if user is already logged in
+    const loadStorageData = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const userDataString = await AsyncStorage.getItem('userData');
+        
+        if (token && userDataString) {
+          setUser(JSON.parse(userDataString));
+          // Note: In a real app, you might want to validate the token with the backend here
+        }
+      } catch (error) {
+        console.error('Failed to load auth data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadStorageData();
+  }, []);
+
+  const login = async (token: string, userData: User) => {
+    try {
+      await AsyncStorage.setItem('userToken', token);
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      setUser(userData);
+    } catch (error) {
+      console.error('Failed to save auth data:', error);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.removeItem('userData');
+      setUser(null);
+    } catch (error) {
+      console.error('Failed to clear auth data:', error);
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
