@@ -1,0 +1,6 @@
+@RideO.API_HostAddress = http://localhost:5248
+
+GET {{RideO.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

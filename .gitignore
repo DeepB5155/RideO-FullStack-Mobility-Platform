@@ -1,0 +1,40 @@
+# .NET / Visual Studio
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+*.user
+*.userosscache
+*.sln.docuser
+.vs/
+
+# Node.js
+node_modules/
+dist/
+build/
+.npm
+.eslintcache
+*.log
+
+# React / Vite
+.vite/
+
+# MongoDB / Database
+mongodata/
+pgdata/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Temp / Artifacts
+tmp/
+.gemini/

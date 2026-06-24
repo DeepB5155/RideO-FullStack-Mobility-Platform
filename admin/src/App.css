@@ -1,0 +1,11 @@
+/* 
+  Global App overrides for RideO Admin
+  Base styling is handled in index.css, AdminLayout.css, and Pages.css
+*/
+
+#root {
+  width: 100%;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+}

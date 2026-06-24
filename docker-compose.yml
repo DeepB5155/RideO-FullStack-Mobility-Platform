@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: rideo-postgres
+    environment:
+      POSTGRES_USER: rideo_admin
+      POSTGRES_PASSWORD: rideo_password
+      POSTGRES_DB: rideo_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - rideo_network
+
+  mongodb:
+    image: mongo:6.0
+    container_name: rideo-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: rideo_admin
+      MONGO_INITDB_ROOT_PASSWORD: rideo_password
+      MONGO_INITDB_DATABASE: rideo_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./database/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js
+      - mongodata:/data/db
+    networks:
+      - rideo_network
+
+volumes:
+  pgdata:
+  mongodata:
+
+networks:
+  rideo_network:
+    driver: bridge
