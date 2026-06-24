@@ -93,6 +93,13 @@ android {
             keyPassword 'android'
         }
     }
+
+    externalNativeBuild {
+        cmake {
+            buildStagingDirectory "C:/tmp/RDO_cxx2"
+        }
+    }
+
     buildTypes {
         debug {
             signingConfig signingConfigs.debug

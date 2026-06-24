@@ -5,6 +5,8 @@ using RideO.API.Models;
 using MongoDB.Driver;
 using System;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
+using RideO.API.Hubs;
 
 namespace RideO.API.Controllers
 {
@@ -14,11 +16,13 @@ namespace RideO.API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly MongoDbContext _mongoContext;
+        private readonly IHubContext<RideHub> _hubContext;
 
-        public RideController(AppDbContext context, MongoDbContext mongoContext)
+        public RideController(AppDbContext context, MongoDbContext mongoContext, IHubContext<RideHub> hubContext)
         {
             _context = context;
             _mongoContext = mongoContext;
+            _hubContext = hubContext;
         }
 
         [HttpPost("request")]
@@ -29,6 +33,14 @@ namespace RideO.API.Controllers
 
             _context.Rides.Add(rideRequest);
             await _context.SaveChangesAsync();
+
+            await _hubContext.Clients.Group("Drivers").SendAsync("NewRideRequest", new {
+                id = rideRequest.Id,
+                pickupLocation = rideRequest.PickupLocation,
+                dropoffLocation = rideRequest.DropoffLocation,
+                fare = rideRequest.Fare,
+                userId = rideRequest.UserId
+            });
 
             return Ok(rideRequest);
         }

@@ -19,6 +19,10 @@ const HomeScreen = () => {
   const [isOnline, setIsOnline] = useState(false);
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
   const locationWatchId = useRef<number | null>(null);
+  
+  // Incoming Ride State
+  const [incomingRide, setIncomingRide] = useState<any>(null);
+  const [activeRide, setActiveRide] = useState<any>(null);
 
   // Initialize Map & Location
   useEffect(() => {
@@ -68,6 +72,11 @@ const HomeScreen = () => {
       })
       .withAutomaticReconnect()
       .build();
+
+    newConnection.on("NewRideRequest", (rideDetails) => {
+      // Show incoming ride popup!
+      setIncomingRide(rideDetails);
+    });
 
     setConnection(newConnection);
 
@@ -127,6 +136,26 @@ const HomeScreen = () => {
     }
   };
 
+  const acceptRide = async () => {
+    if (!incomingRide || !location) return;
+    try {
+      await api.post(`/ride/${incomingRide.id}/accept`, {
+        latitude: location.latitude,
+        longitude: location.longitude
+      });
+      setActiveRide(incomingRide);
+      setIncomingRide(null);
+      Alert.alert("Ride Accepted", "Follow the route to the passenger.");
+    } catch (error) {
+      Alert.alert("Error", "Could not accept ride.");
+      setIncomingRide(null);
+    }
+  };
+
+  const rejectRide = () => {
+    setIncomingRide(null);
+  };
+
   return (
     <View style={styles.container}>
       {location ? (
@@ -158,25 +187,56 @@ const HomeScreen = () => {
         <Text style={styles.greeting}>Hi, {user?.name || 'Driver'}</Text>
       </View>
 
-      <View style={styles.bottomCard}>
-        <Text style={styles.cardTitle}>
-          {isOnline ? 'You are ONLINE' : 'You are OFFLINE'}
-        </Text>
-        <Text style={styles.cardText}>
-          {isOnline 
-            ? 'Listening for ride requests in your area...' 
-            : 'Go online to start receiving ride requests.'}
-        </Text>
-        
-        <TouchableOpacity 
-          style={[styles.actionButton, isOnline ? styles.offlineButton : styles.onlineButton]}
-          onPress={toggleOnlineStatus}
-        >
-          <Text style={styles.actionButtonText}>
-            {isOnline ? 'GO OFFLINE' : 'GO ONLINE'}
+      {/* Incoming Ride Modal */}
+      {incomingRide && (
+        <View style={styles.incomingModalContainer}>
+          <View style={styles.incomingModal}>
+            <Text style={styles.incomingTitle}>NEW RIDE REQUEST</Text>
+            <Text style={styles.incomingFare}>₹{incomingRide.fare}</Text>
+            <Text style={styles.incomingDistance}>Passenger is waiting.</Text>
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.rejectBtn} onPress={rejectRide}>
+                <Text style={styles.btnText}>Reject</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.acceptBtn} onPress={acceptRide}>
+                <Text style={styles.btnText}>ACCEPT RIDE</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Active Ride UI */}
+      {activeRide && (
+        <View style={styles.bottomCard}>
+          <Text style={styles.cardTitle}>En route to Passenger</Text>
+          <Text style={styles.cardText}>Please follow the map route safely.</Text>
+        </View>
+      )}
+
+      {/* Default Offline/Online Card */}
+      {!incomingRide && !activeRide && (
+        <View style={styles.bottomCard}>
+          <Text style={styles.cardTitle}>
+            {isOnline ? 'You are ONLINE' : 'You are OFFLINE'}
           </Text>
-        </TouchableOpacity>
-      </View>
+          <Text style={styles.cardText}>
+            {isOnline 
+              ? 'Listening for ride requests in your area...' 
+              : 'Go online to start receiving ride requests.'}
+          </Text>
+          
+          <TouchableOpacity 
+            style={[styles.actionButton, isOnline ? styles.offlineButton : styles.onlineButton]}
+            onPress={toggleOnlineStatus}
+          >
+            <Text style={styles.actionButtonText}>
+              {isOnline ? 'GO OFFLINE' : 'GO ONLINE'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
@@ -257,6 +317,64 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  incomingModalContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  incomingModal: {
+    backgroundColor: '#fff',
+    width: '85%',
+    padding: 25,
+    borderRadius: 20,
+    alignItems: 'center',
+    elevation: 10,
+  },
+  incomingTitle: {
+    fontSize: 18,
+    color: '#666',
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  incomingFare: {
+    fontSize: 40,
+    fontWeight: '900',
+    color: '#000',
+    marginBottom: 5,
+  },
+  incomingDistance: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 25,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'space-between',
+  },
+  rejectBtn: {
+    backgroundColor: '#ff4444',
+    padding: 15,
+    borderRadius: 10,
+    flex: 1,
+    marginRight: 10,
+    alignItems: 'center',
+  },
+  acceptBtn: {
+    backgroundColor: '#00C851',
+    padding: 15,
+    borderRadius: 10,
+    flex: 1,
+    marginLeft: 10,
+    alignItems: 'center',
+  },
+  btnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  }
 });
 
 export default HomeScreen;
