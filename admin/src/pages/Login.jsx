@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Lock, User } from 'lucide-react';
+import api from '../api';
 import '../styles/Pages.css';
 import '../styles/Login.css';
 
@@ -15,14 +16,20 @@ const Login = () => {
         return <Navigate to="/" replace />;
     }
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
         
-        if (credentials.username === 'admin' && credentials.password === 'admin123') {
+        try {
+            const response = await api.post('/auth/admin-login', { 
+                email: credentials.username, 
+                password: credentials.password 
+            });
+            
             localStorage.setItem('adminAuth', 'true');
+            localStorage.setItem('adminToken', response.data.token);
             window.location.href = '/'; 
-        } else {
-            setError('Invalid credentials. Hint: admin / admin123');
+        } catch (err) {
+            setError(err.response?.data || 'Invalid credentials.');
         }
     };
 

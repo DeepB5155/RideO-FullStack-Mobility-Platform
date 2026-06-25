@@ -9,7 +9,7 @@ import api, { API_BASE_URL } from '../api/axios';
 const MAPBOX_TOKEN = 'pk.eyJ1IjoiZGVlcC01MTU1Iiwi' + 'YSI6ImNtb2xicG42bzBhcWcyb3BoNW81Ynh4YWgifQ.FvuveCsGrnRfM0VJdGGUXw';
 Mapbox.setAccessToken(MAPBOX_TOKEN);
 
-const HomeScreen = () => {
+const HomeScreen = ({ navigation }: any) => {
   const { user } = useContext(AuthContext);
   
   // Default to Gandhinagar
@@ -92,34 +92,7 @@ const HomeScreen = () => {
   };
 
   const requestRide = async () => {
-    if (!user?.id) {
-      Alert.alert("Error", "You must be logged in to request a ride.");
-      return;
-    }
-
-    setRideStatus('searching');
-    try {
-      const payload = {
-        userId: user.id,
-        pickupLocation: `${pickup[1]},${pickup[0]}`,
-        dropoffLocation: `${region[1]},${region[0]}`,
-        fare: 150
-      };
-      
-      await api.post('/ride/request', payload);
-      
-      // Also notify the SignalR hub directly if we want
-      if (connection && connection.state === signalR.HubConnectionState.Connected) {
-        connection.invoke("RequestRide", payload).catch(err => console.error(err));
-      }
-      
-    } catch (e: any) {
-      const errorMessage = typeof e.response?.data === 'string' 
-        ? e.response.data 
-        : e.response?.data?.title || e.message;
-      Alert.alert("Error", errorMessage);
-      setRideStatus('idle');
-    }
+    navigation.navigate('SearchRide');
   };
 
   const fetchRoute = async (startLng: number, startLat: number, endLng: number, endLat: number) => {
@@ -198,7 +171,7 @@ const HomeScreen = () => {
             <Text style={styles.sheetTitle}>Set Drop-off</Text>
             <Text style={styles.sheetSubtitle}>Drag the map to pinpoint your exact destination or search above.</Text>
             <TouchableOpacity style={styles.requestButton} onPress={requestRide}>
-              <Text style={styles.requestButtonText}>Request Ride (₹150)</Text>
+              <Text style={styles.requestButtonText}>Find Carpool Matches</Text>
             </TouchableOpacity>
           </>
         )}

@@ -9,16 +9,29 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleAuth = async () => {
-    if (!email || !password || (isRegistering && !fullName)) {
+    if (isForgotPassword && !email) {
+      Alert.alert('Error', 'Please enter your email to reset password.');
+      return;
+    }
+    
+    if (!isForgotPassword && (!email || !password || (isRegistering && !fullName))) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
     setLoading(true);
     try {
+      if (isForgotPassword) {
+        const response = await api.post('/auth/forgot-password', { email });
+        Alert.alert('Reset Link Sent', response.data.message);
+        setIsForgotPassword(false);
+        return;
+      }
+
       if (isRegistering) {
         await api.post('/auth/register', { 
           fullName, 
@@ -40,12 +53,12 @@ const LoginScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>RideO Passenger</Text>
+      <Text style={styles.title}>{isForgotPassword ? 'Reset Password' : 'RideO Passenger'}</Text>
       <Text style={styles.subtitle}>
-        {isRegistering ? 'Create a new account' : 'Log in to request a ride'}
+        {isForgotPassword ? 'Enter email to receive a reset link' : isRegistering ? 'Create a new account' : 'Log in to request a ride'}
       </Text>
 
-      {isRegistering && (
+      {!isForgotPassword && isRegistering && (
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
@@ -69,16 +82,18 @@ const LoginScreen = () => {
         />
       </View>
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#999"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-      </View>
+      {!isForgotPassword && (
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor="#999"
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+          />
+        </View>
+      )}
 
       <TouchableOpacity 
         style={[styles.button, loading && styles.buttonDisabled]} 
@@ -88,18 +103,30 @@ const LoginScreen = () => {
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.buttonText}>{isRegistering ? 'Sign Up' : 'Log In'}</Text>
+          <Text style={styles.buttonText}>{isForgotPassword ? 'Send Reset Link' : isRegistering ? 'Sign Up' : 'Log In'}</Text>
         )}
       </TouchableOpacity>
 
       <TouchableOpacity 
         style={styles.toggleButton} 
-        onPress={() => setIsRegistering(!isRegistering)}
+        onPress={() => {
+          if (isForgotPassword) setIsForgotPassword(false);
+          else setIsRegistering(!isRegistering);
+        }}
       >
         <Text style={styles.toggleText}>
-          {isRegistering ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
+          {isForgotPassword ? 'Back to Login' : isRegistering ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
         </Text>
       </TouchableOpacity>
+
+      {!isRegistering && !isForgotPassword && (
+        <TouchableOpacity 
+          style={styles.forgotButton} 
+          onPress={() => setIsForgotPassword(true)}
+        >
+          <Text style={styles.forgotText}>Forgot Password?</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -155,6 +182,14 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 14,
     fontWeight: '600',
+  },
+  forgotButton: {
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  forgotText: {
+    color: '#007AFF',
+    fontSize: 14,
   }
 });
 

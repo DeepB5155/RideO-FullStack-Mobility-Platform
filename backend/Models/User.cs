@@ -28,5 +28,19 @@ namespace RideO.API.Models
         public string PasswordHash { get; set; } = string.Empty;
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        [MaxLength(255)]
+        public string? ResetToken { get; set; }
+
+        public DateTime? ResetTokenExpiry { get; set; }
+
+        [MaxLength(500)]
+        public string? ProfilePicture { get; set; }
+
+        public bool IsVerified { get; set; } = false;
+
+        public decimal AverageRating { get; set; } = 5.0m;
+        
+        public bool IsBlocked { get; set; } = false;
     }
 }

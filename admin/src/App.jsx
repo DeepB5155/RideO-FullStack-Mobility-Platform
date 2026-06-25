@@ -5,6 +5,8 @@ import Login from './pages/Login';
 import Rides from './pages/Rides';
 import Users from './pages/Users';
 import Drivers from './pages/Drivers';
+import KYCManagement from './pages/KYCManagement';
+import LiveRides from './pages/LiveRides';
 import './App.css';
 
 // Protected Route Wrapper
@@ -29,8 +31,10 @@ function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="rides" element={<Rides />} />
+          <Route path="live" element={<LiveRides />} />
           <Route path="users" element={<Users />} />
           <Route path="drivers" element={<Drivers />} />
+          <Route path="kyc" element={<KYCManagement />} />
         </Route>
       </Routes>
     </Router>

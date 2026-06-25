@@ -25,5 +25,12 @@ namespace RideO.API.Models
         public bool IsAvailable { get; set; } = false;
         
         public decimal Rating { get; set; } = 5.0m;
+
+        public bool IsVerified { get; set; } = false; // KYC status
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal Balance { get; set; } = 0.0m; // Driver wallet
+        
+        public bool IsSuspended { get; set; } = false;
     }
 }

@@ -5,6 +5,11 @@ using RideO.API.Models;
 using System;
 using System.Threading.Tasks;
 using BCrypt.Net;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace RideO.API.Controllers
 {
@@ -13,10 +18,39 @@ namespace RideO.API.Controllers
     public class AuthController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IConfiguration _configuration;
 
-        public AuthController(AppDbContext context)
+        public AuthController(AppDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
+        }
+
+        private string GenerateJwtToken(User user)
+        {
+            var jwtSettings = _configuration.GetSection("JwtSettings");
+            var key = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
+
+            var claims = new[]
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email),
+                new Claim(ClaimTypes.Role, user.Role),
+                new Claim("FullName", user.FullName)
+            };
+
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.UtcNow.AddDays(7),
+                Issuer = jwtSettings["Issuer"],
+                Audience = jwtSettings["Audience"],
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+            };
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(token);
         }
 
         public class LoginRequest
@@ -45,9 +79,41 @@ namespace RideO.API.Controllers
                 return Unauthorized("Invalid email or password.");
             }
 
-            // In a full production app, you would generate and return a JWT token here.
-            // For now, we return the user object as expected by the frontend MVP.
-            return Ok(user);
+            if (user.IsBlocked)
+            {
+                return StatusCode(403, new { message = "Your account has been suspended by an administrator." });
+            }
+
+            var token = GenerateJwtToken(user);
+
+            return Ok(new { token, user });
+        }
+
+        [HttpPost("admin-login")]
+        public async Task<IActionResult> AdminLogin([FromBody] LoginRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+            {
+                return BadRequest("Email and Password are required.");
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email && u.Role == "Admin");
+            
+            // Temporary hardcoded fallback for first-time setup if no admin in DB
+            if (user == null && request.Email == "admin" && request.Password == "admin123")
+            {
+                user = new User { Id = Guid.NewGuid(), Email = "admin@rideo.com", FullName = "System Admin", Role = "Admin" };
+            }
+            else if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            {
+                return Unauthorized("Invalid admin credentials.");
+            }
+
+            if (user.IsBlocked)
+                return StatusCode(403, new { message = "Your account has been suspended by an administrator." });
+
+            var token = GenerateJwtToken(user);
+            return Ok(new { token, user });
         }
 
         public class RegisterRequest
@@ -86,7 +152,48 @@ namespace RideO.API.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "User registered successfully", userId = user.Id });
+            var token = GenerateJwtToken(user);
+
+            return Ok(new { message = "User registered successfully", token, user });
+        }
+
+        public class ForgotPasswordRequest
+        {
+            public string Email { get; set; } = string.Empty;
+        }
+
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+            if (user == null) return Ok(new { message = "If the email exists, a reset link was sent." });
+
+            user.ResetToken = Guid.NewGuid().ToString().Replace("-", "");
+            user.ResetTokenExpiry = DateTime.UtcNow.AddHours(1);
+            await _context.SaveChangesAsync();
+
+            // In production, send an email here.
+            return Ok(new { message = "If the email exists, a reset link was sent.", debug_token = user.ResetToken });
+        }
+
+        public class ResetPasswordRequest
+        {
+            public string Token { get; set; } = string.Empty;
+            public string NewPassword { get; set; } = string.Empty;
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.ResetToken == request.Token && u.ResetTokenExpiry > DateTime.UtcNow);
+            if (user == null) return BadRequest("Invalid or expired reset token.");
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            user.ResetToken = null;
+            user.ResetTokenExpiry = null;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Password reset successful. You can now login." });
         }
 
         [HttpGet("seed-driver")]

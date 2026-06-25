@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Users, Car, MapPin, Settings, Menu, X, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Car, MapPin, ShieldCheck, Menu, X, LogOut, Navigation } from 'lucide-react';
 import './AdminLayout.css';
 
 const AdminLayout = () => {
@@ -10,9 +10,11 @@ const AdminLayout = () => {
 
     const menuItems = [
         { name: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/' },
-        { name: 'Rides', icon: <MapPin size={20} />, path: '/rides' },
+        { name: 'All Rides', icon: <Car size={20} />, path: '/rides' },
+        { name: 'Live Map', icon: <Navigation size={20} />, path: '/live' },
         { name: 'Users', icon: <Users size={20} />, path: '/users' },
         { name: 'Drivers', icon: <Car size={20} />, path: '/drivers' },
+        { name: 'KYC Auth', icon: <ShieldCheck size={20} />, path: '/kyc' },
     ];
 
     const handleLogout = () => {

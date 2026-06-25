@@ -7,6 +7,7 @@ const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const { login } = useContext(AuthContext);
 
   const handleLogin = async () => {
@@ -16,15 +17,23 @@ const LoginScreen = () => {
     }
 
     setLoading(true);
-    try {
+      if (isForgotPassword) {
+        const response = await api.post('/Auth/forgot-password', { email });
+        Alert.alert('Reset Link Sent', response.data.message);
+        setIsForgotPassword(false);
+        return;
+      }
+
       const response = await api.post('/Auth/login', { email, password });
-      // The backend returns user info directly in this endpoint
-      const userData = response.data; 
       
-      // Since the backend currently doesn't return a JWT, we use a placeholder or the user ID as token
-      const mockToken = userData.id; 
+      const { token, user } = response.data;
       
-      await login(mockToken, userData);
+      if (user.role !== 'Driver') {
+        Alert.alert('Error', 'Invalid User Role. Please login with a Driver account.');
+        return;
+      }
+      
+      await login(token, user);
     } catch (error: any) {
       const message = error.response?.data || error.message || 'Login failed';
       Alert.alert('Login Error', message);
@@ -35,7 +44,7 @@ const LoginScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Driver Login</Text>
+      <Text style={styles.title}>{isForgotPassword ? 'Reset Password' : 'Driver Login'}</Text>
       
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Email</Text>
@@ -50,17 +59,19 @@ const LoginScreen = () => {
         />
       </View>
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter your password"
-          placeholderTextColor="#999"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-      </View>
+      {!isForgotPassword && (
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your password"
+            placeholderTextColor="#999"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+        </View>
+      )}
 
       <TouchableOpacity 
         style={styles.button} 
@@ -70,8 +81,17 @@ const LoginScreen = () => {
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.buttonText}>Sign In</Text>
+          <Text style={styles.buttonText}>{isForgotPassword ? 'Send Reset Link' : 'Sign In'}</Text>
         )}
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={styles.switchButton} 
+        onPress={() => setIsForgotPassword(!isForgotPassword)}
+      >
+        <Text style={styles.switchButtonText}>
+          {isForgotPassword ? 'Back to Login' : 'Forgot Password?'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -120,6 +140,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  switchButton: {
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  switchButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
   },
 });
 

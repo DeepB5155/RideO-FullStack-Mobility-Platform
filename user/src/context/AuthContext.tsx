@@ -10,6 +10,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  token: string | null;
   login: (userData: any) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
@@ -17,6 +18,7 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType>({
   user: null,
+  token: null,
   login: async () => {},
   logout: async () => {},
   isLoading: true,
@@ -24,12 +26,14 @@ export const AuthContext = createContext<AuthContextType>({
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadToken = async () => {
     try {
       const storedUser = await AsyncStorage.getItem('userData');
-      if (storedUser) {
+      const storedToken = await AsyncStorage.getItem('jwtToken');
+      if (storedUser && storedToken) {
         const userData = JSON.parse(storedUser);
         if (userData && userData.role === 'User') {
           setUser({
@@ -38,6 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             name: userData.fullName || userData.name,
             role: userData.role,
           });
+          setToken(storedToken);
         }
       }
     } catch (e) {
@@ -51,8 +56,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadToken();
   }, []);
 
-  const login = async (userData: any) => {
+  const login = async (authResponse: any) => {
+    // Backend now returns { token, user }
+    const { token, user } = authResponse;
+    const userData = user || authResponse;
+
     if (userData && userData.role === 'User') {
+      if (token) {
+        await AsyncStorage.setItem('jwtToken', token);
+        setToken(token);
+      }
       await AsyncStorage.setItem('userData', JSON.stringify(userData));
       setUser({
         id: userData.id,
@@ -67,11 +80,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     await AsyncStorage.removeItem('userData');
+    await AsyncStorage.removeItem('jwtToken');
     setUser(null);
+    setToken(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

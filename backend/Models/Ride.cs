@@ -1,3 +1,5 @@
+// Deprecated in favor of Route and Booking models
+/*
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -40,3 +42,4 @@ namespace RideO.API.Models
         public DateTime? CompletedAt { get; set; }
     }
 }
+*/

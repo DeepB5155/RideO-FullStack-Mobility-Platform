@@ -10,13 +10,13 @@ namespace RideO.API.Models
         public Guid Id { get; set; } = Guid.NewGuid();
         
         [Required]
-        public Guid RideId { get; set; }
+        public Guid BookingId { get; set; }
         
-        [ForeignKey("RideId")]
-        public Ride? Ride { get; set; }
+        [ForeignKey("BookingId")]
+        public Booking? Booking { get; set; }
         
         [Required]
-        [Column(TypeName = "decimal(10,2)")]
+        [Column(TypeName = "decimal(18,2)")]
         public decimal Amount { get; set; }
         
         [Required]
