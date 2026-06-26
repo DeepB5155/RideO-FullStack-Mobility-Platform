@@ -32,6 +32,25 @@ const MyRoutesScreen = ({ navigation }: any) => {
     }
   };
 
+  const stopRecurring = async (id: string) => {
+    Alert.alert('Stop Auto-Renew', 'This will prevent this route from being automatically published every day. Continue?', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Yes',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await axiosInstance.put(`/route/${id}/stop-recurring`);
+            fetchRoutes();
+            Alert.alert('Success', 'Auto-renew stopped.');
+          } catch (e: any) {
+            Alert.alert('Error', e.response?.data || 'Failed to stop auto-renew');
+          }
+        }
+      }
+    ]);
+  };
+
   const renderItem = ({ item }: { item: any }) => (
     <View style={styles.card}>
       <View style={styles.headerRow}>
@@ -40,6 +59,12 @@ const MyRoutesScreen = ({ navigation }: any) => {
       </View>
       <Text style={styles.details}>Time: {new Date(item.startTime).toLocaleString()}</Text>
       <Text style={styles.details}>Seats: {item.availableSeats} | Price: ${item.pricePerSeat}</Text>
+      
+      {item.isRecurring && (
+        <View style={styles.recurringBadge}>
+          <Text style={styles.recurringText}>🔄 Recurring Template ({item.recurringDays})</Text>
+        </View>
+      )}
       
       <View style={styles.actionRow}>
         {item.status === 'Draft' && (
@@ -73,6 +98,11 @@ const MyRoutesScreen = ({ navigation }: any) => {
            </TouchableOpacity>
         )}
       </View>
+      {item.isRecurring && (
+        <TouchableOpacity style={styles.stopRecurringBtn} onPress={() => stopRecurring(item.id)}>
+          <Text style={styles.stopRecurringText}>Stop Auto-Renew</Text>
+        </TouchableOpacity>
+      )}
       <TouchableOpacity 
         style={styles.bookingsBtn} 
         onPress={() => navigation.navigate('Route Bookings', { routeId: item.id })}
@@ -111,8 +141,12 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
   btn: { flex: 1, padding: 10, borderRadius: 6, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: 'bold' },
-  bookingsBtn: { marginTop: 15, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#ddd' },
+  bookingsBtn: { marginTop: 10, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#ddd' },
   bookingsBtnText: { color: '#333', fontWeight: '600' },
+  recurringBadge: { backgroundColor: '#e6f2ff', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15, marginTop: 5, marginBottom: 5 },
+  recurringText: { color: '#007AFF', fontSize: 12, fontWeight: '600' },
+  stopRecurringBtn: { marginTop: 10, padding: 12, backgroundColor: '#fff', borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#dc3545' },
+  stopRecurringText: { color: '#dc3545', fontWeight: '600' },
   empty: { textAlign: 'center', marginTop: 50, color: '#999' }
 });
 

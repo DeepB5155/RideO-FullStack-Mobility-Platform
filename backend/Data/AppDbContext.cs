@@ -14,13 +14,18 @@ namespace RideO.API.Data
         public DbSet<Payment> Payments { get; set; }
         public DbSet<Vehicle> Vehicles { get; set; }
         public DbSet<DriverDocument> DriverDocuments { get; set; }
+        public DbSet<Wallet> Wallets { get; set; }
+        public DbSet<WalletTransaction> WalletTransactions { get; set; }
         public DbSet<RideO.API.Models.Route> Routes { get; set; }
         public DbSet<RouteStop> RouteStops { get; set; }
         public DbSet<Booking> Bookings { get; set; }
+        public DbSet<RecurringBooking> RecurringBookings { get; set; }
         public DbSet<Rating> Ratings { get; set; }
         public DbSet<Complaint> Complaints { get; set; }
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<ChatMessage> ChatMessages { get; set; }
         public DbSet<SystemSetting> SystemSettings { get; set; }
+        public DbSet<EmergencyContact> EmergencyContacts { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -61,6 +66,12 @@ namespace RideO.API.Data
                 .WithMany()
                 .HasForeignKey(c => c.BookingId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<ChatMessage>()
+                .HasOne(c => c.Sender)
+                .WithMany()
+                .HasForeignKey(c => c.SenderId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

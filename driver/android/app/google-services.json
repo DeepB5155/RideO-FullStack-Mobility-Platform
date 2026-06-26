@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "73649663353",
+    "project_id": "rideo-ea3c9",
+    "storage_bucket": "rideo-ea3c9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:73649663353:android:3820b4d9ec326ea30f93a8",
+        "android_client_info": {
+          "package_name": "com.rideo.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGY3xlWj65ix7DCoIvlPNMuWKRvQJugp0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:73649663353:android:29e1dfaebaf3b75c0f93a8",
+        "android_client_info": {
+          "package_name": "com.rideo.user"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGY3xlWj65ix7DCoIvlPNMuWKRvQJugp0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

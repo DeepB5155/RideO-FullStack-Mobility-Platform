@@ -70,7 +70,7 @@ const Dashboard = () => {
 
             {/* Middle Section: Chart & Live Map */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px', marginBottom: '30px' }}>
-                <div className="panel" style={{ display: 'flex', flexDirection: 'column' }}>
+                <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
                     <h3 style={{ margin: '0 0 15px 0' }}>Ride Status Distribution</h3>
                     <div style={{ flex: 1, minHeight: '250px' }}>
                         <ResponsiveContainer width="100%" height="100%">
@@ -80,14 +80,14 @@ const Dashboard = () => {
                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                     ))}
                                 </Pie>
-                                <Tooltip />
-                                <Legend />
+                                <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--surface-border)', color: 'var(--text-main)' }} />
+                                <Legend wrapperStyle={{ color: 'var(--text-main)' }} />
                             </PieChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                <div className="panel" style={{ padding: '0', overflow: 'hidden', height: '320px' }}>
+                <div className="card" style={{ padding: '0', overflow: 'hidden', height: '320px' }}>
                     <LiveMap />
                 </div>
             </div>
@@ -96,49 +96,49 @@ const Dashboard = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
                 
                 {/* Recent Rides */}
-                <div className="panel">
+                <div className="card">
                     <h3 style={{ margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <RouteIcon size={18} color="#3b82f6" /> Recent Rides
+                        <RouteIcon size={18} color="var(--primary)" /> Recent Rides
                     </h3>
                     {activity.recentRides.length === 0 ? <p style={{color: '#94a3b8'}}>No rides yet.</p> : activity.recentRides.map(r => (
-                        <div key={r.id} style={{ borderBottom: '1px solid #eee', padding: '10px 0' }}>
+                        <div key={r.id} style={{ borderBottom: '1px solid var(--surface-border)', padding: '10px 0' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                 <strong>{r.driverName}</strong>
-                                <span style={{ fontSize: '12px', color: '#10b981' }}>{r.status}</span>
+                                <span className={`badge ${r.status === 'Completed' ? 'badge-success' : 'badge-primary'}`}>{r.status}</span>
                             </div>
-                            <div style={{ fontSize: '13px', color: '#64748b' }}>{r.startLocation} &rarr; {r.endLocation}</div>
+                            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{r.startLocation} &rarr; {r.endLocation}</div>
                         </div>
                     ))}
                 </div>
 
                 {/* Recent Bookings */}
-                <div className="panel">
+                <div className="card">
                     <h3 style={{ margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Clock size={18} color="#f59e0b" /> Recent Bookings
+                        <Clock size={18} color="var(--warning)" /> Recent Bookings
                     </h3>
                     {activity.recentBookings.length === 0 ? <p style={{color: '#94a3b8'}}>No bookings yet.</p> : activity.recentBookings.map(b => (
-                        <div key={b.id} style={{ borderBottom: '1px solid #eee', padding: '10px 0' }}>
+                        <div key={b.id} style={{ borderBottom: '1px solid var(--surface-border)', padding: '10px 0' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                 <strong>{b.userName}</strong>
-                                <span style={{ fontSize: '12px', color: '#f59e0b' }}>{b.status}</span>
+                                <span className={`badge ${b.status === 'Completed' ? 'badge-success' : (b.status === 'Cancelled' ? 'badge-danger' : 'badge-warning')}`}>{b.status}</span>
                             </div>
-                            <div style={{ fontSize: '13px', color: '#64748b' }}>Seats: {b.seatsBooked}</div>
+                            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Seats: {b.seatsBooked}</div>
                         </div>
                     ))}
                 </div>
 
                 {/* Pending KYC Requests */}
-                <div className="panel">
+                <div className="card">
                     <h3 style={{ margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <FileX size={18} color="#ef4444" /> Pending KYC
                     </h3>
                     {activity.recentKyc.length === 0 ? <p style={{color: '#94a3b8'}}>No pending approvals.</p> : activity.recentKyc.map(k => (
-                        <div key={k.id} style={{ borderBottom: '1px solid #eee', padding: '10px 0' }}>
+                        <div key={k.id} style={{ borderBottom: '1px solid var(--surface-border)', padding: '10px 0' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                 <strong>{k.userName}</strong>
-                                <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: 'bold' }}>Review</span>
+                                <span className="badge badge-danger">Review</span>
                             </div>
-                            <div style={{ fontSize: '13px', color: '#64748b' }}>License: {k.licenseNumber}</div>
+                            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>License: {k.licenseNumber}</div>
                         </div>
                     ))}
                 </div>
@@ -149,14 +149,14 @@ const Dashboard = () => {
 };
 
 const MetricCard = ({ title, value, icon, trend }) => (
-    <div className="stat-card">
-        <div className="stat-header">
-            <span className="stat-title">{title}</span>
-            <div className="stat-icon-wrapper" style={{ backgroundColor: 'transparent' }}>{icon}</div>
+    <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: '500' }}>{title}</span>
+            <div style={{ padding: '8px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>{icon}</div>
         </div>
-        <div className="stat-body">
-            <h2 className="stat-value">{value}</h2>
-            {trend && <span className="stat-trend" style={{color: trend === 'Requires Action' || trend === 'Urgent' ? '#ef4444' : '#64748b'}}>{trend}</span>}
+        <div>
+            <h2 style={{ fontSize: '2rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>{value}</h2>
+            {trend && <span style={{ fontSize: '0.85rem', fontWeight: '600', marginTop: '5px', display: 'block', color: trend === 'Requires Action' || trend === 'Urgent' ? 'var(--danger)' : 'var(--success)' }}>{trend}</span>}
         </div>
     </div>
 );

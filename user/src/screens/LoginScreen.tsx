@@ -8,6 +8,7 @@ const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -37,7 +38,8 @@ const LoginScreen = () => {
           fullName, 
           email, 
           password, 
-          role: 'User' 
+          role: 'User',
+          referralCode: referralCode ? referralCode : undefined
         });
         Alert.alert('Success', 'Account created! Logging you in...');
       }
@@ -91,6 +93,19 @@ const LoginScreen = () => {
             secureTextEntry
             value={password}
             onChangeText={setPassword}
+          />
+        </View>
+      )}
+
+      {!isForgotPassword && isRegistering && (
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Referral Code (Optional)"
+            placeholderTextColor="#999"
+            autoCapitalize="characters"
+            value={referralCode}
+            onChangeText={setReferralCode}
           />
         </View>
       )}

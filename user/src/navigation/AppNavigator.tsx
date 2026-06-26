@@ -7,6 +7,14 @@ import SearchRideScreen from '../screens/SearchRideScreen';
 import RideResultsScreen from '../screens/RideResultsScreen';
 import MyRidesScreen from '../screens/MyRidesScreen';
 import LiveTrackingScreen from '../screens/LiveTrackingScreen';
+import RatingScreen from '../screens/RatingScreen';
+import ChatScreen from '../screens/ChatScreen';
+import LoginScreen from '../screens/LoginScreen';
+import PaymentScreen from '../screens/PaymentScreen';
+import SupportScreen from '../screens/SupportScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import WalletScreen from '../screens/WalletScreen';
+import EmergencyContactsScreen from '../screens/EmergencyContactsScreen';
 
 const Stack = createStackNavigator();
 
@@ -30,6 +38,13 @@ const AppNavigator = () => {
           <Stack.Screen name="RideResults" component={RideResultsScreen} />
           <Stack.Screen name="My Rides" component={MyRidesScreen} />
           <Stack.Screen name="Live Tracking" component={LiveTrackingScreen} />
+          <Stack.Screen name="Rating" component={RatingScreen} />
+          <Stack.Screen name="Chat" component={ChatScreen} />
+          <Stack.Screen name="Payment" component={PaymentScreen} />
+          <Stack.Screen name="Support" component={SupportScreen} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
+          <Stack.Screen name="Wallet" component={WalletScreen} />
+          <Stack.Screen name="Emergency Contacts" component={EmergencyContactsScreen} />
         </>
       ) : (
         <Stack.Screen name="Login" component={LoginScreen} />

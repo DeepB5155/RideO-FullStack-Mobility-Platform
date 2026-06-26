@@ -1,7 +1,8 @@
 import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api/axios';
+import { theme } from '../theme/theme';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
@@ -17,6 +18,7 @@ const LoginScreen = () => {
     }
 
     setLoading(true);
+    try {
       if (isForgotPassword) {
         const response = await api.post('/Auth/forgot-password', { email });
         Alert.alert('Reset Link Sent', response.data.message);
@@ -43,111 +45,150 @@ const LoginScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{isForgotPassword ? 'Reset Password' : 'Driver Login'}</Text>
-      
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter your email"
-          placeholderTextColor="#999"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-      </View>
-
-      {!isForgotPassword && (
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your password"
-            placeholderTextColor="#999"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoid} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>RideO</Text>
+          <Text style={styles.headerSubtitle}>
+            {isForgotPassword ? 'Reset your password' : 'Sign in to Driver Portal'}
+          </Text>
         </View>
-      )}
 
-      <TouchableOpacity 
-        style={styles.button} 
-        onPress={handleLogin}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>{isForgotPassword ? 'Send Reset Link' : 'Sign In'}</Text>
-        )}
-      </TouchableOpacity>
+        <View style={styles.formContainer}>
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Email Address</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="name@example.com"
+              placeholderTextColor={theme.colors.text.muted}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
 
-      <TouchableOpacity 
-        style={styles.switchButton} 
-        onPress={() => setIsForgotPassword(!isForgotPassword)}
-      >
-        <Text style={styles.switchButtonText}>
-          {isForgotPassword ? 'Back to Login' : 'Forgot Password?'}
-        </Text>
-      </TouchableOpacity>
-    </View>
+          {!isForgotPassword && (
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your password"
+                placeholderTextColor={theme.colors.text.muted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
+            </View>
+          )}
+
+          <TouchableOpacity 
+            style={styles.button} 
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color={theme.colors.text.light} />
+            ) : (
+              <Text style={styles.buttonText}>{isForgotPassword ? 'Send Reset Link' : 'Sign In'}</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.switchButton} 
+            onPress={() => setIsForgotPassword(!isForgotPassword)}
+          >
+            <Text style={styles.switchButtonText}>
+              {isForgotPassword ? 'Back to Login' : 'Forgot Password?'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.primary,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 40,
-    textAlign: 'center',
+  keyboardAvoid: {
+    flex: 1,
   },
-  inputContainer: {
-    marginBottom: 20,
+  header: {
+    padding: theme.spacing.xl,
+    paddingTop: theme.spacing.xxl * 1.5,
+    paddingBottom: theme.spacing.xxl,
   },
-  label: {
+  headerTitle: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: theme.colors.text.light,
+    marginBottom: theme.spacing.xs,
+    letterSpacing: 1,
+  },
+  headerSubtitle: {
     fontSize: 16,
-    color: '#666',
-    marginBottom: 8,
+    color: theme.colors.primaryLight,
     fontWeight: '500',
   },
+  formContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    paddingTop: theme.spacing.xxl,
+    ...theme.shadows.large,
+  },
+  inputContainer: {
+    marginBottom: theme.spacing.lg,
+  },
+  label: {
+    fontSize: 14,
+    color: theme.colors.text.muted,
+    marginBottom: theme.spacing.xs,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 15,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
     fontSize: 16,
-    color: '#333',
+    color: theme.colors.text.main,
+    ...theme.shadows.small,
   },
   button: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 8,
+    backgroundColor: theme.colors.primary,
+    padding: theme.spacing.lg,
+    borderRadius: theme.radius.full,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: theme.spacing.lg,
+    ...theme.shadows.medium,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: theme.colors.text.light,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   switchButton: {
-    marginTop: 15,
+    marginTop: theme.spacing.lg,
     alignItems: 'center',
+    padding: theme.spacing.sm,
   },
   switchButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
+    color: theme.colors.primary,
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
 

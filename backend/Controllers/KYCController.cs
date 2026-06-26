@@ -12,6 +12,8 @@ using System.Threading.Tasks;
 
 namespace RideO.API.Controllers
 {
+    using RideO.API.Services;
+
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = "Driver")]
@@ -52,6 +54,7 @@ namespace RideO.API.Controllers
             public string LicenseBackUrl { get; set; } = string.Empty;
             public string RCUrl { get; set; } = string.Empty;
             public string LicenseNumber { get; set; } = string.Empty;
+            public string PhoneNumber { get; set; } = string.Empty;
             
             // Vehicle Details
             public string Make { get; set; } = string.Empty;
@@ -65,9 +68,16 @@ namespace RideO.API.Controllers
         [HttpPost("submit")]
         public async Task<IActionResult> SubmitKYC([FromBody] SubmitKYCRequest request)
         {
-            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdString)) return Unauthorized();
+            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub);
+            if (string.IsNullOrEmpty(userIdString)) return Unauthorized("User ID claim is missing.");
             var userId = Guid.Parse(userIdString);
+
+            // Update Phone Number in User table
+            var user = await _context.Users.FindAsync(userId);
+            if (user != null && !string.IsNullOrWhiteSpace(request.PhoneNumber))
+            {
+                user.PhoneNumber = request.PhoneNumber;
+            }
 
             // Ensure Driver record exists
             var driver = await _context.Drivers.FirstOrDefaultAsync(d => d.UserId == userId);
@@ -134,25 +144,28 @@ namespace RideO.API.Controllers
         [HttpGet("status")]
         public async Task<IActionResult> GetStatus()
         {
-            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdString)) return Unauthorized();
+            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub);
+            if (string.IsNullOrEmpty(userIdString)) return Unauthorized("User ID claim is missing.");
             var userId = Guid.Parse(userIdString);
 
             var driver = await _context.Drivers.FirstOrDefaultAsync(d => d.UserId == userId);
             if (driver == null)
                 return Ok(new { status = "NotSubmitted", isVerified = false });
 
+            var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.DriverId == driver.Id);
+            var vehicleId = vehicle?.Id;
+
             var documents = await _context.DriverDocuments.Where(d => d.DriverId == driver.Id).ToListAsync();
             if (documents.Count == 0)
                 return Ok(new { status = "NotSubmitted", isVerified = false });
 
             if (driver.IsVerified)
-                return Ok(new { status = "Approved", isVerified = true });
+                return Ok(new { status = "Approved", isVerified = true, vehicleId, licenseNumber = driver.LicenseNumber });
 
             if (documents.Any(d => d.Status == "Rejected"))
-                return Ok(new { status = "Rejected", isVerified = false });
+                return Ok(new { status = "Rejected", isVerified = false, vehicleId, licenseNumber = driver.LicenseNumber });
 
-            return Ok(new { status = "Pending", isVerified = false });
+            return Ok(new { status = "Pending", isVerified = false, vehicleId, licenseNumber = driver.LicenseNumber });
         }
     }
 }

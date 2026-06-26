@@ -49,6 +49,14 @@ namespace RideO.API.Models
         [Column(TypeName = "decimal(18,2)")]
         public decimal PricePerSeat { get; set; } = 0.0m;
 
+        [Required]
+        [MaxLength(20)]
+        public string PricingMode { get; set; } = "Fixed"; // "Fixed" or "PerKm"
+
+        [Required]
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal PricePerKm { get; set; } = 0.0m;
+
         public bool IsLuggageAllowed { get; set; } = true;
 
         public bool AutoApprove { get; set; } = false;
@@ -61,5 +69,13 @@ namespace RideO.API.Models
         public string Status { get; set; } = "Draft"; // Draft, Published, Started, Completed, Cancelled
 
         public ICollection<RouteStop> Stops { get; set; } = new List<RouteStop>();
+
+        // Scheduled / Recurring Rides Feature
+        public bool IsRecurring { get; set; } = false;
+
+        [MaxLength(50)]
+        public string? RecurringDays { get; set; } // e.g. "Mon,Tue,Wed,Thu,Fri"
+
+        public TimeSpan? RecurringTime { get; set; } 
     }
 }

@@ -3,13 +3,15 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform, PermissionsA
 import Mapbox from '@rnmapbox/maps';
 import Geolocation from '@react-native-community/geolocation';
 import * as signalR from '@microsoft/signalr';
+import { MAPBOX_ACCESS_TOKEN, SIGNALR_HUB_URL } from '@env';
 import { AuthContext } from '../context/AuthContext';
-import { API_BASE_URL } from '../api/axios';
+import api, { API_BASE_URL } from '../api/axios';
+import { theme } from '../theme/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Split token string to bypass overzealous GitHub secret scanning for public keys
-Mapbox.setAccessToken('pk.eyJ1IjoiZGVlcC01MTU1Iiwi' + 'YSI6ImNtb2xicG42bzBhcWcyb3BoNW81Ynh4YWgifQ.FvuveCsGrnRfM0VJdGGUXw');
+Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
 
-const HomeScreen = () => {
+const HomeScreen = ({ navigation }: any) => {
   const { user } = useContext(AuthContext);
   // Default to Gandhinagar, Gujarat
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>({ 
@@ -64,12 +66,9 @@ const HomeScreen = () => {
     };
 
     // Setup SignalR connection object
-    const hubUrl = API_BASE_URL.replace('/api', '/rideHub');
+    const hubUrl = SIGNALR_HUB_URL || API_BASE_URL.replace('/api', '/rideHub');
     const newConnection = new signalR.HubConnectionBuilder()
-      .withUrl(hubUrl, {
-        skipNegotiation: true,
-        transport: signalR.HttpTransportType.WebSockets
-      })
+      .withUrl(hubUrl, { accessTokenFactory: async () => await AsyncStorage.getItem('userToken') || '' })
       .withAutomaticReconnect()
       .build();
 
@@ -184,7 +183,20 @@ const HomeScreen = () => {
 
       {/* Driver Overlay */}
       <View style={styles.topOverlay}>
-        <Text style={styles.greeting}>Hi, {user?.name || 'Driver'}</Text>
+        <Text style={styles.greeting}>Hi, {user?.fullName || 'Driver'}</Text>
+      </View>
+
+      {/* Top Menu Bar */}
+      <View style={styles.topMenuContainer}>
+        <TouchableOpacity style={styles.menuIcon} onPress={() => navigation.navigate('Wallet')}>
+          <Text style={styles.menuText}>💰 Wallet</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.menuIcon} onPress={() => navigation.navigate('Notifications')}>
+          <Text style={styles.menuText}>🔔 Alerts</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.menuIcon} onPress={() => navigation.navigate('Support')}>
+          <Text style={styles.menuText}>💬 Help</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Incoming Ride Modal */}
@@ -197,7 +209,7 @@ const HomeScreen = () => {
             
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.rejectBtn} onPress={rejectRide}>
-                <Text style={styles.btnText}>Reject</Text>
+                <Text style={styles.btnTextDark}>Reject</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.acceptBtn} onPress={acceptRide}>
                 <Text style={styles.btnText}>ACCEPT RIDE</Text>
@@ -244,7 +256,7 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
   map: {
     position: 'absolute',
@@ -256,123 +268,147 @@ const styles = StyleSheet.create({
   loadingMap: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   topOverlay: {
     position: 'absolute',
     top: 50,
-    left: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 10,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    left: theme.spacing.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.radius.full,
+    ...theme.shadows.medium,
   },
   greeting: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.text.main,
+  },
+  topMenuContainer: {
+    position: 'absolute',
+    top: 110,
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 10,
+  },
+  menuIcon: {
+    backgroundColor: theme.colors.surface,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
+    ...theme.shadows.medium,
+  },
+  menuText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.text.main,
   },
   bottomCard: {
     position: 'absolute',
-    bottom: 30,
-    left: 20,
-    right: 20,
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    bottom: theme.spacing.lg,
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.xl,
+    borderRadius: theme.radius.xl,
+    ...theme.shadows.large,
   },
   cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#333',
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: theme.spacing.xs,
+    color: theme.colors.text.main,
   },
   cardText: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
+    color: theme.colors.text.muted,
+    marginBottom: theme.spacing.xl,
   },
   actionButton: {
-    padding: 16,
-    borderRadius: 10,
+    padding: theme.spacing.lg,
+    borderRadius: theme.radius.full,
     alignItems: 'center',
+    ...theme.shadows.medium,
   },
   onlineButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.success,
   },
   offlineButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: theme.colors.danger,
   },
   actionButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: theme.colors.text.light,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   incomingModalContainer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    ...StyleSheet.absoluteFill as any,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
   },
   incomingModal: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     width: '85%',
-    padding: 25,
-    borderRadius: 20,
+    padding: theme.spacing.xl,
+    borderRadius: theme.radius.xl,
     alignItems: 'center',
-    elevation: 10,
+    ...theme.shadows.large,
   },
   incomingTitle: {
-    fontSize: 18,
-    color: '#666',
-    fontWeight: 'bold',
-    marginBottom: 5,
+    fontSize: 14,
+    color: theme.colors.primary,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: theme.spacing.sm,
   },
   incomingFare: {
-    fontSize: 40,
+    fontSize: 48,
     fontWeight: '900',
-    color: '#000',
-    marginBottom: 5,
+    color: theme.colors.text.main,
+    marginBottom: theme.spacing.sm,
   },
   incomingDistance: {
     fontSize: 16,
-    color: '#333',
-    marginBottom: 25,
+    color: theme.colors.text.muted,
+    marginBottom: theme.spacing.xl,
   },
   modalActions: {
     flexDirection: 'row',
     width: '100%',
     justifyContent: 'space-between',
+    gap: theme.spacing.md,
   },
   rejectBtn: {
-    backgroundColor: '#ff4444',
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: theme.colors.background,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.full,
     flex: 1,
-    marginRight: 10,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   acceptBtn: {
-    backgroundColor: '#00C851',
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: theme.colors.primary,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.full,
     flex: 1,
-    marginLeft: 10,
     alignItems: 'center',
+    ...theme.shadows.medium,
   },
   btnText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: theme.colors.text.light,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  btnTextDark: {
+    color: theme.colors.text.main,
+    fontWeight: '600',
     fontSize: 16,
   }
 });

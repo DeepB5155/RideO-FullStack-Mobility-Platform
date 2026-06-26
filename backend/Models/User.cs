@@ -42,5 +42,13 @@ namespace RideO.API.Models
         public decimal AverageRating { get; set; } = 5.0m;
         
         public bool IsBlocked { get; set; } = false;
+
+        [MaxLength(255)]
+        public string? FcmDeviceToken { get; set; }
+
+        [MaxLength(20)]
+        public string? ReferralCode { get; set; }
+
+        public Guid? ReferredByUserId { get; set; }
     }
 }

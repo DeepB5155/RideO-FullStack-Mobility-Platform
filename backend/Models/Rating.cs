@@ -34,6 +34,9 @@ namespace RideO.API.Models
         [MaxLength(1000)]
         public string? Comment { get; set; }
 
+        [MaxLength(100)]
+        public string? Compliment { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

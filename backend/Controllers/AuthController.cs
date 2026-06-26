@@ -28,8 +28,11 @@ namespace RideO.API.Controllers
 
         private string GenerateJwtToken(User user)
         {
-            var jwtSettings = _configuration.GetSection("JwtSettings");
-            var key = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
+            var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? "FallbackSecretIfMissing2026!@#$";
+            var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "RideO_Backend";
+            var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "RideO_MobileApp";
+
+            var key = Encoding.UTF8.GetBytes(jwtSecret);
 
             var claims = new[]
             {
@@ -43,8 +46,8 @@ namespace RideO.API.Controllers
             {
                 Subject = new ClaimsIdentity(claims),
                 Expires = DateTime.UtcNow.AddDays(7),
-                Issuer = jwtSettings["Issuer"],
-                Audience = jwtSettings["Audience"],
+                Issuer = jwtIssuer,
+                Audience = jwtAudience,
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
 
@@ -123,6 +126,7 @@ namespace RideO.API.Controllers
             public string Password { get; set; } = string.Empty;
             public string? PhoneNumber { get; set; }
             public string Role { get; set; } = "User";
+            public string? ReferralCode { get; set; }
         }
 
         [HttpPost("register")]
@@ -138,6 +142,16 @@ namespace RideO.API.Controllers
                 return Conflict("Email is already registered.");
             }
 
+            Guid? referredByUserId = null;
+            if (!string.IsNullOrWhiteSpace(request.ReferralCode))
+            {
+                var referrer = await _context.Users.FirstOrDefaultAsync(u => u.ReferralCode == request.ReferralCode.ToUpper());
+                if (referrer != null)
+                {
+                    referredByUserId = referrer.Id;
+                }
+            }
+
             var user = new User
             {
                 Id = Guid.NewGuid(),
@@ -146,10 +160,45 @@ namespace RideO.API.Controllers
                 PhoneNumber = request.PhoneNumber,
                 Role = request.Role,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                ReferralCode = $"RIDE{Guid.NewGuid().ToString().Substring(0, 6).ToUpper()}",
+                ReferredByUserId = referredByUserId
             };
 
             _context.Users.Add(user);
+
+            // Add wallet for new user
+            var newWallet = new Wallet { Id = Guid.NewGuid(), UserId = user.Id, Balance = 0 };
+            _context.Wallets.Add(newWallet);
+
+            // Process referral bonus if applicable
+            if (referredByUserId.HasValue)
+            {
+                var referrerWallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == referredByUserId.Value);
+                if (referrerWallet != null)
+                {
+                    // Bonus to referrer
+                    referrerWallet.Balance += 50;
+                    _context.WalletTransactions.Add(new WalletTransaction
+                    {
+                        WalletId = referrerWallet.Id,
+                        Amount = 50,
+                        Type = "ReferralBonus",
+                        Description = $"Referral bonus for inviting {user.FullName}"
+                    });
+
+                    // Bonus to new user
+                    newWallet.Balance += 50;
+                    _context.WalletTransactions.Add(new WalletTransaction
+                    {
+                        WalletId = newWallet.Id,
+                        Amount = 50,
+                        Type = "ReferralBonus",
+                        Description = "Sign-up bonus via referral code"
+                    });
+                }
+            }
+
             await _context.SaveChangesAsync();
 
             var token = GenerateJwtToken(user);
@@ -194,6 +243,28 @@ namespace RideO.API.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Password reset successful. You can now login." });
+        }
+
+        public class UpdateFcmTokenRequest
+        {
+            public string Token { get; set; } = string.Empty;
+        }
+
+        [Microsoft.AspNetCore.Authorization.Authorize]
+        [HttpPost("update-fcm-token")]
+        public async Task<IActionResult> UpdateFcmToken([FromBody] UpdateFcmTokenRequest request)
+        {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized();
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return NotFound();
+
+            user.FcmDeviceToken = request.Token;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "FCM token updated successfully." });
         }
 
         [HttpGet("seed-driver")]

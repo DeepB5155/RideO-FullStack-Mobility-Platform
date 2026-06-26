@@ -6,8 +6,12 @@ using RideO.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using DotNetEnv;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Load .env file
+Env.Load();
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -15,8 +19,9 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Configure JWT Authentication
-var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["Secret"];
+var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? "FallbackSecretIfMissing2026!@#$";
+var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "RideO_Backend";
+var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "RideO_MobileApp";
 
 builder.Services.AddAuthentication(options =>
 {
@@ -31,9 +36,9 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtSettings["Issuer"],
-        ValidAudience = jwtSettings["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey!))
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
     };
 
     // Support SignalR Token Auth
@@ -53,8 +58,9 @@ builder.Services.AddAuthentication(options =>
 });
 
 // Configure EF Core PostgreSQL
+var pgConnectionString = Environment.GetEnvironmentVariable("POSTGRES_CONNECTION_STRING") ?? builder.Configuration.GetConnectionString("PostgreSql");
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("PostgreSql") ?? "Host=localhost;Port=5433;Database=rideo_db;Username=rideo_admin;Password=rideo_password"));
+    options.UseNpgsql(pgConnectionString));
 
 // Configure MongoDB
 builder.Services.AddSingleton<MongoDbContext>();
@@ -62,18 +68,37 @@ builder.Services.AddSingleton<MongoDbContext>();
 // Configure Antigravity Engine
 builder.Services.AddScoped<AntigravityEngine>();
 
+// Configure FCM Service
+builder.Services.AddSingleton<FcmService>();
+
 // Configure SignalR
 builder.Services.AddSignalR();
 
+// Register Background Services
+builder.Services.AddHostedService<RecurringRouteService>();
+
 // Enable CORS
+var allowedOriginsStr = Environment.GetEnvironmentVariable("ALLOWED_CORS_ORIGINS") ?? "*";
+var allowedOrigins = allowedOriginsStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.SetIsOriginAllowed(origin => true) // Allow any origin for mobile/dev
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+        if (allowedOrigins.Contains("*"))
+        {
+            policy.SetIsOriginAllowed(origin => true)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
+        else
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
     });
 });
 
@@ -94,7 +119,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 // Enable serving static files from wwwroot
 app.UseStaticFiles();

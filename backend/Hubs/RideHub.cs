@@ -12,10 +12,12 @@ namespace RideO.API.Hubs
     public class RideHub : Hub
     {
         private readonly MongoDbContext _mongoDb;
+        private readonly AppDbContext _appDb;
 
-        public RideHub(MongoDbContext mongoDb)
+        public RideHub(MongoDbContext mongoDb, AppDbContext appDb)
         {
             _mongoDb = mongoDb;
+            _appDb = appDb;
         }
 
         // Users call this when opening LiveTrackingScreen
@@ -59,6 +61,54 @@ namespace RideO.API.Hubs
         public async Task JoinAdminMonitors()
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, "AdminMonitors");
+        }
+
+        // --- CHAT LOGIC ---
+
+        public async Task JoinChat(string bookingId)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"Chat_{bookingId}");
+        }
+
+        public async Task LeaveChat(string bookingId)
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"Chat_{bookingId}");
+        }
+
+        public async Task SendMessage(string bookingId, string content)
+        {
+            var userIdString = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userIdString)) return;
+
+            var userId = Guid.Parse(userIdString);
+            var bId = Guid.Parse(bookingId);
+
+            var booking = await _appDb.Bookings.FindAsync(bId);
+            if (booking == null) return;
+
+            // Enforce chat rules
+            if (booking.Status != "Approved" && booking.Status != "Started") return;
+
+            var message = new ChatMessage
+            {
+                BookingId = bId,
+                SenderId = userId,
+                Content = content,
+                SentAt = DateTime.UtcNow
+            };
+
+            _appDb.ChatMessages.Add(message);
+            await _appDb.SaveChangesAsync();
+
+            var sender = await _appDb.Users.FindAsync(userId);
+
+            await Clients.Group($"Chat_{bookingId}").SendAsync("ReceiveMessage", new {
+                message.Id,
+                message.SenderId,
+                SenderName = sender?.FullName ?? "Unknown",
+                message.Content,
+                message.SentAt
+            });
         }
 
         // Legacy methods for initial setup

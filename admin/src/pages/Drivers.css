@@ -35,6 +35,10 @@
   border-bottom: 1px solid #eee;
 }
 
+.data-table td {
+  color: #333;
+}
+
 .data-table th {
   background-color: #f8f9fa;
   font-weight: 600;

@@ -1,14 +1,15 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/axios';
+import { PushNotificationService } from '../services/PushNotificationService';
 
 // Define the shape of our User
 export interface User {
   id: string;
-  name: string;
+  fullName: string;
   email: string;
-  phone: string;
-  userType: string;
+  phoneNumber: string;
+  role: string;
 }
 
 interface AuthContextData {
@@ -34,6 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (token && userDataString) {
           setUser(JSON.parse(userDataString));
           // Note: In a real app, you might want to validate the token with the backend here
+          PushNotificationService.registerTokenWithBackend();
         }
       } catch (error) {
         console.error('Failed to load auth data:', error);
@@ -50,6 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await AsyncStorage.setItem('userToken', token);
       await AsyncStorage.setItem('userData', JSON.stringify(userData));
       setUser(userData);
+      PushNotificationService.registerTokenWithBackend();
     } catch (error) {
       console.error('Failed to save auth data:', error);
     }

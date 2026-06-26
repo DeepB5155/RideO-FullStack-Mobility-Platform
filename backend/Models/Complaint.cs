@@ -20,6 +20,11 @@ namespace RideO.API.Models
         [ForeignKey("BookingId")]
         public Booking? Booking { get; set; }
 
+        public Guid? ReportedUserId { get; set; }
+
+        [ForeignKey("ReportedUserId")]
+        public User? ReportedUser { get; set; }
+
         [Required]
         [MaxLength(100)]
         public string Subject { get; set; } = string.Empty;
@@ -35,5 +40,8 @@ namespace RideO.API.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime? ResolvedAt { get; set; }
+
+        [MaxLength(1000)]
+        public string? AdminNotes { get; set; }
     }
 }

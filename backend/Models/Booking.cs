@@ -44,10 +44,15 @@ namespace RideO.API.Models
         [Column(TypeName = "decimal(18,2)")]
         public decimal TotalFare { get; set; }
 
+        [MaxLength(20)]
+        public string PaymentMethod { get; set; } = "Cash";
+
         [Required]
         [MaxLength(20)]
         public string Status { get; set; } = "Pending"; // Pending, Approved, Rejected, Cancelled, Started, Completed, No-show
 
         public DateTime BookedAt { get; set; } = DateTime.UtcNow;
+
+        public Guid? TrackingId { get; set; }
     }
 }

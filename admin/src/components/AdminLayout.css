@@ -167,7 +167,7 @@ body {
 
 .content-area {
     flex-grow: 1;
-    overflow-y: auto;
+    overflow-y: scroll;
     padding: 32px;
 }
 

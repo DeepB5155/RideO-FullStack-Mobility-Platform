@@ -5,11 +5,12 @@ using RideO.API.Data;
 using RideO.API.Models;
 using System.Linq;
 using System.Threading.Tasks;
-
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
 
 namespace RideO.API.Controllers
 {
+    using RideO.API.Services;
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = "Admin")]
@@ -17,11 +18,15 @@ namespace RideO.API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly MongoDbContext _mongoContext;
+        private readonly Microsoft.AspNetCore.SignalR.IHubContext<RideO.API.Hubs.RideHub> _hubContext;
+        private readonly FcmService _fcmService;
 
-        public AdminController(AppDbContext context, MongoDbContext mongoContext)
+        public AdminController(AppDbContext context, MongoDbContext mongoContext, Microsoft.AspNetCore.SignalR.IHubContext<RideO.API.Hubs.RideHub> hubContext, FcmService fcmService)
         {
             _context = context;
             _mongoContext = mongoContext;
+            _hubContext = hubContext;
+            _fcmService = fcmService;
         }
 
         [HttpGet("dashboard")]
@@ -48,8 +53,10 @@ namespace RideO.API.Controllers
             var cancelledBookings = await _context.Bookings.CountAsync(b => b.Status == "Cancelled");
 
             // 10. Revenue
+            var revenue = await _context.Payments
+                .Where(p => p.Status == "Completed")
+                .SumAsync(p => p.AdminCommission);
             var totalBookings = await _context.Bookings.CountAsync();
-            var revenue = await _context.Payments.SumAsync(p => p.Amount) + (totalBookings * 15.5m);
 
             // 11. Complaints (if table exists)
             // Note: Since Complaints table exists in AppDbContext, we query it.
@@ -60,7 +67,7 @@ namespace RideO.API.Controllers
                 .Include(r => r.Driver).ThenInclude(d => d.User)
                 .OrderByDescending(r => r.StartTime)
                 .Take(5)
-                .Select(r => new { r.Id, r.StartLocation, r.EndLocation, r.Status, r.StartTime, DriverName = r.Driver.User.FullName })
+                .Select(r => new { r.Id, r.StartLocation, r.EndLocation, r.Status, r.StartTime, DriverName = r.Driver!.User!.FullName })
                 .ToListAsync();
 
             // 13. Recent Bookings
@@ -68,16 +75,16 @@ namespace RideO.API.Controllers
                 .Include(b => b.User)
                 .OrderByDescending(b => b.BookedAt)
                 .Take(5)
-                .Select(b => new { b.Id, b.Status, b.SeatsBooked, UserName = b.User.FullName, b.BookedAt })
+                .Select(b => new { b.Id, b.Status, b.SeatsBooked, UserName = b.User!.FullName, b.BookedAt })
                 .ToListAsync();
 
             // 14. Recent KYC
             var recentKyc = await _context.Drivers
                 .Include(d => d.User)
                 .Where(d => !d.IsVerified && _context.DriverDocuments.Any(doc => doc.DriverId == d.Id && doc.Status == "Pending"))
-                .OrderByDescending(d => d.User.CreatedAt)
+                .OrderByDescending(d => d.User!.CreatedAt)
                 .Take(5)
-                .Select(d => new { d.Id, UserName = d.User.FullName, d.LicenseNumber })
+                .Select(d => new { d.Id, UserName = d.User!.FullName, d.LicenseNumber })
                 .ToListAsync();
 
             return Ok(new
@@ -136,7 +143,7 @@ namespace RideO.API.Controllers
                 .Where(b => b.UserId == id)
                 .OrderByDescending(b => b.BookedAt)
                 .Take(10)
-                .Select(b => new { b.Id, b.Status, b.SeatsBooked, DriverName = b.Route.Driver.User.FullName, b.Route.StartTime })
+                .Select(b => new { b.Id, b.Status, b.SeatsBooked, DriverName = b.Route!.Driver!.User!.FullName, b.Route.StartTime })
                 .ToListAsync();
 
             var complaints = await _context.Complaints
@@ -191,15 +198,114 @@ namespace RideO.API.Controllers
             return Ok(new { message = driver.IsSuspended ? "Driver suspended successfully" : "Driver unsuspended successfully", isSuspended = driver.IsSuspended });
         }
 
-        [HttpGet("rides")]
-        public async Task<IActionResult> GetRides()
+        [HttpGet("routes")]
+        public async Task<IActionResult> GetRoutes([FromQuery] string? search, [FromQuery] string? status)
         {
+            var query = _context.Routes.Include(r => r.Driver).ThenInclude(d => d.User).AsQueryable();
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                var lowerSearch = search.ToLower();
+                query = query.Where(r => r.StartLocation.ToLower().Contains(lowerSearch) || r.EndLocation.ToLower().Contains(lowerSearch) || r.Driver.User.FullName.ToLower().Contains(lowerSearch));
+            }
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                var formattedStatus = char.ToUpper(status[0]) + status.Substring(1).ToLower();
+                query = query.Where(r => r.Status == formattedStatus);
+            }
+
+            var routes = await query.OrderByDescending(r => r.StartTime).ToListAsync();
+            return Ok(routes);
+        }
+
+        [HttpGet("routes/{id}")]
+        public async Task<IActionResult> GetRouteDetails(Guid id)
+        {
+            var route = await _context.Routes
+                .Include(r => r.Stops)
+                .Include(r => r.Driver).ThenInclude(d => d.User)
+                .Include(r => r.Vehicle)
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            if (route == null) return NotFound();
+
             var bookings = await _context.Bookings
                 .Include(b => b.User)
-                .Include(b => b.Route)
+                .Where(b => b.RouteId == id)
                 .OrderByDescending(b => b.BookedAt)
                 .ToListAsync();
+
+            return Ok(new { route, bookings });
+        }
+
+        [HttpPost("routes/{id}/cancel")]
+        public async Task<IActionResult> CancelRoute(Guid id)
+        {
+            var route = await _context.Routes.FindAsync(id);
+            if (route == null) return NotFound();
+
+            if (route.Status == "Completed" || route.Status == "Cancelled")
+            {
+                return BadRequest(new { message = $"Cannot cancel a route that is already {route.Status}" });
+            }
+
+            // 1. Mark route as cancelled
+            route.Status = "Cancelled";
+
+            // 2. Cascade cancel all active/pending bookings
+            var activeBookings = await _context.Bookings
+                .Where(b => b.RouteId == id && (b.Status == "Pending" || b.Status == "Approved"))
+                .ToListAsync();
+
+            foreach (var booking in activeBookings)
+            {
+                booking.Status = "Cancelled";
+                
+                // Refund payment logic would go here if implemented fully
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Route and associated bookings have been cancelled successfully." });
+        }
+
+        [HttpGet("bookings")]
+        public async Task<IActionResult> GetBookings([FromQuery] string? search, [FromQuery] string? status)
+        {
+            var query = _context.Bookings
+                .Include(b => b.User)
+                .Include(b => b.Route)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                var lowerSearch = search.ToLower();
+                query = query.Where(b => b.User.FullName.ToLower().Contains(lowerSearch) || b.Route.StartLocation.ToLower().Contains(lowerSearch) || b.Route.EndLocation.ToLower().Contains(lowerSearch));
+            }
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                var formattedStatus = char.ToUpper(status[0]) + status.Substring(1).ToLower();
+                query = query.Where(b => b.Status == formattedStatus);
+            }
+
+            var bookings = await query.OrderByDescending(b => b.BookedAt).ToListAsync();
             return Ok(bookings);
+        }
+
+        [HttpGet("bookings/{id}")]
+        public async Task<IActionResult> GetBookingDetails(Guid id)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.User)
+                .Include(b => b.Route).ThenInclude(r => r.Driver).ThenInclude(d => d.User)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (booking == null) return NotFound();
+
+            var payment = await _context.Payments.FirstOrDefaultAsync(p => p.BookingId == id);
+
+            return Ok(new { booking, payment });
         }
 
         [HttpGet("live-locations")]
@@ -271,7 +377,7 @@ namespace RideO.API.Controllers
         [HttpPost("kyc/{driverId}/approve")]
         public async Task<IActionResult> ApproveKYC(Guid driverId)
         {
-            var driver = await _context.Drivers.FindAsync(driverId);
+            var driver = await _context.Drivers.Include(d => d.User).FirstOrDefaultAsync(d => d.Id == driverId);
             if (driver == null) return NotFound();
 
             driver.IsVerified = true;
@@ -284,13 +390,22 @@ namespace RideO.API.Controllers
             }
 
             await _context.SaveChangesAsync();
+            
+            // Realtime Update via SignalR
+            await _hubContext.Clients.User(driver.UserId.ToString()).SendAsync("KYCStatusUpdated", "Approved");
+            
+            if (!string.IsNullOrEmpty(driver.User?.FcmDeviceToken))
+            {
+                await _fcmService.SendNotificationAsync(driver.User.FcmDeviceToken, "KYC Approved", "Your KYC documents have been approved. You are now a verified driver.");
+            }
+
             return Ok(new { message = "Driver KYC approved successfully" });
         }
 
         [HttpPost("kyc/{driverId}/reject")]
         public async Task<IActionResult> RejectKYC(Guid driverId, [FromBody] string reason)
         {
-            var driver = await _context.Drivers.FindAsync(driverId);
+            var driver = await _context.Drivers.Include(d => d.User).FirstOrDefaultAsync(d => d.Id == driverId);
             if (driver == null) return NotFound();
 
             driver.IsVerified = false;
@@ -303,7 +418,119 @@ namespace RideO.API.Controllers
             }
 
             await _context.SaveChangesAsync();
+            
+            // Realtime Update via SignalR
+            await _hubContext.Clients.User(driver.UserId.ToString()).SendAsync("KYCStatusUpdated", "Rejected");
+            
+            if (!string.IsNullOrEmpty(driver.User?.FcmDeviceToken))
+            {
+                await _fcmService.SendNotificationAsync(driver.User.FcmDeviceToken, "KYC Rejected", "Your KYC documents have been rejected. Please re-upload valid documents.");
+            }
+
             return Ok(new { message = "Driver KYC rejected" });
+        }
+
+        [HttpGet("complaints")]
+        public async Task<IActionResult> GetComplaints([FromQuery] string? status)
+        {
+            var query = _context.Complaints
+                .Include(c => c.User)
+                .Include(c => c.ReportedUser)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                var formattedStatus = char.ToUpper(status[0]) + status.Substring(1).ToLower();
+                query = query.Where(c => c.Status == formattedStatus);
+            }
+
+            var complaints = await query.OrderByDescending(c => c.CreatedAt)
+                .Select(c => new {
+                    c.Id,
+                    c.Subject,
+                    c.Status,
+                    c.CreatedAt,
+                    ReporterName = c.User != null ? c.User.FullName : "Unknown",
+                    ReportedName = c.ReportedUser != null ? c.ReportedUser.FullName : "Unknown",
+                    c.ReportedUserId,
+                    c.UserId
+                })
+                .ToListAsync();
+
+            return Ok(complaints);
+        }
+
+        [HttpGet("complaints/{id}")]
+        public async Task<IActionResult> GetComplaintDetails(Guid id)
+        {
+            var complaint = await _context.Complaints
+                .Include(c => c.User)
+                .Include(c => c.ReportedUser)
+                .Include(c => c.Booking).ThenInclude(b => b!.Route)
+                .FirstOrDefaultAsync(c => c.Id == id);
+
+            if (complaint == null) return NotFound();
+
+            return Ok(new {
+                complaint,
+                Reporter = new { complaint.User?.FullName, complaint.User?.Email, complaint.User?.PhoneNumber, complaint.User?.Role, complaint.User?.IsBlocked },
+                Reported = new { complaint.ReportedUser?.FullName, complaint.ReportedUser?.Email, complaint.ReportedUser?.PhoneNumber, complaint.ReportedUser?.Role, complaint.ReportedUser?.IsBlocked }
+            });
+        }
+
+        public class UpdateComplaintStatusDto
+        {
+            public string Status { get; set; } = string.Empty;
+            public string? AdminNotes { get; set; }
+        }
+
+        [HttpPut("complaints/{id}/status")]
+        public async Task<IActionResult> UpdateComplaintStatus(Guid id, [FromBody] UpdateComplaintStatusDto dto)
+        {
+            var complaint = await _context.Complaints.FindAsync(id);
+            if (complaint == null) return NotFound("Complaint not found.");
+
+            var validStatuses = new[] { "Open", "In Review", "Resolved", "Rejected" };
+            if (!validStatuses.Contains(dto.Status)) return BadRequest("Invalid status.");
+
+            complaint.Status = dto.Status;
+            
+            if (!string.IsNullOrEmpty(dto.AdminNotes))
+                complaint.AdminNotes = dto.AdminNotes;
+
+            if (dto.Status == "Resolved" || dto.Status == "Rejected")
+            {
+                complaint.ResolvedAt = System.DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Complaint status updated successfully.", complaint });
+        }
+
+        [HttpGet("chat/{bookingId}")]
+        public async Task<IActionResult> GetAdminChatHistory(Guid bookingId)
+        {
+            var booking = await _context.Bookings.FindAsync(bookingId);
+            if (booking == null) return NotFound("Booking not found");
+
+            var messages = await _context.ChatMessages
+                .Include(m => m.Sender)
+                .Where(m => m.BookingId == bookingId)
+                .OrderBy(m => m.SentAt)
+                .Select(m => new {
+                    m.Id,
+                    m.SenderId,
+                    SenderName = m.Sender!.FullName,
+                    SenderRole = m.Sender.Role,
+                    m.Content,
+                    m.SentAt
+                })
+                .ToListAsync();
+
+            return Ok(new { 
+                bookingStatus = booking.Status, 
+                messages 
+            });
         }
     }
 }

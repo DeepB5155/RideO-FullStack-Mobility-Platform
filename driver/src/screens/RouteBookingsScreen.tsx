@@ -86,6 +86,18 @@ const RouteBookingsScreen = ({ route, navigation }: any) => {
           </TouchableOpacity>
         </View>
       )}
+
+      {(item.status === 'Approved' || item.status === 'Started') && (
+        <TouchableOpacity 
+          style={[styles.btn, {backgroundColor: '#4F46E5', marginTop: 10}]} 
+          onPress={() => navigation.navigate('Chat', { 
+            bookingId: item.id,
+            targetName: item.userName
+          })}
+        >
+          <Text style={styles.btnText}>Chat with Passenger</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 

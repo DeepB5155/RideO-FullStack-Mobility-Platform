@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Mapbox from '@rnmapbox/maps';
+import { MAPBOX_ACCESS_TOKEN, SIGNALR_HUB_URL } from '@env';
 import * as signalR from '@microsoft/signalr';
 import { AuthContext } from '../context/AuthContext';
-import api, { API_BASE_URL } from '../api/axios';
+import { API_BASE_URL } from '../api/axios';
+import { theme } from '../theme/theme';
 
 // Split token to bypass GitHub secret scan
-const MAPBOX_TOKEN = 'pk.eyJ1IjoiZGVlcC01MTU1Iiwi' + 'YSI6ImNtb2xicG42bzBhcWcyb3BoNW81Ynh4YWgifQ.FvuveCsGrnRfM0VJdGGUXw';
+const MAPBOX_TOKEN = MAPBOX_ACCESS_TOKEN;
 Mapbox.setAccessToken(MAPBOX_TOKEN);
 
 const HomeScreen = ({ navigation }: any) => {
@@ -29,23 +32,24 @@ const HomeScreen = ({ navigation }: any) => {
   useEffect(() => {
     // Setup SignalR connection
     const setupSignalR = async () => {
-      const hubConnection = new signalR.HubConnectionBuilder()
-        .withUrl(`${API_BASE_URL.replace('/api', '')}/ridehub`, {
-          skipNegotiation: true,
+      const token = await AsyncStorage.getItem('userToken');
+      const newConnection = new signalR.HubConnectionBuilder()
+        .withUrl(SIGNALR_HUB_URL || 'http://192.168.1.182:5248/ridehub', {
+          accessTokenFactory: () => token || '',
           transport: signalR.HttpTransportType.WebSockets
         })
         .withAutomaticReconnect()
         .build();
 
-      hubConnection.on("RideAccepted", (rideDetails) => {
+      newConnection.on("RideAccepted", (rideDetails: any) => {
         setRideStatus('accepted');
         setDriverInfo(rideDetails);
         fetchRoute(rideDetails.pickupLongitude, rideDetails.pickupLatitude, rideDetails.driverLongitude, rideDetails.driverLatitude);
       });
 
       try {
-        await hubConnection.start();
-        setConnection(hubConnection);
+        await newConnection.start();
+        setConnection(newConnection);
       } catch (err) {
         console.error("SignalR Connection Error: ", err);
       }
@@ -142,6 +146,29 @@ const HomeScreen = ({ navigation }: any) => {
         </View>
       )}
 
+      {/* Top Menu Bar */}
+      <View style={styles.topMenuContainer}>
+        <TouchableOpacity style={styles.menuIcon} onPress={() => navigation.navigate('My Rides')}>
+          <Text style={styles.menuText}>🚗 Rides</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.menuIcon} onPress={() => navigation.navigate('Wallet')}>
+          <Text style={styles.menuText}>💳 Wallet</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.menuIcon} onPress={() => navigation.navigate('Emergency Contacts')}>
+          <Text style={styles.menuText}>🛡️ Safety</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.menuIcon} onPress={() => navigation.navigate('Support')}>
+          <Text style={styles.menuText}>💬 Help</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Refer & Earn Banner */}
+      {rideStatus === 'idle' && (
+        <TouchableOpacity style={styles.promoBanner} onPress={() => navigation.navigate('Wallet')}>
+          <Text style={styles.promoText}>💸 Earn ₹50 for every friend you refer!</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Geocoding Search Box */}
       {rideStatus === 'idle' && (
         <View style={styles.searchContainer}>
@@ -200,6 +227,7 @@ const HomeScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.colors.background,
   },
   map: {
     flex: 1,
@@ -216,103 +244,138 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#000',
+    backgroundColor: theme.colors.primary,
     borderWidth: 3,
     borderColor: '#fff',
+    ...theme.shadows.small,
   },
   pinLine: {
     width: 3,
     height: 20,
-    backgroundColor: '#000',
+    backgroundColor: theme.colors.primary,
+  },
+  topMenuContainer: {
+    position: 'absolute',
+    top: 50,
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 10,
+  },
+  menuIcon: {
+    backgroundColor: theme.colors.surface,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
+    ...theme.shadows.medium,
+  },
+  menuText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.text.main,
+  },
+  promoBanner: {
+    position: 'absolute',
+    top: 105,
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
+    backgroundColor: '#E8F5E9',
+    padding: theme.spacing.sm,
+    borderRadius: theme.radius.full,
+    alignItems: 'center',
+    zIndex: 10,
+    ...theme.shadows.small,
+  },
+  promoText: {
+    color: theme.colors.success,
+    fontWeight: '700',
+    fontSize: 14,
   },
   searchContainer: {
     position: 'absolute',
-    top: 50,
-    left: 20,
-    right: 20,
+    top: 145,
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
     zIndex: 10,
   },
   searchInput: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 15,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
     fontSize: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-    color: '#000',
+    color: theme.colors.text.main,
+    ...theme.shadows.medium,
   },
   resultsContainer: {
-    backgroundColor: '#fff',
-    marginTop: 5,
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
+    backgroundColor: theme.colors.surface,
+    marginTop: theme.spacing.sm,
+    borderRadius: theme.radius.md,
     overflow: 'hidden',
+    ...theme.shadows.medium,
   },
   resultItem: {
-    padding: 15,
+    padding: theme.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: theme.colors.border,
   },
   resultText: {
     fontSize: 14,
-    color: '#333',
+    color: theme.colors.text.main,
   },
   bottomSheet: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
-    padding: 25,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 20,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.xl,
+    paddingTop: theme.spacing.lg,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    ...theme.shadows.large,
   },
   sheetTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 5,
+    fontSize: 24,
+    fontWeight: '800',
+    color: theme.colors.text.main,
+    marginBottom: theme.spacing.xs,
   },
   sheetSubtitle: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
+    color: theme.colors.text.muted,
+    marginBottom: theme.spacing.lg,
   },
   requestButton: {
-    backgroundColor: '#000',
-    padding: 18,
-    borderRadius: 15,
+    backgroundColor: theme.colors.primary,
+    padding: theme.spacing.lg,
+    borderRadius: theme.radius.full,
     alignItems: 'center',
+    ...theme.shadows.medium,
   },
   requestButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: theme.colors.text.light,
+    fontSize: 16,
+    fontWeight: '700',
   },
   loadingContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: theme.spacing.lg,
   },
   driverBadge: {
-    backgroundColor: '#eee',
-    padding: 10,
-    borderRadius: 10,
+    backgroundColor: theme.colors.background,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
     alignSelf: 'flex-start',
-    marginTop: 10,
+    marginTop: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   driverBadgeText: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#000',
+    fontWeight: '700',
+    color: theme.colors.primary,
   }
 });
 

@@ -11,16 +11,20 @@ using System.Threading.Tasks;
 
 namespace RideO.API.Controllers
 {
+    using RideO.API.Services;
+
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = "Driver")]
     public class RouteController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly FcmService _fcmService;
 
-        public RouteController(AppDbContext context)
+        public RouteController(AppDbContext context, FcmService fcmService)
         {
             _context = context;
+            _fcmService = fcmService;
         }
 
         public class CreateRouteRequest
@@ -36,10 +40,16 @@ namespace RideO.API.Controllers
             public DateTime EstimatedEndTime { get; set; }
             public int AvailableSeats { get; set; }
             public decimal PricePerSeat { get; set; }
+            public string PricingMode { get; set; } = "Fixed"; // "Fixed" or "PerKm"
+            public decimal PricePerKm { get; set; } = 0.0m;
             public Guid VehicleId { get; set; }
             public bool IsLuggageAllowed { get; set; }
             public bool AutoApprove { get; set; }
             public string? RideNotes { get; set; }
+
+            public bool IsRecurring { get; set; }
+            public string? RecurringDays { get; set; }
+            public TimeSpan? RecurringTime { get; set; }
 
             public List<RouteStopDto> Stops { get; set; } = new();
         }
@@ -98,10 +108,15 @@ namespace RideO.API.Controllers
             route.EstimatedEndTime = request.EstimatedEndTime;
             route.AvailableSeats = request.AvailableSeats;
             route.PricePerSeat = request.PricePerSeat;
+            route.PricingMode = request.PricingMode;
+            route.PricePerKm = request.PricePerKm;
             route.VehicleId = request.VehicleId;
             route.IsLuggageAllowed = request.IsLuggageAllowed;
             route.AutoApprove = request.AutoApprove;
             route.RideNotes = request.RideNotes;
+            route.IsRecurring = request.IsRecurring;
+            route.RecurringDays = request.RecurringDays;
+            route.RecurringTime = request.RecurringTime;
             route.Status = "Draft";
 
             foreach (var stop in request.Stops)
@@ -136,7 +151,8 @@ namespace RideO.API.Controllers
 
             // Basic Validation
             if (request.StartTime <= DateTime.UtcNow) return BadRequest("StartTime must be in the future.");
-            if (request.PricePerSeat <= 0) return BadRequest("Price per seat must be greater than 0.");
+            if (request.PricingMode == "Fixed" && request.PricePerSeat <= 0) return BadRequest("Price per seat must be greater than 0 for fixed pricing.");
+            if (request.PricingMode == "PerKm" && request.PricePerKm <= 0) return BadRequest("Price per km must be greater than 0 for per-km pricing.");
 
             var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == request.VehicleId && v.DriverId == driver.Id);
             if (vehicle == null) return BadRequest("Invalid vehicle selected.");
@@ -167,10 +183,15 @@ namespace RideO.API.Controllers
             route.EstimatedEndTime = request.EstimatedEndTime;
             route.AvailableSeats = request.AvailableSeats;
             route.PricePerSeat = request.PricePerSeat;
+            route.PricingMode = request.PricingMode;
+            route.PricePerKm = request.PricePerKm;
             route.VehicleId = request.VehicleId;
             route.IsLuggageAllowed = request.IsLuggageAllowed;
             route.AutoApprove = request.AutoApprove;
             route.RideNotes = request.RideNotes;
+            route.IsRecurring = request.IsRecurring;
+            route.RecurringDays = request.RecurringDays;
+            route.RecurringTime = request.RecurringTime;
             route.Status = "Published";
 
             foreach (var stop in request.Stops)
@@ -206,10 +227,106 @@ namespace RideO.API.Controllers
             if (route.Status == "Completed" || route.Status == "Cancelled")
                 return BadRequest($"Cannot change status of a {route.Status} route.");
 
+            if (newStatus == "Completed")
+            {
+                var bookings = await _context.Bookings
+                    .Where(b => b.RouteId == id && (b.Status == "Approved" || b.Status == "Started" || b.Status == "Completed"))
+                    .ToListAsync();
+                    
+                foreach (var booking in bookings)
+                {
+                    booking.Status = "Completed";
+                    var payment = await _context.Payments.FirstOrDefaultAsync(p => p.BookingId == booking.Id);
+                    if (payment != null)
+                    {
+                        decimal commissionRate = 0.10m; // 10% MVP
+                        decimal adminCommission = payment.Amount * commissionRate;
+                        decimal driverEarning = payment.Amount - adminCommission;
+
+                        payment.AdminCommission = adminCommission;
+                        payment.DriverEarning = driverEarning;
+                        payment.Status = "Completed";
+
+                        if (booking.PaymentMethod == "Cash") {
+                            driver.Balance -= adminCommission; // Driver collected cash, owes admin
+                        } else if (booking.PaymentMethod == "UPI" || booking.PaymentMethod == "Wallet") {
+                            driver.Balance += driverEarning; // Admin collected money, owes driver
+                            
+                            // Also update the new Wallet model
+                            var driverWallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == driver.UserId);
+                            if (driverWallet == null)
+                            {
+                                driverWallet = new Wallet { UserId = driver.UserId, Balance = 0.0m };
+                                _context.Wallets.Add(driverWallet);
+                                await _context.SaveChangesAsync();
+                            }
+                            driverWallet.Balance += driverEarning;
+                            driverWallet.UpdatedAt = DateTime.UtcNow;
+
+                            var walletTx = new WalletTransaction
+                            {
+                                WalletId = driverWallet.Id,
+                                Amount = driverEarning,
+                                Type = "Earning",
+                                Description = $"Earnings for ride completed on route {route.Id}",
+                                ReferenceId = booking.Id.ToString()
+                            };
+                            _context.WalletTransactions.Add(walletTx);
+                        }
+                    }
+                }
+            }
+
             route.Status = newStatus;
+
+            // Notify all approved passengers
+            if (newStatus == "Started" || newStatus == "Cancelled")
+            {
+                var activeBookings = await _context.Bookings
+                    .Where(b => b.RouteId == id && (b.Status == "Approved" || b.Status == "Started"))
+                    .ToListAsync();
+                    
+                foreach (var booking in activeBookings)
+                {
+                    if (newStatus == "Cancelled") booking.Status = "Cancelled";
+                    
+                    var notification = new Notification
+                    {
+                        UserId = booking.UserId,
+                        Title = $"Ride {newStatus}",
+                        Message = $"The ride you booked has been {newStatus.ToLower()} by the driver."
+                    };
+                    _context.Notifications.Add(notification);
+
+                    var passengerUser = await _context.Users.FindAsync(booking.UserId);
+                    if (passengerUser?.FcmDeviceToken != null)
+                    {
+                        await _fcmService.SendNotificationAsync(passengerUser.FcmDeviceToken, notification.Title, notification.Message);
+                    }
+                }
+            }
+
             await _context.SaveChangesAsync();
 
             return Ok(new { message = $"Route status updated to {newStatus}" });
+        }
+
+        [HttpPut("{id}/stop-recurring")]
+        [Authorize(Roles = "Driver")]
+        public async Task<IActionResult> StopRecurring(Guid id)
+        {
+            var driver = await GetCurrentDriver();
+            if (driver == null) return Unauthorized();
+
+            var route = await _context.Routes.FirstOrDefaultAsync(r => r.Id == id && r.DriverId == driver.Id);
+            if (route == null) return NotFound("Route not found");
+
+            if (!route.IsRecurring) return BadRequest("This route is not a recurring template.");
+
+            route.IsRecurring = false;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Auto-renew stopped for this route." });
         }
 
         [HttpGet("my-routes")]
@@ -269,6 +386,14 @@ namespace RideO.API.Controllers
             var matchedRoutes = new List<object>();
             var radiusKm = 5.0; // Max distance to walk/travel to pickup point
 
+            // Fetch Top 10 Pro Drivers for badges
+            var topDriverIds = await _context.Drivers
+                .Where(d => d.IsVerified && d.Rating > 0)
+                .OrderByDescending(d => d.Rating)
+                .Take(10)
+                .Select(d => d.Id)
+                .ToListAsync();
+
             foreach (var route in availableRoutes)
             {
                 // Create an ordered list of all waypoints (Start -> Stops -> End)
@@ -295,6 +420,13 @@ namespace RideO.API.Controllers
 
                 var bestDropoff = possibleDropoffs.OrderBy(p => CalculateDistance(dropLat, dropLng, p.Lat, p.Lng)).First();
 
+                decimal calculatedPrice = route.PricePerSeat;
+                if (route.PricingMode == "PerKm")
+                {
+                    var distance = CalculateDistance(bestPickup.Lat, bestPickup.Lng, bestDropoff.Lat, bestDropoff.Lng);
+                    calculatedPrice = (decimal)distance * route.PricePerKm;
+                }
+
                 matchedRoutes.Add(new
                 {
                     routeId = route.Id,
@@ -304,8 +436,11 @@ namespace RideO.API.Controllers
                     matchedDropoff = bestDropoff.Name,
                     startTime = route.StartTime,
                     availableSeats = route.AvailableSeats,
-                    pricePerSeat = route.PricePerSeat,
-                    autoApprove = route.AutoApprove
+                    pricePerSeat = calculatedPrice,
+                    pricingMode = route.PricingMode,
+                    autoApprove = route.AutoApprove,
+                    isRecurring = route.IsRecurring,
+                    isProDriver = topDriverIds.Contains(route.DriverId)
                 });
             }
 

@@ -38,6 +38,11 @@ namespace RideO.API.Migrations
                     b.Property<Guid?>("DropoffStopId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("PickupLocationName")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
@@ -59,6 +64,9 @@ namespace RideO.API.Migrations
                     b.Property<decimal>("TotalFare")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<Guid?>("TrackingId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
@@ -75,11 +83,44 @@ namespace RideO.API.Migrations
                     b.ToTable("Bookings");
                 });
 
+            modelBuilder.Entity("RideO.API.Models.ChatMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId");
+
+                    b.HasIndex("SenderId");
+
+                    b.ToTable("ChatMessages");
+                });
+
             modelBuilder.Entity("RideO.API.Models.Complaint", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("AdminNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<Guid?>("BookingId")
                         .HasColumnType("uuid");
@@ -91,6 +132,9 @@ namespace RideO.API.Migrations
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid?>("ReportedUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone");
@@ -111,6 +155,8 @@ namespace RideO.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BookingId");
+
+                    b.HasIndex("ReportedUserId");
 
                     b.HasIndex("UserId");
 
@@ -197,6 +243,36 @@ namespace RideO.API.Migrations
                     b.ToTable("DriverDocuments");
                 });
 
+            modelBuilder.Entity("RideO.API.Models.EmergencyContact", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Relationship")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("EmergencyContacts");
+                });
+
             modelBuilder.Entity("RideO.API.Models.Notification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -235,11 +311,17 @@ namespace RideO.API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("AdminCommission")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<Guid>("BookingId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal>("DriverEarning")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Method")
                         .HasMaxLength(50)
@@ -252,6 +334,10 @@ namespace RideO.API.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<string>("TransactionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
@@ -272,6 +358,10 @@ namespace RideO.API.Migrations
                     b.Property<string>("Comment")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Compliment")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -294,6 +384,39 @@ namespace RideO.API.Migrations
                     b.HasIndex("ReviewerId");
 
                     b.ToTable("Ratings");
+                });
+
+            modelBuilder.Entity("RideO.API.Models.RecurringBooking", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("OriginalRouteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SeatsBooked")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("SubscribedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("TotalFarePerRide")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OriginalRouteId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RecurringBookings");
                 });
 
             modelBuilder.Entity("RideO.API.Models.Route", b =>
@@ -329,8 +452,26 @@ namespace RideO.API.Migrations
                     b.Property<bool>("IsLuggageAllowed")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsRecurring")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("PricePerKm")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<decimal>("PricePerSeat")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("PricingMode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("RecurringDays")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<TimeSpan?>("RecurringTime")
+                        .HasColumnType("interval");
 
                     b.Property<string>("RideNotes")
                         .HasMaxLength(500)
@@ -443,6 +584,10 @@ namespace RideO.API.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
+                    b.Property<string>("FcmDeviceToken")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -466,6 +611,13 @@ namespace RideO.API.Migrations
                     b.Property<string>("ProfilePicture")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ReferralCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("ReferredByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ResetToken")
                         .HasMaxLength(255)
@@ -531,6 +683,63 @@ namespace RideO.API.Migrations
                     b.ToTable("Vehicles");
                 });
 
+            modelBuilder.Entity("RideO.API.Models.Wallet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Balance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Wallets");
+                });
+
+            modelBuilder.Entity("RideO.API.Models.WalletTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("ReferenceId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("WalletId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WalletId");
+
+                    b.ToTable("WalletTransactions");
+                });
+
             modelBuilder.Entity("RideO.API.Models.Booking", b =>
                 {
                     b.HasOne("RideO.API.Models.RouteStop", "DropoffStop")
@@ -564,12 +773,35 @@ namespace RideO.API.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("RideO.API.Models.ChatMessage", b =>
+                {
+                    b.HasOne("RideO.API.Models.Booking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("RideO.API.Models.User", "Sender")
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("Sender");
+                });
+
             modelBuilder.Entity("RideO.API.Models.Complaint", b =>
                 {
                     b.HasOne("RideO.API.Models.Booking", "Booking")
                         .WithMany()
                         .HasForeignKey("BookingId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("RideO.API.Models.User", "ReportedUser")
+                        .WithMany()
+                        .HasForeignKey("ReportedUserId");
 
                     b.HasOne("RideO.API.Models.User", "User")
                         .WithMany()
@@ -578,6 +810,8 @@ namespace RideO.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Booking");
+
+                    b.Navigation("ReportedUser");
 
                     b.Navigation("User");
                 });
@@ -602,6 +836,17 @@ namespace RideO.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Driver");
+                });
+
+            modelBuilder.Entity("RideO.API.Models.EmergencyContact", b =>
+                {
+                    b.HasOne("RideO.API.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("RideO.API.Models.Notification", b =>
@@ -653,6 +898,25 @@ namespace RideO.API.Migrations
                     b.Navigation("Reviewer");
                 });
 
+            modelBuilder.Entity("RideO.API.Models.RecurringBooking", b =>
+                {
+                    b.HasOne("RideO.API.Models.Route", "OriginalRoute")
+                        .WithMany()
+                        .HasForeignKey("OriginalRouteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("RideO.API.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OriginalRoute");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("RideO.API.Models.Route", b =>
                 {
                     b.HasOne("RideO.API.Models.Driver", "Driver")
@@ -690,6 +954,28 @@ namespace RideO.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Driver");
+                });
+
+            modelBuilder.Entity("RideO.API.Models.Wallet", b =>
+                {
+                    b.HasOne("RideO.API.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("RideO.API.Models.WalletTransaction", b =>
+                {
+                    b.HasOne("RideO.API.Models.Wallet", "Wallet")
+                        .WithMany()
+                        .HasForeignKey("WalletId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Wallet");
                 });
 
             modelBuilder.Entity("RideO.API.Models.Route", b =>

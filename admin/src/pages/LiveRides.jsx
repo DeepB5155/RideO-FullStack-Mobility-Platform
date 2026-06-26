@@ -14,7 +14,7 @@ const LiveRides = () => {
         const token = localStorage.getItem('adminToken');
         
         hubConnection = new signalR.HubConnectionBuilder()
-          .withUrl('http://localhost:5248/ridehub', {
+          .withUrl(import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5248/ridehub', {
             accessTokenFactory: () => token || ''
           })
           .withAutomaticReconnect()

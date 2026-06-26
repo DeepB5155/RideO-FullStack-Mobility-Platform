@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { CheckCircle, XCircle, FileSearch } from 'lucide-react';
-import './Drivers.css'; // Reuse table styles
+import '../styles/Pages.css';
 
 const KYCManagement = () => {
   const [pendingDrivers, setPendingDrivers] = useState([]);
@@ -11,7 +11,7 @@ const KYCManagement = () => {
   const fetchPendingKYC = async () => {
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await axios.get('http://localhost:5248/api/admin/kyc-pending', {
+      const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/admin/kyc-pending`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setPendingDrivers(res.data);
@@ -29,7 +29,7 @@ const KYCManagement = () => {
   const viewDetails = async (driverId) => {
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await axios.get(`http://localhost:5248/api/admin/kyc/${driverId}`, {
+      const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/admin/kyc/${driverId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSelectedDriver(res.data);
@@ -41,7 +41,7 @@ const KYCManagement = () => {
   const handleApprove = async () => {
     try {
       const token = localStorage.getItem('adminToken');
-      await axios.post(`http://localhost:5248/api/admin/kyc/${selectedDriver.driver.id}/approve`, {}, {
+      await axios.post(`${import.meta.env.VITE_API_BASE_URL}/admin/kyc/${selectedDriver.driver.id}/approve`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSelectedDriver(null);
@@ -54,7 +54,7 @@ const KYCManagement = () => {
   const handleReject = async () => {
     try {
       const token = localStorage.getItem('adminToken');
-      await axios.post(`http://localhost:5248/api/admin/kyc/${selectedDriver.driver.id}/reject`, "Invalid documents", {
+      await axios.post(`${import.meta.env.VITE_API_BASE_URL}/admin/kyc/${selectedDriver.driver.id}/reject`, "Invalid documents", {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -67,17 +67,19 @@ const KYCManagement = () => {
     }
   };
 
-  if (loading) return <div className="page-container"><h2>Loading KYC requests...</h2></div>;
+  if (loading) return <div className="page-container"><h2 style={{ color: 'var(--text-main)' }}>Loading KYC requests...</h2></div>;
 
   return (
     <div className="page-container">
       <div className="page-header">
-        <h1>Driver KYC Verification</h1>
-        <p>Review and approve pending driver applications</p>
+        <div>
+          <h1 className="page-title">Driver KYC Verification</h1>
+          <p className="page-subtitle">Review and approve pending driver applications</p>
+        </div>
       </div>
 
       {!selectedDriver ? (
-        <div className="table-container">
+        <div className="table-panel">
           <table className="data-table">
             <thead>
               <tr>
@@ -91,12 +93,12 @@ const KYCManagement = () => {
             <tbody>
               {pendingDrivers.map((d) => (
                 <tr key={d.id}>
-                  <td>{d.user.fullName}</td>
+                  <td><strong>{d.user.fullName}</strong></td>
                   <td>{d.user.email}</td>
                   <td>{d.licenseNumber}</td>
-                  <td><span className="status-badge pending">Pending</span></td>
+                  <td><span className="badge badge-warning">Pending</span></td>
                   <td>
-                    <button className="action-btn view" onClick={() => viewDetails(d.id)}>
+                    <button className="text-btn" onClick={() => viewDetails(d.id)} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                       <FileSearch size={16} /> Review
                     </button>
                   </td>
@@ -104,45 +106,49 @@ const KYCManagement = () => {
               ))}
               {pendingDrivers.length === 0 && (
                 <tr>
-                  <td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>No pending KYC requests</td>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No pending KYC requests</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       ) : (
-        <div className="kyc-details-card" style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-          <button onClick={() => setSelectedDriver(null)} style={{ marginBottom: '20px', padding: '8px 16px', cursor: 'pointer' }}>&larr; Back to List</button>
+        <div className="panel">
+          <button className="text-btn" onClick={() => setSelectedDriver(null)} style={{ marginBottom: '20px' }}>&larr; Back to List</button>
           
-          <div style={{ display: 'flex', gap: '40px' }}>
-            <div style={{ flex: 1 }}>
-              <h3>Personal Info</h3>
-              <p><strong>Name:</strong> {selectedDriver.user.fullName}</p>
-              <p><strong>Email:</strong> {selectedDriver.user.email}</p>
-              <p><strong>Phone:</strong> {selectedDriver.user.phoneNumber}</p>
-              <p><strong>License:</strong> {selectedDriver.driver.licenseNumber}</p>
+          <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '40px', marginBottom: '0' }}>
+            <div>
+              <h3 className="section-title">Personal Info</h3>
+              <div style={{ color: 'var(--text-main)', marginBottom: '30px' }}>
+                <p><strong>Name:</strong> {selectedDriver.user.fullName}</p>
+                <p><strong>Email:</strong> {selectedDriver.user.email}</p>
+                <p><strong>Phone:</strong> {selectedDriver.user.phoneNumber}</p>
+                <p><strong>License:</strong> {selectedDriver.driver.licenseNumber}</p>
+              </div>
               
-              <h3 style={{ marginTop: '20px' }}>Vehicle Info</h3>
-              {selectedDriver.vehicle ? (
-                <>
-                  <p><strong>Make & Model:</strong> {selectedDriver.vehicle.make} {selectedDriver.vehicle.model} ({selectedDriver.vehicle.year})</p>
-                  <p><strong>Color:</strong> {selectedDriver.vehicle.color}</p>
-                  <p><strong>Plate:</strong> {selectedDriver.vehicle.licensePlate}</p>
-                  <p><strong>Seats:</strong> {selectedDriver.vehicle.totalSeats}</p>
-                </>
-              ) : <p>No vehicle data</p>}
+              <h3 className="section-title">Vehicle Info</h3>
+              <div style={{ color: 'var(--text-main)' }}>
+                {selectedDriver.vehicle ? (
+                  <>
+                    <p><strong>Make & Model:</strong> {selectedDriver.vehicle.make} {selectedDriver.vehicle.model} ({selectedDriver.vehicle.year})</p>
+                    <p><strong>Color:</strong> {selectedDriver.vehicle.color}</p>
+                    <p><strong>Plate:</strong> {selectedDriver.vehicle.licensePlate}</p>
+                    <p><strong>Seats:</strong> {selectedDriver.vehicle.totalSeats}</p>
+                  </>
+                ) : <p style={{ color: 'var(--text-muted)' }}>No vehicle data</p>}
+              </div>
             </div>
 
-            <div style={{ flex: 2 }}>
-              <h3>Documents</h3>
+            <div>
+              <h3 className="section-title">Documents</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 {selectedDriver.documents.map(doc => (
-                  <div key={doc.id} style={{ border: '1px solid #eee', padding: '10px' }}>
-                    <p><strong>{doc.documentType}</strong></p>
+                  <div key={doc.id} style={{ border: '1px solid var(--surface-border)', padding: '10px', borderRadius: 'var(--radius-md)' }}>
+                    <p style={{ margin: '0 0 10px 0', color: 'var(--text-muted)', fontWeight: 'bold' }}>{doc.documentType}</p>
                     <img 
-                      src={`http://localhost:5248${doc.documentUrl}`} 
+                      src={doc.documentUrl.startsWith('http') ? doc.documentUrl : `${import.meta.env.VITE_API_BASE_URL?.replace('/api', '')}${doc.documentUrl}`} 
                       alt={doc.documentType} 
-                      style={{ width: '100%', height: '200px', objectFit: 'cover', backgroundColor: '#f4f4f4' }} 
+                      style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--bg-color)' }} 
                       onError={(e) => { e.target.onerror = null; e.target.src="https://via.placeholder.com/300?text=No+Image+Available" }}
                     />
                   </div>
@@ -151,15 +157,17 @@ const KYCManagement = () => {
             </div>
           </div>
 
-          <div style={{ marginTop: '30px', display: 'flex', gap: '15px', justifyContent: 'flex-end', borderTop: '1px solid #eee', paddingTop: '20px' }}>
+          <div style={{ marginTop: '30px', display: 'flex', gap: '15px', justifyContent: 'flex-end', borderTop: '1px solid var(--surface-border)', paddingTop: '20px' }}>
             <button 
               onClick={handleReject}
-              style={{ padding: '10px 20px', backgroundColor: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              className="danger-btn"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <XCircle size={18} /> Reject Application
             </button>
             <button 
               onClick={handleApprove}
-              style={{ padding: '10px 20px', backgroundColor: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              className="primary-btn"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--success)' }}>
               <CheckCircle size={18} /> Approve Driver
             </button>
           </div>

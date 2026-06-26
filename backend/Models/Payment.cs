@@ -25,6 +25,15 @@ namespace RideO.API.Models
         
         [MaxLength(50)]
         public string? Method { get; set; }
+
+        [MaxLength(100)]
+        public string? TransactionId { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal AdminCommission { get; set; } = 0.0m;
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal DriverEarning { get; set; } = 0.0m;
         
         public DateTime ProcessedAt { get; set; } = DateTime.UtcNow;
     }

@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PushNotificationService } from '../services/PushNotificationService';
 
 interface User {
   id: string;
@@ -43,6 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             role: userData.role,
           });
           setToken(storedToken);
+          PushNotificationService.registerTokenWithBackend();
         }
       }
     } catch (e) {
@@ -73,6 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: userData.fullName || userData.name,
         role: userData.role,
       });
+      PushNotificationService.registerTokenWithBackend();
     } else {
       throw new Error("Invalid User Role. Please login with a User account.");
     }

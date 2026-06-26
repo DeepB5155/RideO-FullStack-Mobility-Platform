@@ -1,6 +1,7 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply plugin: "com.google.gms.google-services"
 
 // Force the build directory to an extremely short path to bypass the Windows 260 character limit for C++ compilation
 project.buildDir = "C:/tmp/RDO/user_app"

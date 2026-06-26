@@ -12,17 +12,21 @@ using System.Threading.Tasks;
 
 namespace RideO.API.Controllers
 {
+    using RideO.API.Services;
+
     [ApiController]
     [Route("api/[controller]")]
     public class BookingController : ControllerBase
     {
         private readonly AppDbContext _context;
         private readonly IHubContext<RideHub> _hubContext;
+        private readonly FcmService _fcmService;
 
-        public BookingController(AppDbContext context, IHubContext<RideHub> hubContext)
+        public BookingController(AppDbContext context, IHubContext<RideHub> hubContext, FcmService fcmService)
         {
             _context = context;
             _hubContext = hubContext;
+            _fcmService = fcmService;
         }
 
         public class BookingRequestDto
@@ -31,6 +35,7 @@ namespace RideO.API.Controllers
             public string PickupLocationName { get; set; } = string.Empty;
             public string DropoffLocationName { get; set; } = string.Empty;
             public int SeatsBooked { get; set; }
+            public string PaymentMethod { get; set; } = "Cash";
         }
 
         private Guid? GetCurrentUserId()
@@ -64,7 +69,40 @@ namespace RideO.API.Controllers
                 DropoffLocationName = request.DropoffLocationName,
                 SeatsBooked = request.SeatsBooked,
                 TotalFare = route.PricePerSeat * request.SeatsBooked,
-                Status = "Pending"
+                PaymentMethod = request.PaymentMethod,
+                Status = "Pending",
+                TrackingId = Guid.NewGuid()
+            };
+
+            // Process Wallet Payment
+            if (request.PaymentMethod == "Wallet")
+            {
+                var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId.Value);
+                if (wallet == null || wallet.Balance < booking.TotalFare)
+                {
+                    return BadRequest("Insufficient wallet balance.");
+                }
+
+                wallet.Balance -= booking.TotalFare;
+                wallet.UpdatedAt = DateTime.UtcNow;
+
+                var walletTx = new WalletTransaction
+                {
+                    WalletId = wallet.Id,
+                    Amount = -booking.TotalFare,
+                    Type = "Payment",
+                    Description = $"Payment for ride from {request.PickupLocationName} to {request.DropoffLocationName}",
+                    ReferenceId = booking.Id.ToString()
+                };
+                _context.WalletTransactions.Add(walletTx);
+            }
+
+            var payment = new Payment
+            {
+                BookingId = booking.Id,
+                Amount = booking.TotalFare,
+                Status = "Pending",
+                Method = request.PaymentMethod
             };
 
             // If route has AutoApprove, we can directly approve and deduct seats
@@ -81,7 +119,10 @@ namespace RideO.API.Controllers
                         if (route.AvailableSeats < request.SeatsBooked) return BadRequest("Not enough available seats.");
                         
                         route.AvailableSeats -= request.SeatsBooked;
-                        if (retryCount == 0) _context.Bookings.Add(booking);
+                        if (retryCount == 0) {
+                            _context.Bookings.Add(booking);
+                            _context.Payments.Add(payment);
+                        }
                         
                         await _context.SaveChangesAsync();
                         saved = true;
@@ -103,11 +144,29 @@ namespace RideO.API.Controllers
             else
             {
                 _context.Bookings.Add(booking);
+                _context.Payments.Add(payment);
                 await _context.SaveChangesAsync();
             }
 
             // Notify Driver
+            var notification = new Notification
+            {
+                UserId = route.Driver!.UserId,
+                Title = "New Booking Request",
+                Message = $"You have a new booking request for {request.SeatsBooked} seats."
+            };
+            _context.Notifications.Add(notification);
+            await _context.SaveChangesAsync();
+
             await _hubContext.Clients.User(route.Driver!.UserId.ToString()).SendAsync("BookingRequested", booking);
+            await _hubContext.Clients.User(route.Driver!.UserId.ToString()).SendAsync("NewNotification", notification);
+
+            // FCM Push Notification
+            var driverUser = await _context.Users.FindAsync(route.Driver!.UserId);
+            if (driverUser?.FcmDeviceToken != null)
+            {
+                await _fcmService.SendNotificationAsync(driverUser.FcmDeviceToken, notification.Title, notification.Message);
+            }
 
             return Ok(new { message = "Booking requested successfully", booking });
         }
@@ -143,6 +202,36 @@ namespace RideO.API.Controllers
             return Ok(bookings);
         }
 
+        public class PaymentSubmissionDto
+        {
+            public string TransactionId { get; set; } = string.Empty;
+        }
+
+        [HttpPost("{id}/pay")]
+        [Authorize(Roles = "User")]
+        public async Task<IActionResult> PayBooking(Guid id, [FromBody] PaymentSubmissionDto dto)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
+            if (booking == null) return NotFound("Booking not found");
+
+            var payment = await _context.Payments.FirstOrDefaultAsync(p => p.BookingId == id);
+            if (payment == null) return NotFound("Payment record not found");
+
+            if (payment.Status == "Completed") return BadRequest("Payment is already completed");
+
+            if (booking.PaymentMethod != "UPI") return BadRequest("Payment method is not UPI");
+
+            payment.Status = "Completed";
+            payment.TransactionId = dto.TransactionId;
+            payment.ProcessedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Payment verified successfully", payment });
+        }
+
         [HttpPut("{id}/cancel")]
         [Authorize(Roles = "User")]
         public async Task<IActionResult> CancelBooking(Guid id)
@@ -155,6 +244,27 @@ namespace RideO.API.Controllers
 
             if (booking.Status == "Completed" || booking.Status == "Started" || booking.Status == "Cancelled")
                 return BadRequest($"Cannot cancel a {booking.Status} booking.");
+
+            // Refund wallet if payment method was Wallet
+            if (booking.PaymentMethod == "Wallet")
+            {
+                var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId.Value);
+                if (wallet != null)
+                {
+                    wallet.Balance += booking.TotalFare;
+                    wallet.UpdatedAt = DateTime.UtcNow;
+
+                    var walletTx = new WalletTransaction
+                    {
+                        WalletId = wallet.Id,
+                        Amount = booking.TotalFare,
+                        Type = "Refund",
+                        Description = $"Refund for cancelled booking",
+                        ReferenceId = booking.Id.ToString()
+                    };
+                    _context.WalletTransactions.Add(walletTx);
+                }
+            }
 
             if (booking.Status == "Approved")
             {
@@ -190,9 +300,101 @@ namespace RideO.API.Controllers
             }
 
             // Notify Driver
+            var notification = new Notification
+            {
+                UserId = booking.Route!.Driver!.UserId,
+                Title = "Booking Cancelled",
+                Message = $"A passenger cancelled their booking for {booking.SeatsBooked} seats."
+            };
+            _context.Notifications.Add(notification);
+            await _context.SaveChangesAsync();
+
             await _hubContext.Clients.User(booking.Route!.DriverId.ToString()).SendAsync("BookingCancelled", booking.Id);
+            await _hubContext.Clients.User(booking.Route!.Driver!.UserId.ToString()).SendAsync("NewNotification", notification);
 
             return Ok(new { message = "Booking cancelled successfully" });
+        }
+
+        [HttpPost("subscribe/{routeId}")]
+        [Authorize(Roles = "User")]
+        public async Task<IActionResult> SubscribeToRecurringRoute(Guid routeId, [FromBody] BookingRequestDto request)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var route = await _context.Routes.FirstOrDefaultAsync(r => r.Id == routeId);
+            if (route == null) return NotFound("Route not found");
+
+            if (!route.IsRecurring) return BadRequest("This route is not a recurring route.");
+
+            // Check if already subscribed
+            var existingSub = await _context.RecurringBookings
+                .FirstOrDefaultAsync(rb => rb.OriginalRouteId == routeId && rb.UserId == userId && rb.IsActive);
+            
+            if (existingSub != null) return BadRequest("You are already subscribed to this recurring route.");
+
+            var recurringBooking = new RecurringBooking
+            {
+                OriginalRouteId = routeId,
+                UserId = userId.Value,
+                SeatsBooked = request.SeatsBooked,
+                TotalFarePerRide = route.PricePerSeat * request.SeatsBooked,
+                IsActive = true
+            };
+
+            _context.RecurringBookings.Add(recurringBooking);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Subscribed to recurring route successfully", recurringBooking });
+        }
+
+        [HttpPut("unsubscribe/{id}")]
+        [Authorize(Roles = "User")]
+        public async Task<IActionResult> UnsubscribeFromRecurringRoute(Guid id)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var subscription = await _context.RecurringBookings.FirstOrDefaultAsync(rb => rb.Id == id && rb.UserId == userId);
+            if (subscription == null) return NotFound("Subscription not found");
+
+            subscription.IsActive = false;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Unsubscribed successfully" });
+        }
+
+        [HttpGet("subscriptions")]
+        [Authorize(Roles = "User")]
+        public async Task<IActionResult> GetMySubscriptions()
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var subscriptions = await _context.RecurringBookings
+                .Include(rb => rb.OriginalRoute)
+                .ThenInclude(r => r!.Driver)
+                .ThenInclude(d => d!.User)
+                .Where(rb => rb.UserId == userId && rb.IsActive)
+                .Select(rb => new
+                {
+                    rb.Id,
+                    rb.OriginalRouteId,
+                    rb.SeatsBooked,
+                    rb.TotalFarePerRide,
+                    rb.SubscribedAt,
+                    RouteDetails = new {
+                        rb.OriginalRoute!.StartLocation,
+                        rb.OriginalRoute.EndLocation,
+                        Time = rb.OriginalRoute.RecurringTime,
+                        Days = rb.OriginalRoute.RecurringDays,
+                        DriverName = rb.OriginalRoute.Driver!.User!.FullName,
+                        IsTemplateActive = rb.OriginalRoute.IsRecurring // If false, the driver stopped auto-renew
+                    }
+                })
+                .ToListAsync();
+
+            return Ok(subscriptions);
         }
 
         // --- DRIVER ENDPOINTS ---
@@ -295,10 +497,30 @@ namespace RideO.API.Controllers
             {
                 if (newStatus == "Rejected" || newStatus == "No-show")
                 {
-                    if (booking.Status == "Approved" && newStatus == "No-show")
+                    if (booking.Status == "Approved")
                     {
-                        // Maybe give seats back? Usually no-show means it's too late to give back, 
-                        // but depending on logic we might want to. For now, we won't.
+                        booking.Route.AvailableSeats += booking.SeatsBooked;
+                    }
+
+                    // Refund if they paid via Wallet
+                    if (newStatus == "Rejected" && booking.PaymentMethod == "Wallet")
+                    {
+                        var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == booking.UserId);
+                        if (wallet != null)
+                        {
+                            wallet.Balance += booking.TotalFare;
+                            wallet.UpdatedAt = DateTime.UtcNow;
+
+                            var walletTx = new WalletTransaction
+                            {
+                                WalletId = wallet.Id,
+                                Amount = booking.TotalFare,
+                                Type = "Refund",
+                                Description = $"Refund for rejected booking by driver",
+                                ReferenceId = booking.Id.ToString()
+                            };
+                            _context.WalletTransactions.Add(walletTx);
+                        }
                     }
                 }
 
@@ -307,7 +529,24 @@ namespace RideO.API.Controllers
             }
 
             // Notify User
+            var notification = new Notification
+            {
+                UserId = booking.UserId,
+                Title = $"Booking {newStatus}",
+                Message = $"Your booking status has been updated to {newStatus}."
+            };
+            _context.Notifications.Add(notification);
+            await _context.SaveChangesAsync();
+
             await _hubContext.Clients.User(booking.UserId.ToString()).SendAsync("BookingStatusUpdated", new { BookingId = booking.Id, Status = newStatus });
+            await _hubContext.Clients.User(booking.UserId.ToString()).SendAsync("NewNotification", notification);
+
+            // FCM Push Notification
+            var passengerUser = await _context.Users.FindAsync(booking.UserId);
+            if (passengerUser?.FcmDeviceToken != null)
+            {
+                await _fcmService.SendNotificationAsync(passengerUser.FcmDeviceToken, notification.Title, notification.Message);
+            }
 
             return Ok(new { message = $"Booking {newStatus} successfully." });
         }

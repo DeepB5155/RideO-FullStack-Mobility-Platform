@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import * as signalR from '@microsoft/signalr';
+import { SIGNALR_HUB_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
 import axiosInstance from '../api/axios';
@@ -17,12 +18,11 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
 
     const startTracking = async () => {
       try {
-        const token = await AsyncStorage.getItem('driverToken');
+        const token = await AsyncStorage.getItem('userToken');
         
+        const hubUrl = SIGNALR_HUB_URL || 'http://192.168.1.182:5248/rideHub';
         hubConnection = new signalR.HubConnectionBuilder()
-          .withUrl('http://localhost:5248/ridehub', {
-            accessTokenFactory: () => token || ''
-          })
+          .withUrl(hubUrl, { accessTokenFactory: () => token || '' })
           .withAutomaticReconnect()
           .build();
 
@@ -71,7 +71,12 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
               headers: { 'Content-Type': 'application/json' }
             });
             Alert.alert('Success', 'Ride marked as completed!');
-            navigation.goBack();
+            // Ideally we'd map over passengers to rate them, but for MVP we return to Home.
+            // Wait, we can navigate to RatingScreen to rate the app or skip.
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Home' }],
+            });
           } catch (e: any) {
             Alert.alert('Error', e.response?.data || 'Failed to complete ride');
           }
