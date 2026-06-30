@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Share } from 'react-native';
 import axiosInstance from '../api/axios';
 
 const MyRoutesScreen = ({ navigation }: any) => {
@@ -51,6 +51,23 @@ const MyRoutesScreen = ({ navigation }: any) => {
     ]);
   };
 
+  const shareRoute = async (id: string) => {
+    try {
+      const res = await axiosInstance.get(`/route/${id}/public`);
+      const routeInfo = res.data;
+      
+      const dateStr = new Date(routeInfo.startTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+      
+      const message = `🚗 Join my ride on RideO!\nFrom: ${routeInfo.startLocation}\nTo: ${routeInfo.endLocation}\nDate: ${dateStr}\nPrice: ₹${routeInfo.pricePerSeat}/seat\n\nOpen RideO app and search for rides near ${routeInfo.startLocation} on ${new Date(routeInfo.startTime).toLocaleDateString()} to book your seat!`;
+      
+      await Share.share({
+        message: message,
+      });
+    } catch (e: any) {
+      Alert.alert('Error', 'Failed to fetch public route info for sharing.');
+    }
+  };
+
   const renderItem = ({ item }: { item: any }) => (
     <View style={styles.card}>
       <View style={styles.headerRow}>
@@ -58,7 +75,7 @@ const MyRoutesScreen = ({ navigation }: any) => {
         <Text style={[styles.status, item.status === 'Published' && styles.statusActive]}>{item.status}</Text>
       </View>
       <Text style={styles.details}>Time: {new Date(item.startTime).toLocaleString()}</Text>
-      <Text style={styles.details}>Seats: {item.availableSeats} | Price: ${item.pricePerSeat}</Text>
+      <Text style={styles.details}>Seats: {item.availableSeats} | Price: ₹{item.pricePerSeat}</Text>
       
       {item.isRecurring && (
         <View style={styles.recurringBadge}>
@@ -103,12 +120,20 @@ const MyRoutesScreen = ({ navigation }: any) => {
           <Text style={styles.stopRecurringText}>Stop Auto-Renew</Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity 
-        style={styles.bookingsBtn} 
-        onPress={() => navigation.navigate('Route Bookings', { routeId: item.id })}
-      >
-        <Text style={styles.bookingsBtnText}>View Passenger Bookings</Text>
-      </TouchableOpacity>
+      <View style={styles.cardFooterActions}>
+        <TouchableOpacity 
+          style={styles.bookingsBtn} 
+          onPress={() => navigation.navigate('Route Bookings', { routeId: item.id })}
+        >
+          <Text style={styles.bookingsBtnText}>View Passenger Bookings</Text>
+        </TouchableOpacity>
+
+        {(item.status === 'Published' || item.status === 'Started') && (
+          <TouchableOpacity style={styles.shareBtn} onPress={() => shareRoute(item.id)}>
+            <Text style={styles.shareBtnText}>🔗 Share</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 
@@ -141,8 +166,11 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
   btn: { flex: 1, padding: 10, borderRadius: 6, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: 'bold' },
-  bookingsBtn: { marginTop: 10, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#ddd' },
+  cardFooterActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  bookingsBtn: { flex: 1, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#ddd' },
   bookingsBtnText: { color: '#333', fontWeight: '600' },
+  shareBtn: { padding: 12, backgroundColor: '#e2e8f0', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  shareBtnText: { color: '#1e293b', fontWeight: 'bold' },
   recurringBadge: { backgroundColor: '#e6f2ff', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15, marginTop: 5, marginBottom: 5 },
   recurringText: { color: '#007AFF', fontSize: 12, fontWeight: '600' },
   stopRecurringBtn: { marginTop: 10, padding: 12, backgroundColor: '#fff', borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#dc3545' },

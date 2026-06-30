@@ -55,7 +55,7 @@ const RouteBookingsScreen = ({ route, navigation }: any) => {
       </View>
       <Text style={styles.details}>Phone: {item.userPhone || 'N/A'}</Text>
       <Text style={styles.details}>Locations: {item.pickupLocationName} → {item.dropoffLocationName}</Text>
-      <Text style={styles.details}>Seats: {item.seatsBooked} | Total Fare: ${item.totalFare}</Text>
+      <Text style={styles.details}>Seats: {item.seatsBooked} | Total Fare: ₹{item.totalFare}</Text>
       
       {item.status === 'Pending' && (
         <View style={styles.actionRow}>

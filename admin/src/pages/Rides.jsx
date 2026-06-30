@@ -73,18 +73,20 @@ const Rides = () => {
                         <Search size={18} color="#64748b" style={{ position: 'absolute', left: '10px', top: '10px' }} />
                         <input 
                             type="text" 
+                            className="search-input"
                             placeholder="Search location or driver..." 
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            style={{ padding: '8px 10px 8px 35px', borderRadius: '6px', border: '1px solid #cbd5e1', width: '250px' }}
+                            style={{ padding: '8px 10px 8px 35px', width: '250px' }}
                         />
                     </div>
                     <div style={{ position: 'relative' }}>
                         <Filter size={18} color="#64748b" style={{ position: 'absolute', left: '10px', top: '10px' }} />
                         <select 
+                            className="search-input"
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            style={{ padding: '8px 10px 8px 35px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: 'white', cursor: 'pointer' }}
+                            style={{ padding: '8px 10px 8px 35px', cursor: 'pointer' }}
                         >
                             <option value="">All Statuses</option>
                             <option value="Published">Published</option>
@@ -114,12 +116,12 @@ const Rides = () => {
                         </thead>
                         <tbody>
                             {rides.map(ride => (
-                                <tr key={ride.id} style={{ backgroundColor: ride.status === 'Cancelled' ? '#fef2f2' : 'transparent' }}>
+                                <tr key={ride.id}>
                                     <td><strong>{ride.driver.user.fullName}</strong></td>
                                     <td style={{ fontSize: '13px' }}>{ride.startLocation.split(',')[0]} &rarr; {ride.endLocation.split(',')[0]}</td>
                                     <td>{new Date(ride.startTime).toLocaleString()}</td>
                                     <td>{ride.availableSeats} Left</td>
-                                    <td>${ride.pricePerSeat.toFixed(2)}</td>
+                                    <td>₹{ride.pricePerSeat.toFixed(2)}</td>
                                     <td><span className={`status-badge ${ride.status.toLowerCase()}`}>{ride.status}</span></td>
                                     <td style={{ display: 'flex', gap: '10px' }}>
                                         <button onClick={() => fetchRideDetails(ride.id)} className="action-btn view-btn" title="View Profile">
@@ -164,7 +166,7 @@ const Rides = () => {
                                         <span className={`status-badge ${rideDetails.route.status.toLowerCase()}`} style={{ fontSize: '14px', padding: '6px 12px' }}>
                                             {rideDetails.route.status.toUpperCase()}
                                         </span>
-                                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>${rideDetails.route.pricePerSeat.toFixed(2)} <span style={{fontSize: '14px', color: '#64748b'}}>/ seat</span></div>
+                                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>₹{rideDetails.route.pricePerSeat.toFixed(2)} <span style={{fontSize: '14px', color: '#64748b'}}>/ seat</span></div>
                                         <div style={{ color: '#f59e0b', fontWeight: 'bold' }}>{rideDetails.route.availableSeats} Seats Available</div>
                                         
                                         {(rideDetails.route.status !== 'Completed' && rideDetails.route.status !== 'Cancelled') && (

@@ -21,6 +21,8 @@ import SupportScreen from '../screens/SupportScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import WalletScreen from '../screens/WalletScreen';
 import InsightsScreen from '../screens/InsightsScreen';
+import DailyCommuteSetupScreen from '../screens/DailyCommuteSetupScreen';
+import EditVehicleScreen from '../screens/EditVehicleScreen';
 
 // Context
 import { AuthContext } from '../context/AuthContext';
@@ -145,6 +147,8 @@ const MainStack = () => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="KYC" component={KYCScreen} />
       <Stack.Screen name="MainTabs" component={MainTabs} />
+      <Stack.Screen name="DailyCommuteSetup" component={DailyCommuteSetupScreen} />
+      <Stack.Screen name="EditVehicle" component={EditVehicleScreen} />
     </Stack.Navigator>
   );
 };

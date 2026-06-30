@@ -1,14 +1,29 @@
 import { useState, useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Users, Car, MapPin, ShieldCheck, ShieldAlert, Menu, X, LogOut, Navigation } from 'lucide-react';
+import { LayoutDashboard, Users, Car, MapPin, ShieldCheck, ShieldAlert, Menu, X, LogOut, Navigation, AlertTriangle } from 'lucide-react';
 import * as signalR from '@microsoft/signalr';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './AdminLayout.css';
 
 const AdminLayout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sosAlert, setSosAlert] = useState(null);
+    const [sosCount, setSosCount] = useState(0);
     const navigate = useNavigate();
+
+    const fetchSosCount = async () => {
+        try {
+            const token = localStorage.getItem('adminToken');
+            const res = await axios.get('http://localhost:5248/api/emergency/sos', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const openAlerts = res.data.filter(a => a.status === 'Open');
+            setSosCount(openAlerts.length);
+        } catch (error) {
+            console.error('Failed to fetch SOS count', error);
+        }
+    };
 
     const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
@@ -26,6 +41,7 @@ const AdminLayout = () => {
 
                 hubConnection.on('EmergencySOS', (alertData) => {
                     setSosAlert(alertData);
+                    setSosCount(prev => prev + 1);
                     // Play a loud sound
                     const audio = new Audio('/sos-alarm.mp3'); // Mock audio file
                     audio.play().catch(e => console.log('Audio play blocked:', e));
@@ -39,6 +55,7 @@ const AdminLayout = () => {
             }
         };
 
+        fetchSosCount();
         connectSignalR();
 
         return () => {
@@ -55,6 +72,7 @@ const AdminLayout = () => {
         { name: 'Drivers', icon: <Car size={20} />, path: '/drivers' },
         { name: 'KYC Auth', icon: <ShieldCheck size={20} />, path: '/kyc' },
         { name: 'Complaints', icon: <ShieldAlert size={20} />, path: '/complaints' },
+        { name: 'Safety Alerts', icon: <AlertTriangle size={20} />, path: '/safety-alerts', badge: sosCount > 0 ? sosCount : null },
     ];
 
     const handleLogout = () => {
@@ -84,6 +102,7 @@ const AdminLayout = () => {
                         >
                             {item.icon}
                             <span>{item.name}</span>
+                            {item.badge && <span className="nav-badge">{item.badge}</span>}
                         </NavLink>
                     ))}
                 </nav>

@@ -31,6 +31,15 @@ namespace RideO.API.Models
         [Required]
         public bool IsActive { get; set; } = true;
 
+        [Required]
+        [MaxLength(20)]
+        public string PaymentPlan { get; set; } = "Daily";
+
+        public DateTime? PausedUntil { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal TotalAmountPrepaid { get; set; } = 0.0m;
+
         public DateTime SubscribedAt { get; set; } = DateTime.UtcNow;
     }
 }

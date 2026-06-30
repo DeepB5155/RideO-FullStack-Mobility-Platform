@@ -92,7 +92,7 @@ const MyRidesScreen = ({ navigation }: any) => {
       </View>
       <Text style={styles.details}>Driver: {item.route.driverName}</Text>
       <Text style={styles.details}>Date: {new Date(item.route.startTime).toLocaleString()}</Text>
-      <Text style={styles.details}>Seats: {item.seatsBooked} | Total: ${item.totalFare}</Text>
+      <Text style={styles.details}>Seats: {item.seatsBooked} | Total: ₹{item.totalFare}</Text>
       
       {(item.status === 'Pending' || item.status === 'Approved') && (
         <TouchableOpacity style={styles.cancelBtn} onPress={() => cancelBooking(item.id)}>
@@ -139,7 +139,7 @@ const MyRidesScreen = ({ navigation }: any) => {
       </View>
       <Text style={styles.details}>Driver: {item.routeDetails.driverName}</Text>
       <Text style={styles.details}>Schedule: {item.routeDetails.days} at {item.routeDetails.time}</Text>
-      <Text style={styles.details}>Seats: {item.seatsBooked} | Per Ride: ${item.totalFarePerRide}</Text>
+      <Text style={styles.details}>Seats: {item.seatsBooked} | Per Ride: ₹{item.totalFarePerRide}</Text>
       
       <TouchableOpacity style={styles.cancelBtn} onPress={() => cancelSubscription(item.id)}>
         <Text style={styles.cancelBtnText}>Unsubscribe</Text>

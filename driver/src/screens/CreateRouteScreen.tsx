@@ -169,12 +169,12 @@ const CreateRouteScreen = ({ navigation }: any) => {
 
               {pricingMode === 'Fixed' ? (
                 <>
-                  <Text style={styles.label}>Price Per Seat ($)</Text>
+                  <Text style={styles.label}>Price Per Seat (₹)</Text>
                   <TextInput style={styles.input} placeholder="e.g. 25" placeholderTextColor={theme.colors.text.muted} keyboardType="decimal-pad" value={price} onChangeText={setPrice} />
                 </>
               ) : (
                 <>
-                  <Text style={styles.label}>Price Per Km ($)</Text>
+                  <Text style={styles.label}>Price Per Km (₹)</Text>
                   <TextInput style={styles.input} placeholder="e.g. 0.5" placeholderTextColor={theme.colors.text.muted} keyboardType="decimal-pad" value={pricePerKm} onChangeText={setPricePerKm} />
                 </>
               )}

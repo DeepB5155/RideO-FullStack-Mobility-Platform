@@ -111,7 +111,7 @@ const Users = () => {
                         </thead>
                         <tbody>
                             {users.map(user => (
-                                <tr key={user.id} style={{ backgroundColor: user.isBlocked ? '#fef2f2' : 'transparent' }}>
+                                <tr key={user.id}>
                                     <td><strong>{user.fullName}</strong></td>
                                     <td>{user.email}</td>
                                     <td>{new Date(user.createdAt).toLocaleDateString()}</td>

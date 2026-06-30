@@ -54,45 +54,45 @@ const LiveRides = () => {
       <div style={{ display: 'flex', gap: '20px', height: 'calc(100vh - 180px)' }}>
         
         {/* Left Side: Map Simulation */}
-        <div style={{ flex: 2, backgroundColor: '#e2e8f0', borderRadius: '8px', position: 'relative', overflow: 'hidden', border: '2px solid #cbd5e1' }}>
-          <div style={{ position: 'absolute', top: 20, left: 20, backgroundColor: 'white', padding: '10px', borderRadius: '4px', fontWeight: 'bold', zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+        <div style={{ flex: 2, backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-lg)', position: 'relative', overflow: 'hidden', border: '1px solid var(--surface-border)' }}>
+          <div style={{ position: 'absolute', top: 20, left: 20, backgroundColor: 'var(--surface)', color: 'var(--text-main)', padding: '10px', borderRadius: '4px', fontWeight: 'bold', zIndex: 10, border: '1px solid var(--surface-border)' }}>
             System Map (Mock)
           </div>
 
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {Object.keys(activeDrivers).length === 0 ? (
-              <p style={{ color: '#64748b', fontStyle: 'italic' }}>Waiting for drivers to start their rides...</p>
+              <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Waiting for drivers to start their rides...</p>
             ) : (
               <div style={{ textAlign: 'center' }}>
                 <MapPin size={48} color="#ef4444" style={{ marginBottom: '10px' }} />
-                <h3 style={{ color: '#0f172a' }}>{Object.keys(activeDrivers).length} Active Drivers on Map</h3>
+                <h3 style={{ color: 'var(--text-main)' }}>{Object.keys(activeDrivers).length} Active Drivers on Map</h3>
               </div>
             )}
           </div>
         </div>
 
         {/* Right Side: Data Feed */}
-        <div style={{ flex: 1, backgroundColor: 'white', borderRadius: '8px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowY: 'auto' }}>
-          <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-            <Navigation size={18} color="#3b82f6" /> 
+        <div className="panel" style={{ flex: 1, overflowY: 'auto' }}>
+          <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--surface-border)', paddingBottom: '10px', color: 'var(--text-main)' }}>
+            <Navigation size={18} color="var(--primary)" /> 
             Active Data Feed
           </h3>
 
           {Object.keys(activeDrivers).length === 0 && (
-            <p style={{ color: '#94a3b8', fontSize: '14px' }}>No active telemetry data.</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>No active telemetry data.</p>
           )}
 
           {Object.entries(activeDrivers).map(([driverId, data]) => (
-            <div key={driverId} style={{ padding: '15px 0', borderBottom: '1px solid #f1f5f9' }}>
+            <div key={driverId} style={{ padding: '15px 0', borderBottom: '1px solid var(--surface-border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                <strong style={{ color: '#334155' }}>Driver {driverId.substring(0,8)}...</strong>
+                <strong style={{ color: 'var(--text-main)' }}>Driver {driverId.substring(0,8)}...</strong>
                 <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 'bold' }}>LIVE</span>
               </div>
-              <div style={{ fontSize: '13px', color: '#64748b', fontFamily: 'monospace' }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                 <div>Route: {data.routeId.substring(0,8)}...</div>
                 <div>Lat: {data.lat.toFixed(6)}</div>
                 <div>Lng: {data.lng.toFixed(6)}</div>
-                <div style={{ marginTop: '4px', fontSize: '11px', color: '#94a3b8' }}>
+                <div style={{ marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)', opacity: 0.7 }}>
                   Updated: {data.lastUpdate.toLocaleTimeString()}
                 </div>
               </div>

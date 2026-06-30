@@ -62,6 +62,7 @@ namespace RideO.API.Controllers
             public int Year { get; set; }
             public string Color { get; set; } = string.Empty;
             public string LicensePlate { get; set; } = string.Empty;
+            public string VehicleType { get; set; } = string.Empty;
             public int TotalSeats { get; set; } = 4;
         }
 
@@ -112,6 +113,7 @@ namespace RideO.API.Controllers
                     Year = request.Year,
                     Color = request.Color,
                     LicensePlate = request.LicensePlate,
+                    VehicleType = request.VehicleType,
                     TotalSeats = request.TotalSeats
                 };
                 _context.Vehicles.Add(vehicle);
@@ -123,6 +125,7 @@ namespace RideO.API.Controllers
                 vehicle.Year = request.Year;
                 vehicle.Color = request.Color;
                 vehicle.LicensePlate = request.LicensePlate;
+                vehicle.VehicleType = request.VehicleType;
                 vehicle.TotalSeats = request.TotalSeats;
             }
 

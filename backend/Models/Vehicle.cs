@@ -33,6 +33,9 @@ namespace RideO.API.Models
         [MaxLength(20)]
         public string LicensePlate { get; set; } = string.Empty;
 
+        [MaxLength(30)]
+        public string? VehicleType { get; set; }
+
         [Required]
         public int TotalSeats { get; set; } = 4;
     }

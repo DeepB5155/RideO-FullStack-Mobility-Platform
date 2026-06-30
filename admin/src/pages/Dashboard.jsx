@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-    Users, Car, MapPin, DollarSign, Loader2, FileCheck, FileX, AlertTriangle, Clock, 
+    Users, Car, MapPin, IndianRupee, Loader2, FileCheck, FileX, AlertTriangle, Clock, 
     CalendarCheck, Route as RouteIcon, Navigation 
 } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -57,7 +57,7 @@ const Dashboard = () => {
                 <MetricCard title="Total Users" value={m.totalUsers} icon={<Users size={24} color="#f59e0b" />} />
                 <MetricCard title="Total Drivers" value={m.totalDrivers} icon={<Car size={24} color="#3b82f6" />} />
                 <MetricCard title="Today's Bookings" value={m.todayBookings} icon={<CalendarCheck size={24} color="#10b981" />} />
-                <MetricCard title="Total Revenue" value={`$${m.revenue.toLocaleString(undefined, {minimumFractionDigits: 2})}`} icon={<DollarSign size={24} color="#8b5cf6" />} />
+                <MetricCard title="Total Revenue" value={`₹${m.revenue.toLocaleString(undefined, {minimumFractionDigits: 2})}`} icon={<IndianRupee size={24} color="#8b5cf6" />} />
             </div>
 
             {/* Secondary Metric Grid */}

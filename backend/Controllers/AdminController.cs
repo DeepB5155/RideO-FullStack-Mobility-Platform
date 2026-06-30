@@ -394,9 +394,19 @@ namespace RideO.API.Controllers
             // Realtime Update via SignalR
             await _hubContext.Clients.User(driver.UserId.ToString()).SendAsync("KYCStatusUpdated", "Approved");
             
+            var notification = new Notification
+            {
+                UserId = driver.UserId,
+                Title = "KYC Approved! 🎉",
+                Message = "Congratulations! Your documents are verified. You can now publish routes and earn.",
+                Type = "success"
+            };
+            _context.Notifications.Add(notification);
+            await _context.SaveChangesAsync();
+
             if (!string.IsNullOrEmpty(driver.User?.FcmDeviceToken))
             {
-                await _fcmService.SendNotificationAsync(driver.User.FcmDeviceToken, "KYC Approved", "Your KYC documents have been approved. You are now a verified driver.");
+                await _fcmService.SendNotificationAsync(driver.User.FcmDeviceToken, notification.Title, notification.Message);
             }
 
             return Ok(new { message = "Driver KYC approved successfully" });

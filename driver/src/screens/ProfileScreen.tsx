@@ -83,6 +83,13 @@ const ProfileScreen = () => {
           <Text style={styles.insightsButtonText}>📊 View Insights & Leaderboard</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity 
+          style={styles.editVehicleButton} 
+          onPress={() => navigation.navigate('EditVehicle')}
+        >
+          <Text style={styles.editVehicleButtonText}>🚗 Edit Vehicle Details</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutButtonText}>SIGN OUT</Text>
         </TouchableOpacity>
@@ -216,6 +223,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  editVehicleButton: {
+    marginTop: theme.spacing.md,
+    marginHorizontal: theme.spacing.xl,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.lg,
+    borderRadius: theme.radius.full,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadows.small,
+  },
+  editVehicleButtonText: {
+    color: theme.colors.text.main,
+    fontSize: 16,
+    fontWeight: '700',
   },
   logoutButton: {
     marginTop: theme.spacing.lg,

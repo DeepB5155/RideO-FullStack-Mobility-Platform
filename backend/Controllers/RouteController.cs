@@ -72,6 +72,39 @@ namespace RideO.API.Controllers
             return await _context.Drivers.FirstOrDefaultAsync(d => d.UserId == userId);
         }
 
+        [AllowAnonymous]
+        [HttpGet("{id}/public")]
+        public async Task<IActionResult> GetPublicRouteInfo(Guid id)
+        {
+            var route = await _context.Routes
+                .Include(r => r.Driver).ThenInclude(d => d.User)
+                .Include(r => r.Vehicle)
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            if (route == null) return NotFound("Route not found.");
+            if (route.Status != "Published" && route.Status != "Started")
+                return BadRequest("This route is not available for booking.");
+
+            return Ok(new
+            {
+                routeId = route.Id,
+                driverName = route.Driver?.User?.FullName,
+                driverRating = route.Driver?.Rating,
+                vehicleInfo = new
+                {
+                    color = route.Vehicle?.Color,
+                    make = route.Vehicle?.Make,
+                    model = route.Vehicle?.Model
+                },
+                startLocation = route.StartLocation,
+                endLocation = route.EndLocation,
+                startTime = route.StartTime,
+                availableSeats = route.AvailableSeats,
+                pricePerSeat = route.PricePerSeat,
+                isRecurring = route.IsRecurring
+            });
+        }
+
         [HttpPost("draft")]
         public async Task<IActionResult> SaveDraft([FromBody] CreateRouteRequest request)
         {
@@ -290,11 +323,23 @@ namespace RideO.API.Controllers
                 {
                     if (newStatus == "Cancelled") booking.Status = "Cancelled";
                     
+                    string notifTitle = $"Ride {newStatus}";
+                    string notifMessage = $"The ride you booked has been {newStatus.ToLower()} by the driver.";
+                    string notifType = "info";
+
+                    if (newStatus == "Cancelled")
+                    {
+                        notifTitle = "⚠️ Ride Cancelled";
+                        notifMessage = $"Your ride to {booking.DropoffLocationName} has been cancelled by the driver. You have not been charged.";
+                        notifType = "warning";
+                    }
+
                     var notification = new Notification
                     {
                         UserId = booking.UserId,
-                        Title = $"Ride {newStatus}",
-                        Message = $"The ride you booked has been {newStatus.ToLower()} by the driver."
+                        Title = notifTitle,
+                        Message = notifMessage,
+                        Type = notifType
                     };
                     _context.Notifications.Add(notification);
 
@@ -368,7 +413,8 @@ namespace RideO.API.Controllers
         public async Task<IActionResult> SearchRoutes([FromQuery] double pickupLat, [FromQuery] double pickupLng, [FromQuery] double dropLat, [FromQuery] double dropLng, [FromQuery] DateTime date, [FromQuery] int seats = 1)
         {
             // 1. Initial filter: Only Published routes, verified drivers, sufficient seats, on the specific date
-            var startOfDay = date.Date;
+            // Ensure the date is UTC for PostgreSQL timestamp with time zone compatibility
+            var startOfDay = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
             var endOfDay = startOfDay.AddDays(1);
 
             var availableRoutes = await _context.Routes
@@ -383,6 +429,23 @@ namespace RideO.API.Controllers
                          && r.StartTime < endOfDay)
                 .ToListAsync();
 
+            // Fetch recurring routes that match the day of the week
+            var dayOfWeekStr = startOfDay.ToString("ddd"); // "Mon", "Tue", etc.
+            var recurringRoutes = await _context.Routes
+                .Include(r => r.Driver).ThenInclude(d => d.User)
+                .Include(r => r.Vehicle)
+                .Include(r => r.Stops)
+                .Where(r => r.Status == "Published"
+                         && r.IsRecurring
+                         && r.RecurringDays != null
+                         && r.RecurringDays.Contains(dayOfWeekStr)
+                         && r.Driver != null
+                         && r.Driver.IsVerified
+                         && r.AvailableSeats >= seats)
+                .ToListAsync();
+
+            var allRoutes = availableRoutes.UnionBy(recurringRoutes, r => r.Id).ToList();
+
             var matchedRoutes = new List<object>();
             var radiusKm = 5.0; // Max distance to walk/travel to pickup point
 
@@ -394,7 +457,7 @@ namespace RideO.API.Controllers
                 .Select(d => d.Id)
                 .ToListAsync();
 
-            foreach (var route in availableRoutes)
+            foreach (var route in allRoutes)
             {
                 // Create an ordered list of all waypoints (Start -> Stops -> End)
                 var waypoints = new List<(double Lat, double Lng, int Order, string Name)>();
@@ -427,14 +490,26 @@ namespace RideO.API.Controllers
                     calculatedPrice = (decimal)distance * route.PricePerKm;
                 }
 
+                DateTime routeStartTime = route.StartTime;
+                if (route.IsRecurring && route.RecurringTime.HasValue)
+                {
+                    routeStartTime = startOfDay.Add(route.RecurringTime.Value);
+                }
+
                 matchedRoutes.Add(new
                 {
                     routeId = route.Id,
-                    driver = new { name = route.Driver!.User!.FullName, rating = route.Driver.Rating },
-                    vehicle = new { make = route.Vehicle!.Make, model = route.Vehicle.Model },
+                    driver = new { name = route.Driver?.User?.FullName ?? "Unknown", rating = route.Driver?.Rating ?? 0 },
+                    vehicle = new { 
+                        make = route.Vehicle?.Make ?? "Unknown", 
+                        model = route.Vehicle?.Model ?? "",
+                        color = route.Vehicle?.Color ?? "Unknown",
+                        licensePlate = route.Vehicle?.LicensePlate ?? "Unknown",
+                        vehicleType = route.Vehicle?.VehicleType ?? "Unknown"
+                    },
                     matchedPickup = bestPickup.Name,
                     matchedDropoff = bestDropoff.Name,
-                    startTime = route.StartTime,
+                    startTime = routeStartTime,
                     availableSeats = route.AvailableSeats,
                     pricePerSeat = calculatedPrice,
                     pricingMode = route.PricingMode,

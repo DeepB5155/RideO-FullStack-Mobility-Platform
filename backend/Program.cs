@@ -14,6 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 Env.Load();
 
 // Add services to the container.
+builder.Services.AddHostedService<DailyBookingService>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -76,6 +77,7 @@ builder.Services.AddSignalR();
 
 // Register Background Services
 builder.Services.AddHostedService<RecurringRouteService>();
+builder.Services.AddHostedService<RideReminderService>();
 
 // Enable CORS
 var allowedOriginsStr = Environment.GetEnvironmentVariable("ALLOWED_CORS_ORIGINS") ?? "*";

@@ -24,7 +24,7 @@ const EmergencyContactsScreen = ({ navigation }: any) => {
 
   const fetchContacts = async () => {
     try {
-      const res = await axiosInstance.get('/safety/emergency-contacts');
+      const res = await axiosInstance.get('/emergency/contacts');
       setContacts(res.data);
     } catch (e: any) {
       console.log('Failed to fetch emergency contacts', e);
@@ -46,7 +46,7 @@ const EmergencyContactsScreen = ({ navigation }: any) => {
     }
 
     try {
-      const res = await axiosInstance.post('/safety/emergency-contacts', {
+      const res = await axiosInstance.post('/emergency/contacts', {
         name,
         phoneNumber: phone,
         relationship
@@ -70,7 +70,7 @@ const EmergencyContactsScreen = ({ navigation }: any) => {
         style: 'destructive',
         onPress: async () => {
           try {
-            await axiosInstance.delete(`/safety/emergency-contacts/${id}`);
+            await axiosInstance.delete(`/emergency/contacts/${id}`);
             setContacts(contacts.filter(c => c.id !== id));
           } catch(e) {
             Alert.alert('Error', 'Failed to remove contact.');
@@ -101,6 +101,7 @@ const EmergencyContactsScreen = ({ navigation }: any) => {
       
       <Text style={styles.title}>Emergency Contacts</Text>
       <Text style={styles.subtitle}>Add up to 3 trusted contacts who will be notified in an emergency.</Text>
+      <Text style={styles.hintText}>💡 Your contacts will be notified with your location if you press SOS during a ride</Text>
 
       {loading ? (
         <ActivityIndicator size="large" color="#007AFF" style={{ marginTop: 50 }} />
@@ -160,7 +161,8 @@ const styles = StyleSheet.create({
   backBtn: { marginBottom: 15 },
   backBtnText: { color: '#007AFF', fontSize: 16, fontWeight: '500' },
   title: { fontSize: 28, fontWeight: 'bold', color: '#0f172a', marginBottom: 5 },
-  subtitle: { fontSize: 14, color: '#64748b', marginBottom: 20 },
+  subtitle: { fontSize: 14, color: '#64748b', marginBottom: 10 },
+  hintText: { fontSize: 14, color: '#059669', marginBottom: 20, fontStyle: 'italic', backgroundColor: '#ecfdf5', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#a7f3d0' },
   contactCard: { backgroundColor: 'white', padding: 15, borderRadius: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
   contactName: { fontSize: 18, fontWeight: 'bold', color: '#334155' },
   contactPhone: { fontSize: 15, color: '#64748b', marginTop: 2 },

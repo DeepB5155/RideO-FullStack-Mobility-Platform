@@ -26,6 +26,7 @@ namespace RideO.API.Data
         public DbSet<ChatMessage> ChatMessages { get; set; }
         public DbSet<SystemSetting> SystemSettings { get; set; }
         public DbSet<EmergencyContact> EmergencyContacts { get; set; }
+        public DbSet<EmergencySOS> EmergencySOSLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

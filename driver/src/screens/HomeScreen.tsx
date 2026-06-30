@@ -227,6 +227,17 @@ const HomeScreen = ({ navigation }: any) => {
         </View>
       )}
 
+      {/* Floating Action Button for Daily Commute */}
+      {!incomingRide && !activeRide && (
+        <TouchableOpacity 
+          style={styles.dailyCommuteBtn} 
+          onPress={() => navigation.navigate('DailyCommuteSetup')}
+        >
+          <Text style={styles.dailyCommuteIcon}>🗓️</Text>
+          <Text style={styles.dailyCommuteText}>Set Up Daily Commute</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Default Offline/Online Card */}
       {!incomingRide && !activeRide && (
         <View style={styles.bottomCard}>
@@ -410,6 +421,27 @@ const styles = StyleSheet.create({
     color: theme.colors.text.main,
     fontWeight: '600',
     fontSize: 16,
+  },
+  dailyCommuteBtn: {
+    position: 'absolute',
+    bottom: 220,
+    right: theme.spacing.lg,
+    backgroundColor: theme.colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.radius.full,
+    ...theme.shadows.large,
+  },
+  dailyCommuteIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  dailyCommuteText: {
+    color: theme.colors.text.light,
+    fontWeight: '700',
+    fontSize: 15,
   }
 });
 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, Alert, ActivityIndicator, Share } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { theme } from '../theme';
-import api from '../services/api';
+import { theme } from '../theme/theme';
+import api from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 
 const WalletScreen = () => {
@@ -86,7 +86,7 @@ const WalletScreen = () => {
           </View>
         </View>
         <Text style={[styles.txAmount, { color: isPositive ? theme.colors.success : theme.colors.danger }]}>
-          {isPositive ? '+' : '-'}${Math.abs(item.amount).toFixed(2)}
+          {isPositive ? '+' : '-'}₹{Math.abs(item.amount).toFixed(2)}
         </Text>
       </View>
     );
@@ -108,14 +108,14 @@ const WalletScreen = () => {
 
       <View style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Available Balance</Text>
-        <Text style={styles.balanceAmount}>${balance.toFixed(2)}</Text>
+        <Text style={styles.balanceAmount}>₹{balance.toFixed(2)}</Text>
       </View>
 
       <View style={styles.addFundsContainer}>
         <Text style={styles.sectionTitle}>Add Funds (Mock UPI)</Text>
         <TextInput
           style={styles.input}
-          placeholder="Amount ($)"
+          placeholder="Amount (₹)"
           placeholderTextColor={theme.colors.text.muted}
           keyboardType="decimal-pad"
           value={amount}

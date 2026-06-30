@@ -23,6 +23,9 @@ namespace RideO.API.Models
         [MaxLength(500)]
         public string Message { get; set; } = string.Empty;
 
+        [MaxLength(30)]
+        public string Type { get; set; } = "info";
+
         public bool IsRead { get; set; } = false;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
