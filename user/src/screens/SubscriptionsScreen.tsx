@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
 import axios from 'axios';
-
+import { theme } from '../theme/theme';
 // Replace with your local machine's IP address
 const API_URL = 'http://10.0.2.2:5000/api';
 
@@ -198,54 +198,54 @@ export default function SubscriptionsScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212', padding: 20 },
+  container: { flex: 1, backgroundColor: theme.colors.background, padding: 20 },
   headerContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 25, marginTop: 40 },
-  header: { fontSize: 26, fontWeight: '800', color: '#fff', marginLeft: 10 },
+  header: { fontSize: 26, fontWeight: '800', color: theme.colors.text.main, marginLeft: 10 },
   
-  card: { backgroundColor: '#1E1E1E', borderRadius: 16, padding: 18, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
+  card: { backgroundColor: theme.colors.card, borderRadius: theme.radius.xl, padding: 18, marginBottom: 20, ...theme.shadows.medium, borderWidth: 1, borderColor: theme.colors.border },
   cardPaused: { opacity: 0.7 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   routeContainer: { flex: 1, paddingRight: 10 },
-  locationText: { fontSize: 15, color: '#fff', fontWeight: '600', marginVertical: 2 },
-  greenDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#00E676', marginRight: 5 },
+  locationText: { fontSize: 15, color: theme.colors.text.main, fontWeight: '600', marginVertical: 2 },
+  greenDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.success, marginRight: 5 },
   arrowIcon: { marginLeft: 3, marginVertical: 2 },
   
-  badgeContainer: { backgroundColor: '#2C2C2E', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  timeBadge: { color: '#00E676', fontWeight: 'bold', fontSize: 14 },
+  badgeContainer: { backgroundColor: theme.colors.surface, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  timeBadge: { color: theme.colors.success, fontWeight: 'bold', fontSize: 14 },
   
-  divider: { height: 1, backgroundColor: '#333', marginVertical: 15 },
+  divider: { height: 1, backgroundColor: theme.colors.border, marginVertical: 15 },
   
   detailsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-  label: { fontSize: 12, color: '#888', marginBottom: 5 },
+  label: { fontSize: 12, color: theme.colors.text.muted, marginBottom: 5 },
   
   daysRow: { flexDirection: 'row' },
-  dayPill: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#2C2C2E', alignItems: 'center', justifyContent: 'center', marginRight: 4 },
-  dayPillActive: { backgroundColor: '#00E676' },
-  dayText: { fontSize: 10, color: '#888', fontWeight: 'bold' },
-  dayTextActive: { color: '#000' },
+  dayPill: { width: 22, height: 22, borderRadius: 11, backgroundColor: theme.colors.surface, alignItems: 'center', justifyContent: 'center', marginRight: 4 },
+  dayPillActive: { backgroundColor: theme.colors.success },
+  dayText: { fontSize: 10, color: theme.colors.text.muted, fontWeight: 'bold' },
+  dayTextActive: { color: theme.colors.background },
   
   planBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  planBadgeDaily: { backgroundColor: 'rgba(59, 130, 246, 0.2)' },
-  planBadgeWeekly: { backgroundColor: 'rgba(168, 85, 247, 0.2)' },
-  planText: { fontSize: 11, fontWeight: 'bold', color: '#3b82f6' },
+  planBadgeDaily: { backgroundColor: theme.colors.primary + '33' },
+  planBadgeWeekly: { backgroundColor: '#a855f733' },
+  planText: { fontSize: 11, fontWeight: 'bold', color: theme.colors.primaryLight },
   
-  driverInfoRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#252525', padding: 10, borderRadius: 10, marginBottom: 15 },
-  driverName: { color: '#ccc', fontSize: 14, marginLeft: 8, flex: 1 },
-  seatsInfo: { color: '#00E676', fontSize: 13, fontWeight: 'bold' },
+  driverInfoRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, padding: 10, borderRadius: 10, marginBottom: 15 },
+  driverName: { color: theme.colors.text.main, fontSize: 14, marginLeft: 8, flex: 1 },
+  seatsInfo: { color: theme.colors.success, fontSize: 13, fontWeight: 'bold' },
   
-  pausedBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 149, 0, 0.1)', padding: 10, borderRadius: 8, marginBottom: 15 },
-  pausedText: { color: '#FF9500', marginLeft: 8, fontSize: 13, fontWeight: '500' },
+  pausedBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.warning + '15', padding: 10, borderRadius: 8, marginBottom: 15 },
+  pausedText: { color: theme.colors.warning, marginLeft: 8, fontSize: 13, fontWeight: '500' },
   
   actionRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  actionBtnPause: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255, 149, 0, 0.1)', paddingVertical: 10, borderRadius: 10, flex: 1, marginRight: 10 },
-  actionTextPause: { color: '#FF9500', fontWeight: 'bold', marginLeft: 6 },
-  actionBtnCancel: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255, 59, 48, 0.1)', paddingVertical: 10, borderRadius: 10, flex: 1 },
-  actionTextCancel: { color: '#FF3B30', fontWeight: 'bold', marginLeft: 6 },
+  actionBtnPause: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.warning + '15', paddingVertical: 10, borderRadius: 10, flex: 1, marginRight: 10 },
+  actionTextPause: { color: theme.colors.warning, fontWeight: 'bold', marginLeft: 6 },
+  actionBtnCancel: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.danger + '15', paddingVertical: 10, borderRadius: 10, flex: 1 },
+  actionTextCancel: { color: theme.colors.danger, fontWeight: 'bold', marginLeft: 6 },
 
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: -50 },
-  emptyTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold', marginTop: 15, marginBottom: 8 },
-  emptySub: { color: '#888', textAlign: 'center', paddingHorizontal: 40, lineHeight: 22 },
+  emptyTitle: { color: theme.colors.text.main, fontSize: 20, fontWeight: 'bold', marginTop: 15, marginBottom: 8 },
+  emptySub: { color: theme.colors.text.muted, textAlign: 'center', paddingHorizontal: 40, lineHeight: 22 },
 
-  fab: { position: 'absolute', bottom: 30, left: 20, right: 20, backgroundColor: '#3b82f6', flexDirection: 'row', padding: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', elevation: 5 },
-  fabText: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginRight: 8 }
+  fab: { position: 'absolute', bottom: 30, left: 20, right: 20, backgroundColor: theme.colors.primary, flexDirection: 'row', padding: 16, borderRadius: theme.radius.full, alignItems: 'center', justifyContent: 'center', ...theme.shadows.medium },
+  fabText: { color: theme.colors.text.light, fontSize: 16, fontWeight: 'bold', marginRight: 8 }
 });

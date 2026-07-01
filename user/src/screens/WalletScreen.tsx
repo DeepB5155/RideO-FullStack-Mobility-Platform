@@ -77,7 +77,7 @@ const WalletScreen = () => {
     return (
       <View style={styles.txCard}>
         <View style={styles.txLeft}>
-          <View style={[styles.txIconContainer, { backgroundColor: isPositive ? '#E8F5E9' : '#FFEBEE' }]}>
+          <View style={[styles.txIconContainer, { backgroundColor: isPositive ? theme.colors.success + '20' : theme.colors.danger + '20' }]}>
             <Icon name={isPositive ? 'arrow-down' : 'arrow-up'} size={20} color={isPositive ? theme.colors.success : theme.colors.danger} />
           </View>
           <View>
@@ -183,10 +183,12 @@ const styles = StyleSheet.create({
     marginHorizontal: theme.spacing.lg,
     marginTop: theme.spacing.md,
     padding: theme.spacing.lg,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: theme.colors.success + '15',
     borderRadius: theme.radius.md,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.success,
     ...theme.shadows.small,
   },
   referralText: { fontSize: 14, color: theme.colors.text.main, marginTop: 4 },
@@ -202,14 +204,16 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: '600', color: theme.colors.text.main, marginBottom: theme.spacing.md },
   sectionTitleList: { fontSize: 16, fontWeight: '600', color: theme.colors.text.main, marginHorizontal: theme.spacing.lg, marginTop: theme.spacing.lg, marginBottom: theme.spacing.sm },
   input: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.sm,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
     color: theme.colors.text.main,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   addBtn: {
-    backgroundColor: theme.colors.secondary,
+    backgroundColor: theme.colors.primary,
     padding: theme.spacing.md,
     borderRadius: theme.radius.full,
     alignItems: 'center',
@@ -225,6 +229,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     marginBottom: theme.spacing.sm,
     ...theme.shadows.small,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   txLeft: { flexDirection: 'row', alignItems: 'center' },
   txIconContainer: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },

@@ -156,30 +156,32 @@ const EmergencyContactsScreen = ({ navigation }: any) => {
   );
 };
 
+import { theme } from '../theme/theme';
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', padding: 20, paddingTop: 50 },
+  container: { flex: 1, backgroundColor: theme.colors.background, padding: 20, paddingTop: 50 },
   backBtn: { marginBottom: 15 },
-  backBtnText: { color: '#007AFF', fontSize: 16, fontWeight: '500' },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#0f172a', marginBottom: 5 },
-  subtitle: { fontSize: 14, color: '#64748b', marginBottom: 10 },
-  hintText: { fontSize: 14, color: '#059669', marginBottom: 20, fontStyle: 'italic', backgroundColor: '#ecfdf5', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#a7f3d0' },
-  contactCard: { backgroundColor: 'white', padding: 15, borderRadius: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
-  contactName: { fontSize: 18, fontWeight: 'bold', color: '#334155' },
-  contactPhone: { fontSize: 15, color: '#64748b', marginTop: 2 },
-  contactRel: { fontSize: 13, color: '#94a3b8', marginTop: 2, fontStyle: 'italic' },
-  deleteBtn: { backgroundColor: '#fee2e2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
-  deleteBtnText: { color: '#ef4444', fontWeight: 'bold', fontSize: 13 },
-  emptyText: { textAlign: 'center', color: '#94a3b8', marginTop: 20, fontStyle: 'italic' },
-  addBtn: { backgroundColor: '#3b82f6', padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 20 },
-  addBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
-  addForm: { backgroundColor: 'white', padding: 20, borderRadius: 10, marginTop: 20, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5, elevation: 3 },
-  formTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, color: '#1e293b' },
-  input: { backgroundColor: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 16 },
+  backBtnText: { color: theme.colors.primary, fontSize: 16, fontWeight: '500' },
+  title: { fontSize: 28, fontWeight: 'bold', color: theme.colors.text.main, marginBottom: 5 },
+  subtitle: { fontSize: 14, color: theme.colors.text.muted, marginBottom: 10 },
+  hintText: { fontSize: 14, color: theme.colors.success, marginBottom: 20, fontStyle: 'italic', backgroundColor: theme.colors.success + '15', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.success },
+  contactCard: { backgroundColor: theme.colors.card, padding: 15, borderRadius: theme.radius.lg, flexDirection: 'row', alignItems: 'center', marginBottom: 10, ...theme.shadows.small, borderWidth: 1, borderColor: theme.colors.border },
+  contactName: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
+  contactPhone: { fontSize: 15, color: theme.colors.text.muted, marginTop: 2 },
+  contactRel: { fontSize: 13, color: theme.colors.text.muted, marginTop: 2, fontStyle: 'italic' },
+  deleteBtn: { backgroundColor: theme.colors.surface, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: theme.colors.danger },
+  deleteBtnText: { color: theme.colors.danger, fontWeight: 'bold', fontSize: 13 },
+  emptyText: { textAlign: 'center', color: theme.colors.text.muted, marginTop: 20, fontStyle: 'italic' },
+  addBtn: { backgroundColor: theme.colors.primary, padding: 15, borderRadius: theme.radius.md, alignItems: 'center', marginTop: 20 },
+  addBtnText: { color: theme.colors.text.light, fontWeight: 'bold', fontSize: 16 },
+  addForm: { backgroundColor: theme.colors.card, padding: 20, borderRadius: theme.radius.lg, marginTop: 20, ...theme.shadows.medium, borderWidth: 1, borderColor: theme.colors.border },
+  formTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, color: theme.colors.text.main },
+  input: { backgroundColor: theme.colors.surface, padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 16, color: theme.colors.text.main, borderWidth: 1, borderColor: theme.colors.border },
   formActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  cancelBtn: { flex: 1, padding: 12, borderRadius: 8, backgroundColor: '#e2e8f0', alignItems: 'center' },
-  cancelBtnText: { color: '#475569', fontWeight: 'bold' },
-  saveBtn: { flex: 1, padding: 12, borderRadius: 8, backgroundColor: '#10b981', alignItems: 'center' },
-  saveBtnText: { color: 'white', fontWeight: 'bold' }
+  cancelBtn: { flex: 1, padding: 12, borderRadius: 8, backgroundColor: theme.colors.surface, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border },
+  cancelBtnText: { color: theme.colors.text.main, fontWeight: 'bold' },
+  saveBtn: { flex: 1, padding: 12, borderRadius: 8, backgroundColor: theme.colors.success, alignItems: 'center' },
+  saveBtnText: { color: theme.colors.text.light, fontWeight: 'bold' }
 });
 
 export default EmergencyContactsScreen;

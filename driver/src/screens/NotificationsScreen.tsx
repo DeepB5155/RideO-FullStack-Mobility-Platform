@@ -110,17 +110,19 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', marginTop: 50 },
   emptyText: { color: theme.colors.text.muted, fontSize: 16 },
   card: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.card,
     padding: theme.spacing.lg,
     borderRadius: theme.radius.lg,
     marginBottom: theme.spacing.md,
     borderLeftWidth: 4,
     borderLeftColor: theme.colors.border,
-    ...theme.shadows.small,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadows.medium,
   },
   unreadCard: {
     borderLeftColor: theme.colors.primary,
-    backgroundColor: theme.colors.surfaceHighlight, 
+    backgroundColor: theme.colors.surface, 
   },
   cardHeader: {
     flexDirection: 'row',

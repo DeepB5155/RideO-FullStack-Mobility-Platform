@@ -1,98 +1,219 @@
 import React, { useContext } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+  ScrollView,
+  Alert,
+  Image,
+} from 'react-native';
 import { AuthContext } from '../context/AuthContext';
-import { theme } from '../theme/theme';
 import { useNavigation } from '@react-navigation/native';
+import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 
 const ProfileScreen = () => {
   const { user, logout } = useContext(AuthContext);
   const navigation = useNavigation<any>();
-  const [displayId, setDisplayId] = React.useState(user?.id);
+
+  const [kycStatus, setKycStatus] = React.useState<string>('Pending');
+  const [earnings, setEarnings] = React.useState<number>(0);
+  const [trips, setTrips] = React.useState<number>(0);
+  const [vehicle, setVehicle] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    const fetchDriverInfo = async () => {
+    const fetchData = async () => {
       try {
         const { default: axiosInstance } = await import('../api/axios');
-        const res = await axiosInstance.get('/kyc/status');
-        const license = res.data.licenseNumber;
-        
-        if (license && user) {
-           const prefix = license.substring(0, 2).toUpperCase() || 'DL';
-           const namePart = user.fullName.split(' ')[0].substring(0, 4).toUpperCase();
-           const licLast4 = license.length >= 4 ? license.slice(-4) : '0000';
-           const phoneLast4 = user.phoneNumber && user.phoneNumber.length >= 4 ? user.phoneNumber.slice(-4) : '0000';
-           
-           setDisplayId(`${prefix}-${namePart}-${licLast4}-${phoneLast4}`);
-        } else if (user) {
-           const namePart = user.fullName.split(' ')[0].substring(0, 4).toUpperCase();
-           const phoneLast4 = user.phoneNumber && user.phoneNumber.length >= 4 ? user.phoneNumber.slice(-4) : '0000';
-           setDisplayId(`DRV-${namePart}-${phoneLast4}`);
+        const [kycRes, vehicleRes, statsRes] = await Promise.allSettled([
+          axiosInstance.get('/kyc/status'),
+          axiosInstance.get('/vehicle/my'),
+          axiosInstance.get('/insights/driver-stats')
+        ]);
+
+        if (kycRes.status === 'fulfilled') {
+          setKycStatus(kycRes.value.data.status || 'Pending');
+        }
+        if (vehicleRes.status === 'fulfilled') {
+          setVehicle(vehicleRes.value.data);
+        }
+        if (statsRes.status === 'fulfilled') {
+          setEarnings(statsRes.value.data.weeklyEarnings || 0);
+          setTrips(statsRes.value.data.totalTripsThisMonth || 0);
         }
       } catch (e) {
-        console.error(e);
+        console.error('Failed to fetch profile data', e);
+      } finally {
+        setLoading(false);
       }
     };
-    if (user) {
-      fetchDriverInfo();
-    }
+    if (user) fetchData();
   }, [user]);
 
-  const handleLogout = async () => {
-    await logout();
+  const handleLogout = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: async () => await logout() },
+    ]);
   };
+
+  const name = user?.fullName || 'Alex Rider';
+  const initials = name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) || 'AR';
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.heroBackground} />
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        <View style={styles.profileCard}>
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarText}>{user?.fullName?.charAt(0).toUpperCase()}</Text>
-          </View>
-          <Text style={styles.name}>{user?.fullName}</Text>
-          <Text style={styles.email}>{user?.email}</Text>
-          <View style={styles.badgeContainer}>
-            <Text style={styles.badge}>{user?.role?.toUpperCase()}</Text>
-          </View>
-        </View>
-
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Account Details</Text>
-          <View style={styles.row}>
-            <View style={styles.rowLabelContainer}>
-              <Text style={styles.icon}>📱</Text>
-              <Text style={styles.label}>Phone Number</Text>
-            </View>
-            <Text style={styles.value}>{user?.phoneNumber || 'Not Set'}</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.row}>
-            <View style={styles.rowLabelContainer}>
-              <Text style={styles.icon}>🆔</Text>
-              <Text style={styles.label}>Driver ID</Text>
-            </View>
-            <Text style={styles.value}>{displayId}</Text>
+        {/* Mobile Header */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.headerBtn}>
+            <MaterialIcon name="menu" size={24} color="#000000" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>RideO</Text>
+          <View style={styles.headerAvatar}>
+            <Text style={styles.headerAvatarText}>{initials}</Text>
           </View>
         </View>
 
-        <TouchableOpacity 
-          style={styles.insightsButton} 
-          onPress={() => navigation.navigate('Insights')}
-        >
-          <Text style={styles.insightsButtonText}>📊 View Insights & Leaderboard</Text>
-        </TouchableOpacity>
+        <View style={styles.container}>
+          {/* Profile Info */}
+          <View style={styles.profileSection}>
+            <View style={styles.largeAvatar}>
+              <Text style={styles.largeAvatarText}>{initials}</Text>
+            </View>
+            <Text style={styles.profileName}>{name}</Text>
+            <View style={styles.pillRow}>
+              <View style={styles.tierPill}>
+                <Text style={styles.tierPillText}>Gold Tier</Text>
+              </View>
+              <View style={styles.ratingPill}>
+                <Text style={styles.ratingPillText}>4.9</Text>
+                <MaterialIcon name="star" size={14} color="#006f66" style={{ marginLeft: 2 }} />
+              </View>
+            </View>
+          </View>
 
-        <TouchableOpacity 
-          style={styles.editVehicleButton} 
-          onPress={() => navigation.navigate('EditVehicle')}
-        >
-          <Text style={styles.editVehicleButtonText}>🚗 Edit Vehicle Details</Text>
-        </TouchableOpacity>
+          {/* KYC Status Banner */}
+          <View style={[styles.kycBanner, kycStatus !== 'Verified' && { backgroundColor: '#fff3e0', borderColor: '#ffe0b2' }]}>
+            <View style={styles.kycLeft}>
+              <View style={[styles.kycIconWrapper, kycStatus !== 'Verified' && { backgroundColor: '#f57c00' }]}>
+                <MaterialIcon name={kycStatus === 'Verified' ? 'verified-user' : 'pending-actions'} size={20} color="#ffffff" />
+              </View>
+              <View style={styles.kycTextCol}>
+                <Text style={styles.kycTitle}>Account {kycStatus}</Text>
+                <Text style={styles.kycSubtitle}>
+                  {kycStatus === 'Verified' ? 'All documents are up to date.' : 'Please update your documents.'}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.kycDetailsBtn} onPress={() => navigation.navigate('KYC', { fromProfile: true })}>
+              <Text style={[styles.kycDetailsText, kycStatus !== 'Verified' && { color: '#f57c00' }]}>Details</Text>
+            </TouchableOpacity>
+          </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>SIGN OUT</Text>
-        </TouchableOpacity>
+          {/* Grid Quick Actions */}
+          <View style={styles.grid}>
+            {/* Earnings */}
+            <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Earnings')} activeOpacity={0.8}>
+              <View style={styles.gridCardHeader}>
+                <View style={styles.iconBoxDark}>
+                  <MaterialIcon name="account-balance-wallet" size={20} color="#ffffff" />
+                </View>
+                <MaterialIcon name="arrow-forward" size={20} color="#76777d" />
+              </View>
+              <View>
+                <Text style={styles.gridCardLabel}>THIS WEEK</Text>
+                <Text style={styles.gridCardValue}>₹{earnings.toFixed(2)}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Insights */}
+            <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Insights')} activeOpacity={0.8}>
+              <View style={styles.gridCardHeader}>
+                <View style={styles.iconBoxTeal}>
+                  <MaterialIcon name="trending-up" size={20} color="#005049" />
+                </View>
+                <MaterialIcon name="arrow-forward" size={20} color="#76777d" />
+              </View>
+              <View>
+                <Text style={styles.gridCardLabel}>TRIPS</Text>
+                <Text style={styles.gridCardValue}>{trips} Completed</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Vehicle Details */}
+          <View style={styles.vehicleCard}>
+            <View style={styles.vehicleHeader}>
+              <View style={styles.vehicleHeaderLeft}>
+                <MaterialIcon name="directions-car" size={20} color="#000000" />
+                <Text style={styles.vehicleHeaderTitle}>Active Vehicle</Text>
+              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('EditVehicle')}>
+                <Text style={styles.vehicleManageText}>{vehicle ? 'Manage' : 'Add Vehicle'}</Text>
+              </TouchableOpacity>
+            </View>
+            {vehicle ? (
+              <View style={styles.vehicleBody}>
+                <Image 
+                  source={{ uri: 'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fd?auto=format&fit=crop&q=80&w=800' }} 
+                  style={styles.vehicleImage}
+                />
+                <Text style={styles.vehicleName}>{vehicle.make} {vehicle.model} {vehicle.year}</Text>
+                <Text style={styles.vehicleSub}>{vehicle.vehicleType} • {vehicle.color}</Text>
+                
+                <View style={styles.vehicleInfoRow}>
+                  <View style={styles.vehicleInfoBox}>
+                    <Text style={styles.vehicleInfoLabel}>PLATE</Text>
+                    <Text style={styles.vehicleInfoValue}>{vehicle.licensePlate}</Text>
+                  </View>
+                  <View style={styles.vehicleInfoBox}>
+                    <Text style={styles.vehicleInfoLabel}>INSPECTION</Text>
+                    <Text style={[styles.vehicleInfoValue, { color: '#006a61' }]}>Valid</Text>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.vehicleBody}>
+                <Text style={{textAlign: 'center', paddingVertical: 20, color: '#45464d'}}>No active vehicle found.</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Links */}
+          <View style={styles.linksContainer}>
+            <TouchableOpacity style={styles.linkRow} onPress={() => navigation.navigate('Support')} activeOpacity={0.7}>
+              <View style={styles.linkIconBox}>
+                <MaterialIcon name="help-outline" size={20} color="#0b1c30" />
+              </View>
+              <View style={styles.linkTextCol}>
+                <Text style={styles.linkTitle}>Help & Support</Text>
+                <Text style={styles.linkSub}>FAQs, Contact us</Text>
+              </View>
+              <MaterialIcon name="chevron-right" size={24} color="#76777d" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.linkRow} activeOpacity={0.7}>
+              <View style={styles.linkIconBox}>
+                <MaterialIcon name="settings" size={20} color="#0b1c30" />
+              </View>
+              <View style={styles.linkTextCol}>
+                <Text style={styles.linkTitle}>App Settings</Text>
+                <Text style={styles.linkSub}>Navigation, Preferences</Text>
+              </View>
+              <MaterialIcon name="chevron-right" size={24} color="#76777d" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Sign Out */}
+          <TouchableOpacity style={styles.signOutBtn} onPress={handleLogout} activeOpacity={0.8}>
+            <MaterialIcon name="logout" size={20} color="#ba1a1a" />
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -101,160 +222,321 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#f8f9ff',
   },
-  container: {
-    flexGrow: 1,
-    paddingBottom: theme.spacing.xxl,
+  scrollContent: {
+    paddingBottom: 120,
   },
-  heroBackground: {
-    backgroundColor: theme.colors.primary,
-    height: 180,
-    borderBottomLeftRadius: theme.radius.xl,
-    borderBottomRightRadius: theme.radius.xl,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-  },
-  profileCard: {
-    marginTop: 80,
-    marginHorizontal: theme.spacing.xl,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.xl,
-    alignItems: 'center',
-    ...theme.shadows.large,
-  },
-  avatarPlaceholder: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: -55, // Overlap the card edge
-    borderWidth: 4,
-    borderColor: theme.colors.surface,
-    marginBottom: theme.spacing.md,
-  },
-  avatarText: {
-    fontSize: 36,
-    color: theme.colors.text.light,
-    fontWeight: '800',
-  },
-  name: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: theme.colors.text.main,
-    marginBottom: theme.spacing.xs,
-  },
-  email: {
-    fontSize: 15,
-    color: theme.colors.text.muted,
-    marginBottom: theme.spacing.md,
-  },
-  badgeContainer: {
-    backgroundColor: theme.colors.primaryLight + '20', // 20% opacity
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.full,
-  },
-  badge: {
-    color: theme.colors.primary,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  sectionCard: {
-    backgroundColor: theme.colors.surface,
-    marginTop: theme.spacing.xl,
-    marginHorizontal: theme.spacing.xl,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.xl,
-    ...theme.shadows.medium,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: theme.colors.text.main,
-    marginBottom: theme.spacing.lg,
-  },
-  row: {
+  header: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    height: 64,
+  },
+  headerBtn: {
+    padding: 8,
+    marginLeft: -8,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  headerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#131b2e',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
+    justifyContent: 'center',
   },
-  rowLabelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  icon: {
-    fontSize: 18,
-    marginRight: theme.spacing.sm,
-  },
-  label: {
-    fontSize: 15,
-    color: theme.colors.text.muted,
+  headerAvatarText: {
+    color: '#ffffff',
+    fontSize: 12,
     fontWeight: '600',
   },
-  value: {
-    fontSize: 15,
-    color: theme.colors.text.main,
-    fontWeight: '700',
+
+  container: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
-  divider: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginVertical: theme.spacing.sm,
-  },
-  insightsButton: {
-    marginTop: theme.spacing.xl,
-    marginHorizontal: theme.spacing.xl,
-    backgroundColor: theme.colors.primary,
-    padding: theme.spacing.lg,
-    borderRadius: theme.radius.full,
+
+  // Profile Section
+  profileSection: {
     alignItems: 'center',
-    ...theme.shadows.medium,
+    marginBottom: 24,
   },
-  insightsButtonText: {
-    color: theme.colors.surface,
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  editVehicleButton: {
-    marginTop: theme.spacing.md,
-    marginHorizontal: theme.spacing.xl,
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.lg,
-    borderRadius: theme.radius.full,
+  largeAvatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#131b2e',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderWidth: 4,
+    borderColor: '#e5eeff',
+  },
+  largeAvatarText: {
+    fontSize: 32,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  profileName: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#0b1c30',
+    marginBottom: 8,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tierPill: {
+    backgroundColor: '#e5eeff',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 99,
+  },
+  tierPillText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#45464d',
+  },
+  ratingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#86f2e4',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 99,
+  },
+  ratingPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#006f66',
+  },
+
+  // KYC Banner
+  kycBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#e0f2f1', // Light teal tint
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    ...theme.shadows.small,
+    borderColor: '#b2dfdb',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
   },
-  editVehicleButtonText: {
-    color: theme.colors.text.main,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  logoutButton: {
-    marginTop: theme.spacing.lg,
-    marginHorizontal: theme.spacing.xl,
-    backgroundColor: theme.colors.background,
-    padding: theme.spacing.lg,
-    borderRadius: theme.radius.full,
+  kycLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.danger,
+    gap: 12,
   },
-  logoutButtonText: {
-    color: theme.colors.danger,
+  kycIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#006a61',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kycTextCol: {
+    justifyContent: 'center',
+  },
+  kycTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
+    color: '#0b1c30',
+  },
+  kycSubtitle: {
+    fontSize: 12,
+    color: '#45464d',
+    marginTop: 2,
+  },
+  kycDetailsBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  kycDetailsText: {
+    color: '#006a61',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+
+  // Grid Actions
+  grid: {
+    flexDirection: 'column',
+    gap: 16,
+    marginBottom: 16,
+  },
+  gridCard: {
+    backgroundColor: '#eff4ff',
+    borderWidth: 1,
+    borderColor: 'rgba(198,198,205,0.3)',
+    borderRadius: 12,
+    padding: 16,
+    height: 120,
+    justifyContent: 'space-between',
+  },
+  gridCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  iconBoxDark: {
+    backgroundColor: '#131b2e',
+    padding: 8,
+    borderRadius: 8,
+  },
+  iconBoxTeal: {
+    backgroundColor: '#86f2e4',
+    padding: 8,
+    borderRadius: 8,
+  },
+  gridCardLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#45464d',
     letterSpacing: 1,
+    marginBottom: 4,
+  },
+  gridCardValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0b1c30',
+  },
+
+  // Vehicle Details
+  vehicleCard: {
+    backgroundColor: '#e5eeff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  vehicleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    paddingBottom: 12,
+  },
+  vehicleHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  vehicleHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0b1c30',
+  },
+  vehicleManageText: {
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '600',
+  },
+  vehicleBody: {
+    padding: 16,
+    paddingTop: 0,
+  },
+  vehicleImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  vehicleName: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#0b1c30',
+  },
+  vehicleSub: {
+    fontSize: 12,
+    color: '#45464d',
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  vehicleInfoRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  vehicleInfoBox: {
+    flex: 1,
+    backgroundColor: '#f8f9ff',
+    borderWidth: 1,
+    borderColor: 'rgba(198,198,205,0.5)',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  vehicleInfoLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#45464d',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  vehicleInfoValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#0b1c30',
+    letterSpacing: 1,
+  },
+
+  // Links
+  linksContainer: {
+    gap: 12,
+    marginBottom: 32,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(198,198,205,0.3)',
+    borderRadius: 12,
+    padding: 16,
+  },
+  linkIconBox: {
+    backgroundColor: '#dce9ff',
+    padding: 8,
+    borderRadius: 8,
+    marginRight: 16,
+  },
+  linkTextCol: {
+    flex: 1,
+  },
+  linkTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0b1c30',
+  },
+  linkSub: {
+    fontSize: 12,
+    color: '#45464d',
+    marginTop: 2,
+  },
+
+  // Sign out
+  signOutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: '#ba1a1a',
+    borderRadius: 12,
+  },
+  signOutText: {
+    color: '#ba1a1a',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

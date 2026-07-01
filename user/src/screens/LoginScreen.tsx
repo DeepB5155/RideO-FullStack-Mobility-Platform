@@ -2,6 +2,7 @@ import React, { useState, useContext } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api/axios';
+import { theme } from '../theme/theme';
 
 const LoginScreen = () => {
   const { login } = useContext(AuthContext);
@@ -65,7 +66,7 @@ const LoginScreen = () => {
           <TextInput
             style={styles.input}
             placeholder="Full Name"
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.text.muted}
             value={fullName}
             onChangeText={setFullName}
           />
@@ -76,7 +77,7 @@ const LoginScreen = () => {
         <TextInput
           style={styles.input}
           placeholder="Email Address"
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.colors.text.muted}
           autoCapitalize="none"
           keyboardType="email-address"
           value={email}
@@ -89,7 +90,7 @@ const LoginScreen = () => {
           <TextInput
             style={styles.input}
             placeholder="Password"
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.text.muted}
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -102,7 +103,7 @@ const LoginScreen = () => {
           <TextInput
             style={styles.input}
             placeholder="Referral Code (Optional)"
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.text.muted}
             autoCapitalize="characters"
             value={referralCode}
             onChangeText={setReferralCode}
@@ -149,62 +150,67 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
     justifyContent: 'center',
-    padding: 20,
+    padding: theme.spacing.xl,
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
+    fontWeight: '800',
+    color: theme.colors.text.main,
+    marginBottom: theme.spacing.sm,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
-    marginBottom: 40,
+    color: theme.colors.text.muted,
+    marginBottom: theme.spacing.xxl,
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: theme.spacing.lg,
   },
   input: {
-    backgroundColor: '#f5f5f5',
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.lg,
+    borderRadius: theme.radius.md,
     fontSize: 16,
-    color: '#333', // ensure text is visible
+    color: theme.colors.text.main,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   button: {
-    backgroundColor: '#000',
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: theme.colors.primary,
+    padding: theme.spacing.lg,
+    borderRadius: theme.radius.full,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: theme.spacing.md,
+    ...theme.shadows.medium,
   },
   buttonDisabled: {
-    backgroundColor: '#666',
+    backgroundColor: theme.colors.surface,
   },
   buttonText: {
-    color: '#fff',
+    color: theme.colors.text.light,
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   toggleButton: {
-    marginTop: 20,
+    marginTop: theme.spacing.xl,
     alignItems: 'center',
   },
   toggleText: {
-    color: '#000',
+    color: theme.colors.primaryLight,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   forgotButton: {
-    marginTop: 15,
+    marginTop: theme.spacing.lg,
     alignItems: 'center',
   },
   forgotText: {
-    color: '#007AFF',
+    color: theme.colors.primary,
     fontSize: 14,
+    fontWeight: '600',
   }
 });
 

@@ -267,6 +267,61 @@ namespace RideO.API.Controllers
             return Ok(new { message = "FCM token updated successfully." });
         }
 
+        [HttpGet("update-passwords")]
+        public async Task<IActionResult> UpdatePasswords()
+        {
+            var accounts = new[]
+            {
+                new { Email = "admin@gmail.com", Role = "Admin", Name = "Admin User" },
+                new { Email = "driver@gmail.com", Role = "Driver", Name = "Driver User" },
+                new { Email = "user@gmail.com", Role = "User", Name = "Passenger User" }
+            };
+
+            var updated = 0;
+            var created = 0;
+
+            foreach (var acc in accounts)
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == acc.Email);
+                if (user != null)
+                {
+                    user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("Pass@123");
+                    updated++;
+                }
+                else
+                {
+                    user = new User
+                    {
+                        Id = Guid.NewGuid(),
+                        FullName = acc.Name,
+                        Email = acc.Email,
+                        Role = acc.Role,
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword("Pass@123"),
+                        CreatedAt = DateTime.UtcNow,
+                        IsVerified = true
+                    };
+                    _context.Users.Add(user);
+                    
+                    if (acc.Role == "Driver")
+                    {
+                        _context.Drivers.Add(new Driver
+                        {
+                            Id = Guid.NewGuid(),
+                            UserId = user.Id,
+                            LicenseNumber = "DL-NEW-000",
+                            VehicleType = "Sedan",
+                            IsAvailable = true,
+                            Rating = 5.0m
+                        });
+                    }
+                    created++;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = $"Passwords updated. Created: {created}, Updated: {updated}" });
+        }
+
         [HttpGet("seed-driver")]
         public async Task<IActionResult> SeedDriver()
         {

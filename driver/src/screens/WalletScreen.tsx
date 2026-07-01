@@ -65,7 +65,7 @@ const WalletScreen = () => {
     return (
       <View style={styles.txCard}>
         <View style={styles.txLeft}>
-          <View style={[styles.txIconContainer, { backgroundColor: isPositive ? '#E8F5E9' : '#FFEBEE' }]}>
+          <View style={[styles.txIconContainer, { backgroundColor: isPositive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)' }]}>
             <Icon name={isPositive ? 'arrow-down' : 'arrow-up'} size={20} color={isPositive ? theme.colors.success : theme.colors.danger} />
           </View>
           <View>
@@ -135,58 +135,65 @@ const WalletScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { padding: theme.spacing.lg, paddingTop: 60, backgroundColor: theme.colors.surface, ...theme.shadows.small },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
+  header: { padding: theme.spacing.lg, paddingTop: 60, backgroundColor: theme.colors.background, ...theme.shadows.small },
   headerTitle: { fontSize: 22, fontWeight: 'bold', color: theme.colors.text.main },
   balanceCard: {
     margin: theme.spacing.lg,
     padding: theme.spacing.xl,
-    backgroundColor: theme.colors.success, // Use green for earnings
-    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.radius.xl,
     alignItems: 'center',
-    ...theme.shadows.medium,
+    ...theme.shadows.large,
   },
-  balanceLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: theme.spacing.sm },
-  balanceAmount: { color: '#FFF', fontSize: 36, fontWeight: 'bold' },
+  balanceLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: theme.spacing.sm, fontWeight: '600' },
+  balanceAmount: { color: theme.colors.text.main, fontSize: 36, fontWeight: '900' },
   withdrawContainer: {
     marginHorizontal: theme.spacing.lg,
     padding: theme.spacing.lg,
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.xl,
+    ...theme.shadows.medium,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: theme.colors.text.main, marginBottom: theme.spacing.md },
+  sectionTitleList: { fontSize: 16, fontWeight: '700', color: theme.colors.text.main, marginHorizontal: theme.spacing.lg, marginTop: theme.spacing.lg, marginBottom: theme.spacing.sm },
+  input: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
-    ...theme.shadows.small,
-  },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: theme.colors.text.main, marginBottom: theme.spacing.md },
-  sectionTitleList: { fontSize: 16, fontWeight: '600', color: theme.colors.text.main, marginHorizontal: theme.spacing.lg, marginTop: theme.spacing.lg, marginBottom: theme.spacing.sm },
-  input: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: theme.radius.sm,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
     color: theme.colors.text.main,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   withdrawBtn: {
     backgroundColor: theme.colors.primary,
     padding: theme.spacing.md,
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.lg,
     alignItems: 'center',
+    ...theme.shadows.small,
   },
-  withdrawBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
+  withdrawBtnText: { color: theme.colors.text.main, fontWeight: '800', fontSize: 16, letterSpacing: 0.5 },
   listContent: { paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.xl },
   txCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
-    marginBottom: theme.spacing.sm,
-    ...theme.shadows.small,
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.xl,
+    marginBottom: theme.spacing.md,
+    ...theme.shadows.medium,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   txLeft: { flexDirection: 'row', alignItems: 'center' },
   txIconContainer: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
-  txType: { fontSize: 15, fontWeight: '600', color: theme.colors.text.main },
+  txType: { fontSize: 15, fontWeight: '700', color: theme.colors.text.main },
   txDate: { fontSize: 12, color: theme.colors.text.muted, marginTop: 2 },
-  txAmount: { fontSize: 16, fontWeight: 'bold' },
+  txAmount: { fontSize: 16, fontWeight: '800' },
   emptyText: { textAlign: 'center', color: theme.colors.text.muted, marginTop: theme.spacing.xl }
 });
 

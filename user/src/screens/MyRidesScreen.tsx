@@ -185,24 +185,26 @@ const MyRidesScreen = ({ navigation }: any) => {
   );
 };
 
+import { theme } from '../theme/theme';
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f4f4f4', padding: 15, paddingTop: 50 },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 15, color: '#333' },
-  tabContainer: { flexDirection: 'row', marginBottom: 15, backgroundColor: '#e9ecef', borderRadius: 8, padding: 4 },
-  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 6 },
-  tabBtnActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
-  tabText: { fontWeight: '600', color: '#666' },
-  tabTextActive: { color: '#007AFF', fontWeight: 'bold' },
-  card: { backgroundColor: '#fff', padding: 15, borderRadius: 8, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5, elevation: 3 },
+  container: { flex: 1, backgroundColor: theme.colors.background, padding: 15, paddingTop: 50 },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 15, color: theme.colors.text.main },
+  tabContainer: { flexDirection: 'row', marginBottom: 15, backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, padding: 4 },
+  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: theme.radius.sm },
+  tabBtnActive: { backgroundColor: theme.colors.card, ...theme.shadows.small, borderWidth: 1, borderColor: theme.colors.border },
+  tabText: { fontWeight: '600', color: theme.colors.text.muted },
+  tabTextActive: { color: theme.colors.primary, fontWeight: 'bold' },
+  card: { backgroundColor: theme.colors.card, padding: 15, borderRadius: theme.radius.lg, marginBottom: 10, ...theme.shadows.medium, borderWidth: 1, borderColor: theme.colors.border },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, alignItems: 'center' },
-  locations: { fontSize: 16, fontWeight: 'bold', flex: 1 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, color: '#fff', fontSize: 12, overflow: 'hidden', fontWeight: 'bold' },
-  details: { color: '#666', marginBottom: 5 },
-  cancelBtn: { marginTop: 10, padding: 10, borderRadius: 6, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dc3545', alignItems: 'center' },
-  cancelBtnText: { color: '#dc3545', fontWeight: 'bold' },
-  trackBtn: { marginTop: 10, padding: 10, borderRadius: 6, backgroundColor: '#007AFF', alignItems: 'center' },
-  trackBtnText: { color: '#fff', fontWeight: 'bold' },
-  empty: { textAlign: 'center', marginTop: 50, color: '#999' }
+  locations: { fontSize: 16, fontWeight: 'bold', flex: 1, color: theme.colors.text.main },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, color: theme.colors.text.light, fontSize: 12, overflow: 'hidden', fontWeight: 'bold' },
+  details: { color: theme.colors.text.muted, marginBottom: 5 },
+  cancelBtn: { marginTop: 10, padding: 10, borderRadius: theme.radius.md, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.danger, alignItems: 'center' },
+  cancelBtnText: { color: theme.colors.danger, fontWeight: 'bold' },
+  trackBtn: { marginTop: 10, padding: 10, borderRadius: theme.radius.md, backgroundColor: theme.colors.primary, alignItems: 'center' },
+  trackBtnText: { color: theme.colors.text.light, fontWeight: 'bold' },
+  empty: { textAlign: 'center', marginTop: 50, color: theme.colors.text.muted }
 });
 
 export default MyRidesScreen;

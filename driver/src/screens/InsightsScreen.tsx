@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import axiosInstance from '../api/axios';
-
+import { theme } from '../theme/theme';
 const InsightsScreen = () => {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -135,21 +135,20 @@ const InsightsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f4f4f4' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     margin: 15,
     marginBottom: 5,
     padding: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadows.medium,
   },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1e293b', marginBottom: 15 },
-  earningsLarge: { fontSize: 36, fontWeight: '800', color: '#007AFF', marginBottom: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.text.main, marginBottom: 15 },
+  earningsLarge: { fontSize: 36, fontWeight: '900', color: theme.colors.primary, marginBottom: 20 },
   
   // Chart Styles
   chartContainer: {
@@ -159,7 +158,7 @@ const styles = StyleSheet.create({
     height: 120,
     marginTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopColor: theme.colors.border,
     paddingTop: 15,
   },
   barCol: {
@@ -169,23 +168,23 @@ const styles = StyleSheet.create({
   barBg: {
     height: 80,
     width: 12,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: theme.colors.surface,
     borderRadius: 6,
     justifyContent: 'flex-end',
   },
   barFill: {
     width: 12,
-    backgroundColor: '#94a3b8',
+    backgroundColor: theme.colors.text.muted,
     borderRadius: 6,
   },
   barFillActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.primary,
   },
   barLabel: {
     marginTop: 8,
     fontSize: 10,
-    color: '#64748b',
-    fontWeight: '500'
+    color: theme.colors.text.muted,
+    fontWeight: '600'
   },
 
   // Stats Grid
@@ -197,47 +196,46 @@ const styles = StyleSheet.create({
   },
   statBox: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     padding: 15,
-    borderRadius: 12,
+    borderRadius: theme.radius.xl,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadows.medium,
   },
-  statLabel: { fontSize: 12, color: '#64748b', textAlign: 'center', marginBottom: 5 },
-  statValue: { fontSize: 18, fontWeight: '700', color: '#1e293b' },
+  statLabel: { fontSize: 12, color: theme.colors.text.muted, textAlign: 'center', marginBottom: 5, fontWeight: '600' },
+  statValue: { fontSize: 18, fontWeight: '800', color: theme.colors.text.main },
 
   // Badges
   badgeScroll: {
     marginHorizontal: -5,
   },
   badgeCard: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
     padding: 15,
     marginHorizontal: 5,
     alignItems: 'center',
     width: 110,
   },
   badgeIcon: { fontSize: 24, marginBottom: 5 },
-  badgeName: { fontSize: 12, fontWeight: '600', color: '#334155', textAlign: 'center' },
+  badgeName: { fontSize: 12, fontWeight: '700', color: theme.colors.text.main, textAlign: 'center' },
 
   // Reviews
   reviewCard: {
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: theme.colors.border,
     paddingVertical: 15,
   },
   reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
-  reviewerName: { fontWeight: '600', color: '#1e293b' },
-  reviewDate: { fontSize: 12, color: '#94a3b8' },
+  reviewerName: { fontWeight: '700', color: theme.colors.text.main },
+  reviewDate: { fontSize: 12, color: theme.colors.text.muted },
   reviewStars: { marginBottom: 8 },
-  reviewText: { fontSize: 14, color: '#475569', fontStyle: 'italic', lineHeight: 20 },
-  emptyText: { color: '#94a3b8', fontStyle: 'italic' }
+  reviewText: { fontSize: 14, color: theme.colors.text.muted, fontStyle: 'italic', lineHeight: 20 },
+  emptyText: { color: theme.colors.text.muted, fontStyle: 'italic' }
 });
 
 export default InsightsScreen;

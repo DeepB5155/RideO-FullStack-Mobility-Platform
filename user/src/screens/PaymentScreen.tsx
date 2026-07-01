@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   },
   input: {
     width: '100%',
-    backgroundColor: '#FAFAFA',
+    backgroundColor: theme.colors.background,
     borderWidth: 1,
     borderColor: theme.colors.border,
     padding: theme.spacing.lg,

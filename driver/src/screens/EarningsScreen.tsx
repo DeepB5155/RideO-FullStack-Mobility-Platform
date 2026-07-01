@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  SafeAreaView, 
+  ScrollView, 
+  TouchableOpacity, 
+  ActivityIndicator, 
+  StatusBar,
+  Platform
+} from 'react-native';
 import axiosInstance from '../api/axios';
-import { theme } from '../theme/theme';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const EarningsScreen = ({ navigation }: any) => {
   const [stats, setStats] = useState<any>(null);
@@ -10,22 +20,25 @@ const EarningsScreen = ({ navigation }: any) => {
   useEffect(() => {
     const fetchEarnings = async () => {
       try {
-        // Just mock fetching for MVP, or point to an actual endpoint if we built it.
-        // We know RouteController completes the route and calculates DriverEarning.
-        // We will fetch completed routes for the driver.
         const res = await axiosInstance.get('/route/my-routes');
-        const completed = res.data.filter((r: any) => r.status === 'Completed');
+        // Include both Completed and Cancelled to show different card states like the design
+        const historyRides = res.data.filter((r: any) => r.status === 'Completed' || r.status === 'Cancelled');
         
         let totalEarnings = 0;
-        completed.forEach((r: any) => {
-          // Mock 90% of total price if real earning not in payload
-          totalEarnings += (r.pricePerSeat * (r.totalSeats - r.availableSeats)) * 0.9;
+        let totalRides = 0;
+
+        historyRides.forEach((r: any) => {
+          if (r.status === 'Completed') {
+            totalEarnings += (r.pricePerSeat * (r.totalSeats - r.availableSeats)) * 0.9; // Mock 90% payout
+            totalRides += 1;
+          }
         });
 
         setStats({
           balance: totalEarnings,
-          recentRides: completed.length,
-          rides: completed
+          recentRides: totalRides,
+          onlineHours: '36h 15m', // Mocked as per design
+          rides: historyRides.sort((a: any, b: any) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
         });
       } catch (err) {
         console.log('Earnings fetch error:', err);
@@ -36,51 +49,146 @@ const EarningsScreen = ({ navigation }: any) => {
     fetchEarnings();
   }, []);
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.backBtn}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Earnings & Wallet</Text>
-          <View style={{ width: 50 }} />
+  const formatMoney = (amount: number) => {
+    const parts = amount.toFixed(2).split('.');
+    return { whole: parts[0], decimal: parts[1] };
+  };
+
+  const renderRideCard = (ride: any, idx: number) => {
+    const isCancelled = ride.status === 'Cancelled';
+    const total = ride.pricePerSeat * (ride.totalSeats - ride.availableSeats);
+    const earning = isCancelled ? 0 : (total * 0.9);
+    
+    // Mock trip ID for UI
+    const tripId = `#${8829 - idx}`; 
+
+    const startDate = new Date(ride.startTime);
+    const dateStr = startDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    const timeStr = startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Mock distance/time for UI completeness
+    const mockKm = Math.floor(Math.random() * 20) + 5;
+    const mockMins = Math.floor(Math.random() * 40) + 15;
+
+    return (
+      <View key={ride.id || idx} style={[styles.rideCard, isCancelled && styles.rideCardCancelled]}>
+        <View style={styles.cardHeaderRow}>
+          <View>
+            <Text style={styles.cardDateTime}>{dateStr}, {timeStr}</Text>
+            <Text style={styles.cardTripId}>Trip ID: {tripId}</Text>
+          </View>
+          <Text style={[styles.cardEarning, isCancelled && styles.cardEarningCancelled]}>
+            ₹{earning.toFixed(0)}
+          </Text>
         </View>
 
+        <View style={styles.routeNodesContainer}>
+          <View style={styles.nodeGraphics}>
+            <View style={[styles.dotOpen, isCancelled && styles.dotCancelled]} />
+            <View style={[styles.verticalLine, isCancelled && styles.lineCancelled]} />
+            <View style={[styles.dotClosed, isCancelled && styles.dotCancelledFill]} />
+          </View>
+          <View style={styles.nodeTexts}>
+            <Text style={styles.nodeText} numberOfLines={1}>{ride.startLocation}</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={styles.nodeText} numberOfLines={1}>{ride.endLocation}</Text>
+          </View>
+        </View>
+
+        <View style={styles.cardFooterRow}>
+          <View style={styles.metricsContainer}>
+            <Text style={styles.metricChip}>{mockKm} km</Text>
+            <Text style={styles.metricChip}>{mockMins} mins</Text>
+          </View>
+          {isCancelled ? (
+            <View style={styles.badgeCancelled}>
+              <Text style={styles.badgeTextCancelled}>Cancelled</Text>
+            </View>
+          ) : (
+            <View style={styles.badgeCompleted}>
+              <Text style={styles.badgeTextCompleted}>Completed</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9ff" />
+      
+      {/* ── Top App Bar ── */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.headerIconBtn} onPress={() => navigation.openDrawer && navigation.openDrawer()}>
+          <Icon name="menu" size={24} color="#0b1c30" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>RideO</Text>
+        <TouchableOpacity style={styles.headerProfileBtn} onPress={() => navigation.navigate('Profile')}>
+          <Icon name="account-outline" size={20} color="#45464d" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {isLoading ? (
-          <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 50 }} />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#000" />
+          </View>
         ) : (
           <>
-            <View style={styles.balanceCard}>
-              <Text style={styles.balanceTitle}>Total Earnings</Text>
-              <Text style={styles.balanceAmount}>₹{stats?.balance?.toFixed(2) || '0.00'}</Text>
-              <TouchableOpacity style={styles.withdrawBtn}>
-                <Text style={styles.withdrawText}>Withdraw to Bank</Text>
+            {/* ── Total Earnings Card ── */}
+            <View style={styles.earningsCard}>
+              <View style={styles.earningsCardTop}>
+                <Text style={styles.earningsCardTitle}>TOTAL EARNINGS (THIS WEEK)</Text>
+                <Icon name="wallet-outline" size={20} color="rgba(255,255,255,0.6)" />
+              </View>
+              
+              <View style={styles.balanceRow}>
+                <Text style={styles.balanceSymbol}>₹</Text>
+                <Text style={styles.balanceWhole}>{formatMoney(stats?.balance || 0).whole}</Text>
+                <Text style={styles.balanceDecimal}>.{formatMoney(stats?.balance || 0).decimal}</Text>
+              </View>
+
+              <View style={styles.statsRow}>
+                <View style={styles.statCol}>
+                  <Text style={styles.statLabel}>Rides</Text>
+                  <Text style={styles.statValue}>{stats?.recentRides || 0}</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statCol}>
+                  <Text style={styles.statLabel}>Online</Text>
+                  <Text style={styles.statValue}>{stats?.onlineHours || '0h 0m'}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* ── Withdraw Button ── */}
+            <TouchableOpacity style={styles.withdrawBtn} activeOpacity={0.9}>
+              <Icon name="bank" size={20} color="#ffffff" style={{ marginRight: 8 }} />
+              <Text style={styles.withdrawText}>Withdraw to Bank</Text>
+            </TouchableOpacity>
+
+            {/* ── Recent Rides Header ── */}
+            <View style={styles.recentHeader}>
+              <Text style={styles.recentTitle}>Recent Rides</Text>
+              <TouchableOpacity style={styles.filterBtn}>
+                <Text style={styles.filterText}>Filter</Text>
+                <Icon name="filter-variant" size={18} color="#0b1c30" />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.sectionTitle}>Recent Completed Rides ({stats?.recentRides || 0})</Text>
-
-            {stats?.rides?.length === 0 ? (
-              <Text style={styles.emptyText}>You haven't completed any rides yet.</Text>
-            ) : (
-              stats?.rides?.map((ride: any, idx: number) => {
-                const total = ride.pricePerSeat * (ride.totalSeats - ride.availableSeats);
-                const earning = total * 0.9;
-                return (
-                  <View key={idx} style={styles.rideCard}>
-                    <View>
-                      <Text style={styles.rideRoute}>{ride.startLocation} → {ride.endLocation}</Text>
-                      <Text style={styles.rideDate}>{new Date(ride.startTime).toLocaleDateString()}</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={styles.rideEarning}>+₹{earning.toFixed(2)}</Text>
-                      <Text style={styles.rideFee}>Fee: ₹{(total * 0.1).toFixed(2)}</Text>
-                    </View>
-                  </View>
-                );
-              })
-            )}
+            {/* ── Rides List ── */}
+            <View style={styles.ridesList}>
+              {stats?.rides?.length === 0 ? (
+                <Text style={styles.emptyText}>No recent rides to show.</Text>
+              ) : (
+                stats?.rides?.map((ride: any, index: number) => renderRideCard(ride, index))
+              )}
+            </View>
           </>
         )}
       </ScrollView>
@@ -89,50 +197,307 @@ const EarningsScreen = ({ navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: theme.colors.background },
-  container: { flex: 1, padding: theme.spacing.lg },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f8f9ff',
+  },
+  
+  // Top Header
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: theme.spacing.xl,
-    marginTop: theme.spacing.md,
-  },
-  backBtn: { fontSize: 16, color: theme.colors.primary, fontWeight: '600' },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: theme.colors.text.main },
-  balanceCard: {
-    backgroundColor: theme.colors.primary,
-    padding: theme.spacing.xl,
-    borderRadius: theme.radius.xl,
     alignItems: 'center',
-    marginBottom: theme.spacing.xl,
-    ...theme.shadows.large,
+    paddingHorizontal: 16,
+    height: 64,
   },
-  balanceTitle: { color: 'rgba(255,255,255,0.8)', fontSize: 16, fontWeight: '600', marginBottom: theme.spacing.sm },
-  balanceAmount: { color: theme.colors.text.light, fontSize: 48, fontWeight: '900', marginBottom: theme.spacing.lg },
-  withdrawBtn: {
-    backgroundColor: theme.colors.surface,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.xl,
-    borderRadius: theme.radius.full,
+  headerIconBtn: {
+    padding: 8,
+    marginLeft: -8,
   },
-  withdrawText: { color: theme.colors.primary, fontSize: 16, fontWeight: '800' },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.text.main, marginBottom: theme.spacing.lg },
-  emptyText: { color: theme.colors.text.muted, textAlign: 'center', marginTop: 20 },
-  rideCard: {
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.lg,
-    borderRadius: theme.radius.lg,
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#000',
+    letterSpacing: -0.5,
+  },
+  headerProfileBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#c6c6cd',
+    backgroundColor: '#e5eeff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 120, // Extra padding for floating tab bar
+    gap: 24,
+  },
+  loadingContainer: {
+    marginTop: 100,
+    alignItems: 'center',
+  },
+
+  // Earnings Card
+  earningsCard: {
+    backgroundColor: '#131b2e',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#131b2e',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  earningsCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.md,
-    ...theme.shadows.small,
   },
-  rideRoute: { fontSize: 16, fontWeight: '700', color: theme.colors.text.main, marginBottom: 4 },
-  rideDate: { fontSize: 12, color: theme.colors.text.muted },
-  rideEarning: { fontSize: 18, fontWeight: '800', color: theme.colors.success },
-  rideFee: { fontSize: 12, color: theme.colors.text.muted, marginTop: 4 }
+  earningsCardTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+    letterSpacing: 0.5,
+  },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  balanceSymbol: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginRight: 4,
+  },
+  balanceWhole: {
+    fontSize: 48,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: -1,
+  },
+  balanceDecimal: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statCol: {
+    flexDirection: 'column',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  statDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginHorizontal: 24,
+  },
+
+  // Withdraw Button
+  withdrawBtn: {
+    backgroundColor: '#000000',
+    borderRadius: 9999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  withdrawText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+
+  // Recent Header
+  recentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  recentTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#0b1c30',
+  },
+  filterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  filterText: {
+    fontSize: 14,
+    color: '#0b1c30',
+    marginRight: 4,
+  },
+
+  // Rides List
+  ridesList: {
+    gap: 16,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#76777d',
+    marginTop: 20,
+  },
+
+  // Ride Card
+  rideCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(198,198,205,0.4)',
+  },
+  rideCardCancelled: {
+    opacity: 0.7,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(198,198,205,0.3)',
+    paddingBottom: 12,
+    marginBottom: 12,
+  },
+  cardDateTime: {
+    fontSize: 12,
+    color: '#45464d',
+    marginBottom: 2,
+  },
+  cardTripId: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0b1c30',
+  },
+  cardEarning: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#006a61', // green
+  },
+  cardEarningCancelled: {
+    color: '#76777d',
+  },
+
+  // Nodes
+  routeNodesContainer: {
+    flexDirection: 'row',
+    height: 56,
+  },
+  nodeGraphics: {
+    width: 24,
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  dotOpen: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#0b1c30',
+    backgroundColor: '#fff',
+  },
+  verticalLine: {
+    flex: 1,
+    width: 1,
+    backgroundColor: '#c6c6cd',
+    marginVertical: 4,
+  },
+  dotClosed: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#0b1c30',
+    backgroundColor: '#0b1c30',
+  },
+  dotCancelled: {
+    borderColor: '#76777d',
+  },
+  lineCancelled: {
+    backgroundColor: '#e5eeff',
+  },
+  dotCancelledFill: {
+    borderColor: '#76777d',
+    backgroundColor: '#76777d',
+  },
+  nodeTexts: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingVertical: 1,
+  },
+  nodeText: {
+    fontSize: 15,
+    color: '#0b1c30',
+  },
+
+  // Footer Row
+  cardFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  metricsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  metricChip: {
+    backgroundColor: '#e5eeff',
+    color: '#45464d',
+    fontSize: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  badgeCompleted: {
+    backgroundColor: '#e0fbf6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  badgeTextCompleted: {
+    color: '#006a61',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  badgeCancelled: {
+    backgroundColor: '#ffdad6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  badgeTextCancelled: {
+    color: '#ba1a1a',
+    fontSize: 10,
+    fontWeight: '600',
+  },
 });
 
 export default EarningsScreen;

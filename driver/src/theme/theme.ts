@@ -1,19 +1,21 @@
 export const theme = {
   colors: {
-    primary: '#4F46E5',    // Indigo
-    primaryLight: '#818CF8',
-    secondary: '#1E293B',  // Slate
-    background: '#F8FAFC', // Light Gray
-    surface: '#FFFFFF',
+    primary: '#5B4FE9',
+    primaryLight: '#8B84EB',
+    secondary: '#10B981',
+    background: '#0F172A',
+    surface: '#334155', 
+    card: '#1E293B',
     text: {
-      main: '#0F172A',
-      muted: '#64748B',
-      light: '#FFFFFF'
+      main: '#F8FAFC',
+      muted: '#94A3B8',
+      light: '#FFFFFF',
+      dark: '#0F172A',
     },
     success: '#10B981',
     danger: '#EF4444',
     warning: '#F59E0B',
-    border: '#E2E8F0',
+    border: '#334155',
   },
   spacing: {
     xs: 4,
@@ -26,29 +28,30 @@ export const theme = {
   radius: {
     sm: 8,
     md: 12,
-    lg: 24,
-    xl: 30,
+    lg: 14,
+    xl: 16,
+    xxl: 24,
     full: 9999,
   },
   shadows: {
     small: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
+      shadowOpacity: 0.15,
       shadowRadius: 4,
       elevation: 2,
     },
     medium: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.1,
+      shadowOpacity: 0.25,
       shadowRadius: 10,
       elevation: 5,
     },
     large: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.15,
+      shadowOpacity: 0.35,
       shadowRadius: 20,
       elevation: 10,
     }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, FlatList, ActivityIndicator, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { theme } from '../theme/theme';
 
 // IMPORTANT: User should replace this with their actual Mapbox token
 const MAPBOX_TOKEN = 'pk.eyJ1IjoiZGVlcC01MTU1Iiwi' + 'YSI6ImNtb2xicG42bzBhcWcyb3BoNW81Ynh4YWgifQ.FvuveCsGrnRfM0VJdGGUXw';
@@ -154,7 +155,7 @@ export default function SearchRideScreen({ navigation }: any) {
 
   const renderSuggestionItem = ({ item }: { item: any }, type: 'pickup' | 'dropoff') => (
     <TouchableOpacity style={styles.suggestionItem} onPress={() => selectSuggestion(item, type)}>
-      <Icon name="location-outline" size={20} color="#888" style={{ marginRight: 10 }} />
+      <Icon name="location-outline" size={20} color={theme.colors.text.muted} style={{ marginRight: 10 }} />
       <View style={{ flex: 1 }}>
         <Text style={styles.suggestionTitle}>{item.text}</Text>
         <Text style={styles.suggestionSubtitle} numberOfLines={1}>{item.place_name}</Text>
@@ -179,17 +180,17 @@ export default function SearchRideScreen({ navigation }: any) {
             <TextInput
               style={styles.input}
               placeholder="Leaving from..."
-              placeholderTextColor="#888"
+              placeholderTextColor={theme.colors.text.muted}
               value={pickupText}
               onChangeText={handlePickupChange}
               onFocus={() => setActiveField('pickup')}
             />
-            {isPickupSearching && <ActivityIndicator size="small" color="#00E676" style={styles.spinner} />}
+            {isPickupSearching && <ActivityIndicator size="small" color={theme.colors.success} style={styles.spinner} />}
           </View>
 
           {activeField === 'pickup' && pickupSuggestions.length === 0 && pickupText.length < 2 && (
             <TouchableOpacity style={styles.currentLocationBtn} onPress={useCurrentLocation}>
-              <Icon name="navigate-outline" size={18} color="#00E676" />
+              <Icon name="navigate-outline" size={18} color={theme.colors.success} />
               <Text style={styles.currentLocationText}>Use Current Location</Text>
             </TouchableOpacity>
           )}
@@ -215,12 +216,12 @@ export default function SearchRideScreen({ navigation }: any) {
             <TextInput
               style={styles.input}
               placeholder="Going to..."
-              placeholderTextColor="#888"
+              placeholderTextColor={theme.colors.text.muted}
               value={dropoffText}
               onChangeText={handleDropoffChange}
               onFocus={() => setActiveField('dropoff')}
             />
-            {isDropoffSearching && <ActivityIndicator size="small" color="#FF3B30" style={styles.spinner} />}
+            {isDropoffSearching && <ActivityIndicator size="small" color={theme.colors.danger} style={styles.spinner} />}
           </View>
 
           {activeField === 'dropoff' && dropoffSuggestions.length > 0 && (
@@ -262,7 +263,7 @@ export default function SearchRideScreen({ navigation }: any) {
 
         <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
           <Text style={styles.searchBtnText}>Search Rides</Text>
-          <Icon name="arrow-forward" size={20} color="#fff" style={{ marginLeft: 8 }} />
+          <Icon name="arrow-forward" size={20} color={theme.colors.text.light} style={{ marginLeft: 8 }} />
         </TouchableOpacity>
       </View>
     </TouchableWithoutFeedback>
@@ -272,41 +273,41 @@ export default function SearchRideScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
-    padding: 20,
+    backgroundColor: theme.colors.background,
+    padding: theme.spacing.xl,
     paddingTop: 60,
   },
   headerContainer: {
-    marginBottom: 30,
+    marginBottom: theme.spacing.xl,
   },
   header: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.colors.text.main,
     marginBottom: 8,
   },
   subHeader: {
     fontSize: 16,
-    color: '#aaa',
+    color: theme.colors.text.muted,
   },
   card: {
-    backgroundColor: '#1E1E1E',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
-    marginBottom: 30,
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    ...theme.shadows.large,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: theme.spacing.xl,
     zIndex: 10,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2C2C2E',
-    borderRadius: 12,
-    paddingHorizontal: 15,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: theme.spacing.md,
     height: 56,
   },
   iconContainer: {
@@ -319,11 +320,11 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#00E676',
+    backgroundColor: theme.colors.success,
   },
   input: {
     flex: 1,
-    color: '#fff',
+    color: theme.colors.text.main,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -333,7 +334,7 @@ const styles = StyleSheet.create({
   verticalLine: {
     width: 2,
     height: 15,
-    backgroundColor: '#444',
+    backgroundColor: theme.colors.border,
     marginLeft: 26,
     marginVertical: 4,
   },
@@ -342,20 +343,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 15,
-    backgroundColor: 'rgba(0, 230, 118, 0.1)',
-    borderRadius: 8,
+    backgroundColor: theme.colors.success + '15',
+    borderRadius: theme.radius.sm,
     marginTop: 8,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.success,
   },
   currentLocationText: {
-    color: '#00E676',
+    color: theme.colors.success,
     fontWeight: '600',
     marginLeft: 8,
     fontSize: 14,
   },
   suggestionsList: {
-    backgroundColor: '#2C2C2E',
-    borderRadius: 12,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     marginTop: 8,
     marginBottom: 8,
     maxHeight: 200,
@@ -366,16 +371,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#3A3A3C',
+    borderBottomColor: theme.colors.border,
   },
   suggestionTitle: {
-    color: '#fff',
+    color: theme.colors.text.main,
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 3,
   },
   suggestionSubtitle: {
-    color: '#888',
+    color: theme.colors.text.muted,
     fontSize: 13,
   },
   row: {
@@ -388,19 +393,22 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#888',
+    color: theme.colors.text.muted,
     marginBottom: 8,
+    textTransform: 'uppercase',
   },
   datePickerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2C2C2E',
-    padding: 15,
-    borderRadius: 12,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
     height: 56,
   },
   dateText: {
-    color: '#fff',
+    color: theme.colors.text.main,
     fontSize: 16,
     fontWeight: '500',
     marginLeft: 10,
@@ -409,45 +417,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#2C2C2E',
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     paddingHorizontal: 10,
-    borderRadius: 12,
+    borderRadius: theme.radius.md,
     height: 56,
   },
   seatBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#444',
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   seatBtnText: {
-    color: '#fff',
+    color: theme.colors.text.main,
     fontSize: 20,
     fontWeight: '500',
   },
   seatCount: {
-    color: '#fff',
+    color: theme.colors.text.main,
     fontSize: 18,
     fontWeight: 'bold',
   },
   searchBtn: {
     flexDirection: 'row',
-    backgroundColor: '#3b82f6', // Premium Blue
-    padding: 18,
-    borderRadius: 16,
+    backgroundColor: theme.colors.primary,
+    padding: theme.spacing.lg,
+    borderRadius: theme.radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#3b82f6',
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
+    ...theme.shadows.medium,
   },
   searchBtnText: {
-    color: '#fff',
+    color: theme.colors.text.light,
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
+    letterSpacing: 0.5,
   }
 });
+
+export default SearchRideScreen;

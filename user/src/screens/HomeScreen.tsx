@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView, ScrollView, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Mapbox from '@rnmapbox/maps';
 import { MAPBOX_ACCESS_TOKEN, SIGNALR_HUB_URL } from '@env';
 import * as signalR from '@microsoft/signalr';
 import { AuthContext } from '../context/AuthContext';
-import { API_BASE_URL } from '../api/axios';
-import { theme } from '../theme/theme';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 // Split token to bypass GitHub secret scan
 const MAPBOX_TOKEN = MAPBOX_ACCESS_TOKEN;
@@ -15,12 +14,7 @@ Mapbox.setAccessToken(MAPBOX_TOKEN);
 const HomeScreen = ({ navigation }: any) => {
   const { user } = useContext(AuthContext);
   
-  // Default to Gandhinagar
   const [region, setRegion] = useState([72.6369, 23.2156]); // [lng, lat]
-  const [pickup, setPickup] = useState([72.6369, 23.2156]);
-  
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
   
   const [rideStatus, setRideStatus] = useState<'idle' | 'searching' | 'accepted'>('idle');
   const [driverInfo, setDriverInfo] = useState<any>(null);
@@ -30,11 +24,10 @@ const HomeScreen = ({ navigation }: any) => {
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
 
   useEffect(() => {
-    // Setup SignalR connection
     const setupSignalR = async () => {
       const token = await AsyncStorage.getItem('userToken');
       const newConnection = new signalR.HubConnectionBuilder()
-        .withUrl(SIGNALR_HUB_URL || 'http://192.168.1.182:5248/ridehub', {
+        .withUrl(SIGNALR_HUB_URL || 'http://10.0.2.2:5248/ridehub', {
           accessTokenFactory: () => token || '',
           transport: signalR.HttpTransportType.WebSockets
         })
@@ -64,39 +57,8 @@ const HomeScreen = ({ navigation }: any) => {
     };
   }, [user]);
 
-  const searchAddress = async (query: string) => {
-    setSearchQuery(query);
-    if (query.length > 3) {
-      try {
-        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&proximity=72.6369,23.2156`);
-        const data = await res.json();
-        setSearchResults(data.features || []);
-      } catch (e) {
-        console.error(e);
-      }
-    } else {
-      setSearchResults([]);
-    }
-  };
-
-  const handleSelectAddress = (feature: any) => {
-    const [lng, lat] = feature.center;
-    setRegion([lng, lat]);
-    cameraRef.current?.setCamera({
-      centerCoordinate: [lng, lat],
-      zoomLevel: 14,
-      animationDuration: 1000,
-    });
-    setSearchQuery(feature.place_name);
-    setSearchResults([]);
-  };
-
   const onRegionDidChange = (e: any) => {
     setRegion(e.geometry.coordinates);
-  };
-
-  const requestRide = async () => {
-    navigation.navigate('SearchRide');
   };
 
   const fetchRoute = async (startLng: number, startLat: number, endLng: number, endLat: number) => {
@@ -113,7 +75,17 @@ const HomeScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <Mapbox.MapView style={styles.map} styleURL={Mapbox.StyleURL.Street} onRegionDidChange={onRegionDidChange}>
+      {/* Map Content */}
+      <Mapbox.MapView 
+        style={styles.map} 
+        styleURL={Mapbox.StyleURL.Street} 
+        onRegionDidChange={onRegionDidChange}
+        onPress={() => {
+          if (rideStatus === 'idle') {
+            navigation.navigate('SearchRide');
+          }
+        }}
+      >
         <Mapbox.Camera
           ref={cameraRef}
           defaultSettings={{
@@ -135,91 +107,200 @@ const HomeScreen = ({ navigation }: any) => {
             />
           </Mapbox.ShapeSource>
         )}
-
       </Mapbox.MapView>
 
-      {/* Center Pin for Dragging (Only show when idle) */}
-      {rideStatus === 'idle' && (
-        <View style={styles.centerPin} pointerEvents="none">
-          <View style={styles.pinDot} />
-          <View style={styles.pinLine} />
-        </View>
-      )}
-
-      {/* Top Menu Bar */}
-      <View style={styles.topMenuContainer}>
-        <TouchableOpacity style={styles.menuIcon} onPress={() => navigation.navigate('My Rides')}>
-          <Text style={styles.menuText}>🚗 Rides</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuIcon} onPress={() => navigation.navigate('Wallet')}>
-          <Text style={styles.menuText}>💳 Wallet</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuIcon} onPress={() => navigation.navigate('Emergency Contacts')}>
-          <Text style={styles.menuText}>🛡️ Safety</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuIcon} onPress={() => navigation.navigate('Support')}>
-          <Text style={styles.menuText}>💬 Help</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Refer & Earn Banner */}
-      {rideStatus === 'idle' && (
-        <TouchableOpacity style={styles.promoBanner} onPress={() => navigation.navigate('Wallet')}>
-          <Text style={styles.promoText}>💸 Earn ₹50 for every friend you refer!</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Geocoding Search Box */}
-      {rideStatus === 'idle' && (
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Where to?"
-            placeholderTextColor="#666"
-            value={searchQuery}
-            onChangeText={searchAddress}
-          />
-          {searchResults.length > 0 && (
-            <View style={styles.resultsContainer}>
-              {searchResults.slice(0, 3).map((result, index) => (
-                <TouchableOpacity key={index} style={styles.resultItem} onPress={() => handleSelectAddress(result)}>
-                  <Text style={styles.resultText} numberOfLines={1}>{result.place_name}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+      {/* Top App Bar */}
+      <SafeAreaView style={styles.headerWrapper} pointerEvents="box-none">
+        <View style={styles.header}>
+          {rideStatus === 'accepted' ? (
+            <>
+              <TouchableOpacity style={styles.headerBtn} onPress={() => { /* Handle back if needed */ }}>
+                <Icon name="arrow-back" size={28} color="#000000" />
+              </TouchableOpacity>
+              <Text style={[styles.headerTitle, { fontSize: 24 }]}>En Route</Text>
+              <View style={{ width: 32 }} />
+            </>
+          ) : (
+            <>
+              <TouchableOpacity style={styles.headerBtn} onPress={() => {}}>
+                <Icon name="menu-outline" size={30} color="#000000" />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>RideO</Text>
+              <TouchableOpacity style={styles.headerAvatar} onPress={() => navigation.navigate('Profile')}>
+                <Icon name="person" size={20} color="#ffffff" />
+              </TouchableOpacity>
+            </>
           )}
+        </View>
+      </SafeAreaView>
+
+      {/* Floating SOS Button */}
+      {rideStatus === 'accepted' && (
+        <TouchableOpacity style={styles.sosButton} activeOpacity={0.8}>
+          <Text style={styles.sosIconText}>SOS</Text>
+          <Text style={styles.sosSubText}>SOS</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Floating Search / Where to? */}
+      {rideStatus === 'idle' && (
+        <View style={styles.floatingSearchContainer} pointerEvents="box-none">
+          <TouchableOpacity 
+            style={styles.searchBox} 
+            activeOpacity={0.9} 
+            onPress={() => navigation.navigate('SearchRide')}
+          >
+            <Icon name="search-outline" size={24} color="#000000" />
+            <Text style={styles.searchText}>Where to?</Text>
+            <View style={styles.searchDivider} />
+            <TouchableOpacity style={styles.scheduleBtn}>
+              <Icon name="time-outline" size={20} color="#45464d" />
+            </TouchableOpacity>
+          </TouchableOpacity>
         </View>
       )}
 
       {/* Bottom Sheet UI */}
       <View style={styles.bottomSheet}>
+        {/* Drag Handle */}
+        <View style={styles.dragHandleContainer}>
+          <View style={styles.dragHandle} />
+        </View>
+
         {rideStatus === 'idle' && (
-          <>
-            <Text style={styles.sheetTitle}>Set Drop-off</Text>
-            <Text style={styles.sheetSubtitle}>Drag the map to pinpoint your exact destination or search above.</Text>
-            <TouchableOpacity style={styles.requestButton} onPress={requestRide}>
-              <Text style={styles.requestButtonText}>Find Carpool Matches</Text>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+            {/* Suggestions Row */}
+            <View style={styles.suggestionsRow}>
+              <TouchableOpacity style={styles.suggestionItem} onPress={() => navigation.navigate('SearchRide')}>
+                <View style={styles.suggestionIconBox}>
+                  <Icon name="home" size={28} color="#000000" />
+                </View>
+                <Text style={styles.suggestionLabel}>Home</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.suggestionItem} onPress={() => navigation.navigate('SearchRide')}>
+                <View style={styles.suggestionIconBox}>
+                  <Icon name="briefcase" size={28} color="#000000" />
+                </View>
+                <Text style={styles.suggestionLabel}>Work</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.suggestionItem}>
+                <View style={[styles.suggestionIconBox, { backgroundColor: '#dce9ff' }]}>
+                  <Icon name="add" size={28} color="#45464d" />
+                </View>
+                <Text style={[styles.suggestionLabel, { color: '#45464d' }]}>Save</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Recent Locations */}
+            <Text style={styles.recentTitle}>Recent Locations</Text>
+            
+            <TouchableOpacity style={styles.recentItem} onPress={() => navigation.navigate('SearchRide')}>
+              <View style={styles.recentIconBox}>
+                <Icon name="time" size={20} color="#45464d" />
+              </View>
+              <View style={styles.recentTextCol}>
+                <Text style={styles.recentItemTitle}>SFO International Airport</Text>
+                <Text style={styles.recentItemSub}>Terminal 2, Departures</Text>
+              </View>
             </TouchableOpacity>
-          </>
+            
+            <View style={styles.recentDivider} />
+
+            <TouchableOpacity style={styles.recentItem} onPress={() => navigation.navigate('SearchRide')}>
+              <View style={styles.recentIconBox}>
+                <Icon name="time" size={20} color="#45464d" />
+              </View>
+              <View style={styles.recentTextCol}>
+                <Text style={styles.recentItemTitle}>Ferry Building</Text>
+                <Text style={styles.recentItemSub}>1 Ferry Building, San Francisco</Text>
+              </View>
+            </TouchableOpacity>
+          </ScrollView>
         )}
 
         {rideStatus === 'searching' && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#000" />
-            <Text style={styles.sheetTitle}>Finding you a driver...</Text>
+            <ActivityIndicator size="large" color="#000000" />
+            <Text style={styles.loadingTitle}>Finding you a driver...</Text>
           </View>
         )}
 
         {rideStatus === 'accepted' && driverInfo && (
-          <>
-            <Text style={styles.sheetTitle}>Driver is on the way!</Text>
-            <Text style={styles.sheetSubtitle}>Driver ID: {driverInfo.driverId}</Text>
-            <View style={styles.driverBadge}>
-              <Text style={styles.driverBadgeText}>ETA: 4 mins</Text>
+          <View style={styles.enRouteContainer}>
+            {/* ETA and Driver Status Header */}
+            <View style={styles.enRouteHeader}>
+              <View>
+                <Text style={styles.enRouteTitle}>Arriving in <Text style={styles.enRouteEta}>2 min</Text></Text>
+                <View style={styles.dropoffRow}>
+                  <View style={styles.dropoffDot} />
+                  <Text style={styles.dropoffText}>Dropoff at 9:45 AM</Text>
+                </View>
+              </View>
+              {/* Live Chip */}
+              <View style={styles.onWayChip}>
+                <View style={styles.onWayDot} />
+                <Text style={styles.onWayText}>ON WAY</Text>
+              </View>
             </View>
-          </>
+
+            {/* Driver & Vehicle Info Card */}
+            <View style={styles.driverCard}>
+              <View style={styles.driverCardLeft}>
+                <View style={styles.driverAvatarContainer}>
+                  <Image 
+                    source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD83BwxiprUCh-EeBT3Pr1yMpgPWK3K1ufR4OXaNLOCx-M4eg23uZmGN7AQP9EsH33P4iypG68zYrqrCntPeCKsFkXDK8FcxrCyVTFs-Ho1U66ZC5JSPOnO6ItkKi7KGo2HQgNbHnprfOn1nHAo_9EDSzEjRWMGhTV24hatKE0L0SMOlrMK2kUVYKY_5pWDhMtrEA_Ab_9LpfZnMc5HlHEbN2_AtjetfSnQUOyttnMvNDDG0YruRp39u-OfYIuBwTvw5dDRDxvnWpW-' }} 
+                    style={styles.driverAvatar} 
+                  />
+                  <View style={styles.ratingBadge}>
+                    <Text style={styles.ratingText}>4.9</Text>
+                    <Icon name="star" size={8} color="#ffffff" style={{ marginLeft: 2 }} />
+                  </View>
+                </View>
+                <View style={styles.driverInfoText}>
+                  <Text style={styles.driverName}>Michael</Text>
+                  <Text style={styles.carInfo}>Toyota Camry · Black</Text>
+                </View>
+              </View>
+              <View style={styles.licensePlateContainer}>
+                <Text style={styles.licensePlate}>ABC 123</Text>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.actionButtonsRow}>
+              <TouchableOpacity style={styles.callButton}>
+                <Icon name="call" size={20} color="#000000" />
+                <Text style={styles.callButtonText}>Call</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.chatButton}>
+                <Icon name="chatbubble" size={20} color="#ffffff" />
+                <Text style={styles.chatButtonText}>Chat</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
       </View>
+
+      {/* Bottom Tab Bar */}
+      {rideStatus !== 'accepted' && (
+        <View style={styles.tabBar}>
+          <TouchableOpacity style={styles.tabItem}>
+            <Icon name="home" size={24} color="#5B4FE9" />
+            <Text style={[styles.tabText, { color: '#5B4FE9' }]}>Home</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('My Rides')}>
+            <Icon name="car-outline" size={24} color="#45464d" />
+            <Text style={styles.tabText}>Rides</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Wallet')}>
+            <Icon name="wallet-outline" size={24} color="#45464d" />
+            <Text style={styles.tabText}>Wallet</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
     </View>
   );
 };
@@ -227,155 +308,456 @@ const HomeScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#f8f9ff',
   },
   map: {
     flex: 1,
   },
-  centerPin: {
+  // Header
+  headerWrapper: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginLeft: -10,
-    marginTop: -40,
-    alignItems: 'center',
-  },
-  pinDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: theme.colors.primary,
-    borderWidth: 3,
-    borderColor: '#fff',
-    ...theme.shadows.small,
-  },
-  pinLine: {
-    width: 3,
-    height: 20,
-    backgroundColor: theme.colors.primary,
-  },
-  topMenuContainer: {
-    position: 'absolute',
-    top: 50,
-    left: theme.spacing.lg,
-    right: theme.spacing.lg,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    zIndex: 10,
-  },
-  menuIcon: {
-    backgroundColor: theme.colors.surface,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.full,
-    ...theme.shadows.medium,
-  },
-  menuText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: theme.colors.text.main,
-  },
-  promoBanner: {
-    position: 'absolute',
-    top: 105,
-    left: theme.spacing.lg,
-    right: theme.spacing.lg,
-    backgroundColor: '#E8F5E9',
-    padding: theme.spacing.sm,
-    borderRadius: theme.radius.full,
-    alignItems: 'center',
-    zIndex: 10,
-    ...theme.shadows.small,
-  },
-  promoText: {
-    color: theme.colors.success,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  searchContainer: {
-    position: 'absolute',
-    top: 145,
-    left: theme.spacing.lg,
-    right: theme.spacing.lg,
-    zIndex: 10,
-  },
-  searchInput: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    fontSize: 16,
-    color: theme.colors.text.main,
-    ...theme.shadows.medium,
-  },
-  resultsContainer: {
-    backgroundColor: theme.colors.surface,
-    marginTop: theme.spacing.sm,
-    borderRadius: theme.radius.md,
-    overflow: 'hidden',
-    ...theme.shadows.medium,
-  },
-  resultItem: {
-    padding: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  resultText: {
-    fontSize: 14,
-    color: theme.colors.text.main,
-  },
-  bottomSheet: {
-    position: 'absolute',
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.xl,
-    paddingTop: theme.spacing.lg,
-    borderTopLeftRadius: theme.radius.xl,
-    borderTopRightRadius: theme.radius.xl,
-    ...theme.shadows.large,
+    zIndex: 50,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    height: 64,
+    backgroundColor: 'rgba(248, 249, 255, 0.8)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(198, 198, 205, 0.2)',
+  },
+  headerBtn: {
+    padding: 8,
+    marginLeft: -8,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#000000',
+    letterSpacing: -0.5,
+  },
+  headerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#131b2e',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  // Floating Search
+  floatingSearchContainer: {
+    position: 'absolute',
+    top: 100, // Below header
+    left: 16,
+    right: 16,
+    zIndex: 10,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(248, 249, 255, 0.9)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#c6c6cd',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  searchText: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#45464d',
+    marginLeft: 12,
+  },
+  searchDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: '#c6c6cd',
+    marginHorizontal: 12,
+  },
+  scheduleBtn: {
+    backgroundColor: '#dce9ff',
+    padding: 8,
+    borderRadius: 20,
+  },
+
+  // Bottom Sheet
+  bottomSheet: {
+    position: 'absolute',
+    bottom: 60, // Above the tab bar
+    left: 0,
+    right: 0,
+    backgroundColor: '#f8f9ff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 10,
+    paddingHorizontal: 16,
+    maxHeight: 400,
+  },
+  dragHandleContainer: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  dragHandle: {
+    width: 48,
+    height: 6,
+    backgroundColor: '#c6c6cd',
+    borderRadius: 3,
+  },
+  scrollContent: {
+    paddingBottom: 24,
+  },
+
+  // Suggestions
+  suggestionsRow: {
+    flexDirection: 'row',
+    marginBottom: 24,
+    paddingTop: 4,
+  },
+  suggestionItem: {
+    alignItems: 'center',
+    marginRight: 24,
+  },
+  suggestionIconBox: {
+    width: 64,
+    height: 64,
+    backgroundColor: '#e5eeff',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(198, 198, 205, 0.3)',
+  },
+  suggestionLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#0b1c30',
+    letterSpacing: 0.5,
+  },
+
+  // Recent Locations
+  recentTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#0b1c30',
+    marginBottom: 12,
+  },
+  recentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  recentIconBox: {
+    backgroundColor: '#dce9ff',
+    padding: 8,
+    borderRadius: 20,
+    marginRight: 16,
+  },
+  recentTextCol: {
+    flex: 1,
+  },
+  recentItemTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#0b1c30',
+    marginBottom: 2,
+  },
+  recentItemSub: {
+    fontSize: 14,
+    color: '#45464d',
+  },
+  recentDivider: {
+    height: 1,
+    backgroundColor: 'rgba(198, 198, 205, 0.3)',
+    marginLeft: 56,
+  },
+
+  // Ride Status active
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingBottom: 64,
+  },
+  loadingTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000000',
+    marginTop: 16,
   },
   sheetTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: theme.colors.text.main,
-    marginBottom: theme.spacing.xs,
+    color: '#000000',
+    marginBottom: 4,
   },
   sheetSubtitle: {
     fontSize: 14,
-    color: theme.colors.text.muted,
-    marginBottom: theme.spacing.lg,
-  },
-  requestButton: {
-    backgroundColor: theme.colors.primary,
-    padding: theme.spacing.lg,
-    borderRadius: theme.radius.full,
-    alignItems: 'center',
-    ...theme.shadows.medium,
-  },
-  requestButtonText: {
-    color: theme.colors.text.light,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing.lg,
+    color: '#45464d',
+    marginBottom: 16,
   },
   driverBadge: {
-    backgroundColor: theme.colors.background,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.full,
-    alignSelf: 'flex-start',
-    marginTop: theme.spacing.sm,
+    backgroundColor: '#e5eeff',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 99,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: 'rgba(198, 198, 205, 0.3)',
   },
   driverBadgeText: {
     fontSize: 14,
     fontWeight: '700',
-    color: theme.colors.primary,
+    color: '#000000',
+  },
+
+  // Tab Bar
+  tabBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(198, 198, 205, 0.3)',
+    paddingBottom: 4,
+    zIndex: 100,
+  },
+  tabItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 64,
+  },
+  tabText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#45464d',
+    marginTop: 2,
+  },
+  
+  // SOS Button
+  sosButton: {
+    position: 'absolute',
+    top: 96,
+    right: 16,
+    zIndex: 40,
+    width: 56,
+    height: 56,
+    backgroundColor: '#ba1a1a',
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#ba1a1a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  sosIconText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
+    lineHeight: 18,
+  },
+  sosSubText: {
+    fontSize: 10,
+    color: '#ffffff',
+    lineHeight: 12,
+  },
+
+  // En Route UI
+  enRouteContainer: {
+    paddingVertical: 12,
+    paddingBottom: 24,
+  },
+  enRouteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 24,
+  },
+  enRouteTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#0b1c30',
+  },
+  enRouteEta: {
+    color: '#006a61',
+  },
+  dropoffRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  dropoffDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#006a61',
+    marginRight: 6,
+  },
+  dropoffText: {
+    fontSize: 16,
+    color: '#45464d',
+  },
+  onWayChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#86f2e4',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  onWayDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#006f66',
+    marginRight: 6,
+  },
+  onWayText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#006f66',
+    letterSpacing: 0.5,
+  },
+  
+  driverCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#eff4ff',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#d3e4fe',
+    marginBottom: 24,
+  },
+  driverCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  driverAvatarContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#dce9ff',
+    borderWidth: 2,
+    borderColor: '#f8f9ff',
+    overflow: 'hidden',
+    marginRight: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  driverAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  ratingBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#000000',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderTopLeftRadius: 8,
+  },
+  ratingText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  driverInfoText: {
+    justifyContent: 'center',
+  },
+  driverName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  carInfo: {
+    fontSize: 14,
+    color: '#45464d',
+    marginTop: 2,
+  },
+  licensePlateContainer: {
+    backgroundColor: '#e5eeff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#c6c6cd',
+  },
+  licensePlate: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+    letterSpacing: 2,
+  },
+
+  actionButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  callButton: {
+    flex: 1,
+    height: 56,
+    backgroundColor: '#dce9ff',
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  callButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+    marginLeft: 8,
+  },
+  chatButton: {
+    flex: 1,
+    height: 56,
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+    marginLeft: 6,
+  },
+  chatButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginLeft: 8,
   }
 });
 

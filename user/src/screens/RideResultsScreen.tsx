@@ -254,37 +254,35 @@ const RideResultsScreen = ({ route, navigation }: any) => {
   );
 };
 
+import { theme } from '../theme/theme';
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f4f4f4', padding: 15, paddingTop: 50 },
+  container: { flex: 1, backgroundColor: theme.colors.background, padding: 15, paddingTop: 50 },
   backBtn: { marginBottom: 15 },
-  backBtnText: { color: '#007AFF', fontSize: 16, fontWeight: '500' },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#333' },
-  subtitle: { fontSize: 14, color: '#666', marginBottom: 20 },
-  card: { backgroundColor: '#fff', padding: 20, borderRadius: 12, marginBottom: 15, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5, elevation: 3 },
+  backBtnText: { color: theme.colors.primary, fontSize: 16, fontWeight: '500' },
+  title: { fontSize: 22, fontWeight: 'bold', color: theme.colors.text.main },
+  subtitle: { fontSize: 14, color: theme.colors.text.muted, marginBottom: 20 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   driverInfoContainer: { flexDirection: 'row', alignItems: 'center' },
-  driverName: { fontSize: 18, fontWeight: 'bold' },
-  proBadge: { backgroundColor: '#fffbe6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8, borderWidth: 1, borderColor: '#ffc107' },
-  paymentTitle: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 10 },
+  proBadge: { backgroundColor: theme.colors.warning + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8, borderWidth: 1, borderColor: theme.colors.warning },
+  paymentTitle: { fontSize: 16, fontWeight: '600', color: theme.colors.text.main, marginBottom: 10 },
   paymentSelector: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  paymentOption: { flex: 1, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#ccc', borderRadius: 8, marginHorizontal: 4, backgroundColor: '#fff' },
-  paymentOptionActive: { borderColor: '#007AFF', backgroundColor: '#e6f2ff' },
-  paymentOptionText: { fontSize: 14, color: '#666', fontWeight: '500' },
+  paymentOption: { flex: 1, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, marginHorizontal: 4, backgroundColor: theme.colors.surface },
+  paymentOptionActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '20' },
+  paymentOptionText: { fontSize: 14, color: theme.colors.text.muted, fontWeight: '500' },
   paymentOptionTextActive: {
-    color: '#007AFF',
+    color: theme.colors.primary,
     fontWeight: 'bold'
   },
   card: {
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    marginBottom: theme.spacing.lg,
     borderLeftWidth: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadows.medium,
   },
   topRow: {
     flexDirection: 'row',
@@ -299,35 +297,35 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB'
+    borderColor: theme.colors.border
   },
   driverInitials: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#374151'
+    color: theme.colors.text.main
   },
   proBadgeOverlay: {
     position: 'absolute',
     bottom: -4,
     left: 4,
-    backgroundColor: '#F59E0B',
+    backgroundColor: theme.colors.warning,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FFF'
+    borderColor: theme.colors.card
   },
   proBadgeTextOverlay: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#0f172a',
+    color: theme.colors.background,
   },
   safetyRow: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: theme.colors.success + '15',
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 6,
@@ -335,10 +333,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#a7f3d0'
+    borderColor: theme.colors.success
   },
   safetyText: {
-    color: '#059669',
+    color: theme.colors.success,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -348,12 +346,12 @@ const styles = StyleSheet.create({
   driverName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#111827',
+    color: theme.colors.text.main,
     marginBottom: 2
   },
   driverRating: {
     fontSize: 13,
-    color: '#6B7280',
+    color: theme.colors.text.muted,
     fontWeight: '600'
   },
   routeRow: {
@@ -369,20 +367,20 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#10B981',
+    backgroundColor: theme.colors.success,
     marginTop: 4
   },
   dashedLine: {
     width: 2,
     flex: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: theme.colors.border,
     marginVertical: 4
   },
   dotRed: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#EF4444',
+    backgroundColor: theme.colors.danger,
     marginBottom: 4
   },
   routeDetails: {
@@ -398,25 +396,25 @@ const styles = StyleSheet.create({
   routeText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#374151',
+    color: theme.colors.text.main,
     flex: 1,
     marginRight: 8
   },
   timeText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#10B981'
+    color: theme.colors.success
   },
   vehicleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: theme.colors.surface,
     padding: 10,
     borderRadius: 8,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#F3F4F6'
+    borderColor: theme.colors.border
   },
   vehicleInfo: {
     flexDirection: 'row',
@@ -430,21 +428,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#D1D5DB'
+    borderColor: theme.colors.border
   },
   vehicleText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#4B5563',
+    color: theme.colors.text.main,
     marginRight: 6
   },
   vehicleIcon: {
     fontSize: 16,
   },
   licensePlate: {
-    backgroundColor: '#FFF',
+    backgroundColor: theme.colors.background,
     borderWidth: 1,
-    borderColor: '#000',
+    borderColor: theme.colors.border,
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 2
@@ -452,7 +450,7 @@ const styles = StyleSheet.create({
   licensePlateText: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#000',
+    color: theme.colors.text.main,
     letterSpacing: 0.5
   },
   bottomRow: {
@@ -472,7 +470,7 @@ const styles = StyleSheet.create({
   },
   badgeNeutral: {
     alignSelf: 'flex-start',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.colors.surface,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6
@@ -480,11 +478,11 @@ const styles = StyleSheet.create({
   badgeNeutralText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#4B5563'
+    color: theme.colors.text.muted
   },
   badgeRecurring: {
     alignSelf: 'flex-start',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: theme.colors.primary + '15',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6
@@ -492,11 +490,11 @@ const styles = StyleSheet.create({
   badgeRecurringText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#2563EB'
+    color: theme.colors.primaryLight
   },
   badgeInstant: {
     alignSelf: 'flex-start',
-    backgroundColor: '#FFFBEB',
+    backgroundColor: theme.colors.warning + '15',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6
@@ -504,7 +502,7 @@ const styles = StyleSheet.create({
   badgeInstantText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#D97706'
+    color: theme.colors.warning
   },
   actionCol: {
     alignItems: 'flex-end',
@@ -513,23 +511,23 @@ const styles = StyleSheet.create({
   priceText: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#10B981'
+    color: theme.colors.success
   },
   actionBtn: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 20,
+    borderRadius: theme.radius.full,
     justifyContent: 'center',
     alignItems: 'center'
   },
   actionBtnBook: {
-    backgroundColor: '#111827'
+    backgroundColor: theme.colors.primary
   },
   actionBtnSubscribe: {
-    backgroundColor: '#3B82F6'
+    backgroundColor: theme.colors.primaryLight
   },
   actionBtnText: {
-    color: '#FFF',
+    color: theme.colors.text.light,
     fontWeight: '700',
     fontSize: 14
   },
@@ -537,23 +535,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 50,
     fontSize: 16,
-    color: '#666'
+    color: theme.colors.text.muted
   },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, minHeight: 400 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: theme.colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, minHeight: 400 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333' },
-  closeBtn: { fontSize: 24, color: '#666', paddingHorizontal: 10 },
-  summaryBox: { backgroundColor: '#f8f9fa', padding: 15, borderRadius: 10, marginBottom: 20 },
-  summaryText: { fontSize: 15, color: '#444', marginBottom: 5, fontWeight: '500' },
-  planTitle: { fontSize: 16, fontWeight: '600', marginBottom: 10, color: '#333' },
-  planCard: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 15, marginBottom: 10 },
-  planCardActive: { borderColor: '#007AFF', backgroundColor: '#e6f2ff' },
-  planCardTitle: { fontSize: 16, fontWeight: 'bold', color: '#555', marginBottom: 4 },
-  planCardTitleActive: { color: '#007AFF' },
-  planCardDesc: { fontSize: 13, color: '#666' },
-  confirmBtn: { backgroundColor: '#28a745', padding: 16, borderRadius: 10, alignItems: 'center', marginTop: 15 },
-  confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text.main },
+  closeBtn: { fontSize: 24, color: theme.colors.text.muted, paddingHorizontal: 10 },
+  summaryBox: { backgroundColor: theme.colors.surface, padding: 15, borderRadius: 10, marginBottom: 20 },
+  summaryText: { fontSize: 15, color: theme.colors.text.main, marginBottom: 5, fontWeight: '500' },
+  planTitle: { fontSize: 16, fontWeight: '600', marginBottom: 10, color: theme.colors.text.main },
+  planCard: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 15, marginBottom: 10, backgroundColor: theme.colors.surface },
+  planCardActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '15' },
+  planCardTitle: { fontSize: 16, fontWeight: 'bold', color: theme.colors.text.main, marginBottom: 4 },
+  planCardTitleActive: { color: theme.colors.primaryLight },
+  planCardDesc: { fontSize: 13, color: theme.colors.text.muted },
+  confirmBtn: { backgroundColor: theme.colors.success, padding: 16, borderRadius: theme.radius.full, alignItems: 'center', marginTop: 15 },
+  confirmBtnText: { color: theme.colors.text.light, fontSize: 16, fontWeight: 'bold' }
 });
 
 export default RideResultsScreen;
