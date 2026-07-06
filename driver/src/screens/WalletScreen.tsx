@@ -4,13 +4,10 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../theme/theme';
 import api from '../api/axios';
 
-const WalletScreen = () => {
+const WalletScreen = ({ navigation }: any) => {
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [amount, setAmount] = useState('');
-  const [bankInfo, setBankInfo] = useState('');
-  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   useEffect(() => {
     fetchWalletData();
@@ -32,34 +29,7 @@ const WalletScreen = () => {
     }
   };
 
-  const handleWithdraw = async () => {
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount.');
-      return;
-    }
-    if (Number(amount) > balance) {
-      Alert.alert('Insufficient Balance', 'You cannot withdraw more than your available balance.');
-      return;
-    }
-    if (!bankInfo) {
-      Alert.alert('Bank Info Required', 'Please enter your bank account or UPI details.');
-      return;
-    }
-
-    try {
-      setIsWithdrawing(true);
-      const res = await api.post('/wallet/withdraw', { amount: Number(amount), bankAccountInfo: bankInfo });
-      Alert.alert('Success', res.data.message);
-      setAmount('');
-      setBankInfo('');
-      fetchWalletData(); // Refresh
-    } catch (err) {
-      Alert.alert('Error', 'Failed to process withdrawal.');
-    } finally {
-      setIsWithdrawing(false);
-    }
-  };
-
+  // handleWithdraw moved to WithdrawScreen
   const renderTransaction = ({ item }) => {
     const isPositive = item.amount > 0;
     return (
@@ -100,24 +70,8 @@ const WalletScreen = () => {
       </View>
 
       <View style={styles.withdrawContainer}>
-        <Text style={styles.sectionTitle}>Withdraw Funds</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Amount (₹)"
-          placeholderTextColor={theme.colors.text.muted}
-          keyboardType="decimal-pad"
-          value={amount}
-          onChangeText={setAmount}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Bank Account / UPI"
-          placeholderTextColor={theme.colors.text.muted}
-          value={bankInfo}
-          onChangeText={setBankInfo}
-        />
-        <TouchableOpacity style={styles.withdrawBtn} onPress={handleWithdraw} disabled={isWithdrawing}>
-          {isWithdrawing ? <ActivityIndicator color="#FFF" /> : <Text style={styles.withdrawBtnText}>Request Withdrawal</Text>}
+        <TouchableOpacity style={styles.withdrawBtn} onPress={() => navigation.navigate('Withdraw')}>
+          <Text style={styles.withdrawBtnText}>Withdraw Funds to Bank</Text>
         </TouchableOpacity>
       </View>
 

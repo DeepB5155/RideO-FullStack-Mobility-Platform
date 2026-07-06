@@ -10,7 +10,7 @@ import {
   Image,
 } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 
 const ProfileScreen = () => {
@@ -23,34 +23,36 @@ const ProfileScreen = () => {
   const [vehicle, setVehicle] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
 
-  React.useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const { default: axiosInstance } = await import('../api/axios');
-        const [kycRes, vehicleRes, statsRes] = await Promise.allSettled([
-          axiosInstance.get('/kyc/status'),
-          axiosInstance.get('/vehicle/my'),
-          axiosInstance.get('/insights/driver-stats')
-        ]);
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchData = async () => {
+        try {
+          const { default: axiosInstance } = await import('../api/axios');
+          const [kycRes, vehicleRes, statsRes] = await Promise.allSettled([
+            axiosInstance.get('/kyc/status'),
+            axiosInstance.get('/vehicle/my'),
+            axiosInstance.get('/insights/driver-stats')
+          ]);
 
-        if (kycRes.status === 'fulfilled') {
-          setKycStatus(kycRes.value.data.status || 'Pending');
+          if (kycRes.status === 'fulfilled') {
+            setKycStatus(kycRes.value.data.status || 'Pending');
+          }
+          if (vehicleRes.status === 'fulfilled') {
+            setVehicle(vehicleRes.value.data);
+          }
+          if (statsRes.status === 'fulfilled') {
+            setEarnings(statsRes.value.data.weeklyEarnings || 0);
+            setTrips(statsRes.value.data.totalTripsThisMonth || 0);
+          }
+        } catch (e) {
+          console.error('Failed to fetch profile data', e);
+        } finally {
+          setLoading(false);
         }
-        if (vehicleRes.status === 'fulfilled') {
-          setVehicle(vehicleRes.value.data);
-        }
-        if (statsRes.status === 'fulfilled') {
-          setEarnings(statsRes.value.data.weeklyEarnings || 0);
-          setTrips(statsRes.value.data.totalTripsThisMonth || 0);
-        }
-      } catch (e) {
-        console.error('Failed to fetch profile data', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (user) fetchData();
-  }, [user]);
+      };
+      if (user) fetchData();
+    }, [user])
+  );
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [

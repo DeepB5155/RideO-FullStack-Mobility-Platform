@@ -1,8 +1,35 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
+import { 
+  View, Text, TextInput, TouchableOpacity, StyleSheet, 
+  ScrollView, Alert, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, Modal
+} from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 import axiosInstance from '../api/axios';
 import { theme } from '../theme/theme';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+
+// Local colors to match the specific HTML design provided
+const localColors = {
+  background: '#f8f9ff',
+  primary: '#000000',
+  onSurfaceVariant: '#45464d',
+  surfaceContainer: '#e5eeff',
+  surfaceContainerHigh: '#dce9ff',
+  surfaceContainerLow: '#eff4ff',
+  secondary: '#006a61',
+  secondaryContainer: '#86f2e4',
+  onSecondaryContainer: '#006f66',
+  outlineVariant: '#c6c6cd',
+  surface: '#ffffff',
+  outline: '#76777d',
+};
+
+const VEHICLE_TYPES = [
+  { label: 'Sedan', value: 'Sedan' },
+  { label: 'SUV', value: 'SUV' },
+  { label: 'Hatchback', value: 'Hatchback' },
+  { label: 'Van / Minivan', value: 'Van' }
+];
 
 const EditVehicleScreen = ({ navigation }: any) => {
   const { user } = useContext(AuthContext);
@@ -10,32 +37,18 @@ const EditVehicleScreen = ({ navigation }: any) => {
   const [isSaving, setIsSaving] = useState(false);
   const [vehicleId, setVehicleId] = useState<string | null>(null);
 
-  // Form State
-  const [make, setMake] = useState('');
-  const [model, setModel] = useState('');
+  // Form State matching the new design
+  const [makeModel, setMakeModel] = useState('');
   const [year, setYear] = useState('');
-  const [color, setColor] = useState('White');
   const [licensePlate, setLicensePlate] = useState('');
   const [vehicleType, setVehicleType] = useState('Sedan');
+  
+  // Hidden state kept for API compatibility
+  const [color, setColor] = useState('White');
   const [seats, setSeats] = useState('4');
 
-  const VEHICLE_TYPES = [
-    { type: 'Hatchback', icon: '🚗' },
-    { type: 'Sedan', icon: '🚙' },
-    { type: 'SUV', icon: '🛻' },
-    { type: 'MPV', icon: '🚐' }
-  ];
-
-  const VEHICLE_COLORS = [
-    { name: 'White', hex: '#FFFFFF' },
-    { name: 'Silver', hex: '#C0C0C0' },
-    { name: 'Black', hex: '#000000' },
-    { name: 'Red', hex: '#FF0000' },
-    { name: 'Blue', hex: '#0000FF' },
-    { name: 'Grey', hex: '#808080' },
-    { name: 'Gold', hex: '#FFD700' },
-    { name: 'Brown', hex: '#A52A2A' }
-  ];
+  // Dropdown state
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
 
   useEffect(() => {
     fetchVehicle();
@@ -46,13 +59,12 @@ const EditVehicleScreen = ({ navigation }: any) => {
       const res = await axiosInstance.get('/vehicle/my');
       const v = res.data;
       setVehicleId(v.id);
-      setMake(v.make);
-      setModel(v.model);
-      setYear(v.year.toString());
+      setMakeModel(`${v.make || ''} ${v.model || ''}`.trim());
+      setYear(v.year?.toString() || '');
       setColor(v.color || 'White');
-      setLicensePlate(v.licensePlate);
+      setLicensePlate(v.licensePlate || '');
       setVehicleType(v.vehicleType || 'Sedan');
-      setSeats(v.totalSeats.toString());
+      setSeats(v.totalSeats?.toString() || '4');
     } catch (e: any) {
       if (e.response?.status === 404) {
         Alert.alert('No Vehicle', 'You do not have a vehicle registered yet. Please complete KYC.');
@@ -66,10 +78,14 @@ const EditVehicleScreen = ({ navigation }: any) => {
   };
 
   const saveVehicle = async () => {
-    if (!make || !model || !licensePlate) {
+    if (!makeModel || !licensePlate || !year) {
       Alert.alert('Error', 'Please fill all required fields');
       return;
     }
+
+    const parts = makeModel.trim().split(' ');
+    const make = parts[0] || 'Unknown';
+    const model = parts.slice(1).join(' ') || 'Unknown';
 
     try {
       setIsSaving(true);
@@ -96,119 +112,453 @@ const EditVehicleScreen = ({ navigation }: any) => {
   if (isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <ActivityIndicator size="large" color={localColors.primary} />
       </View>
     );
   }
 
+  // Derive display values for preview card
+  const displayMakeModel = makeModel || 'Unknown Vehicle';
+  const displayType = vehicleType || 'Type';
+  const displayReg = licensePlate || 'ABC-1234';
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: theme.spacing.xxl }}>
-        <Text style={styles.header}>Edit Vehicle</Text>
-        
-        <View style={styles.card}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Vehicle Make (Brand)</Text>
-            <TextInput style={styles.input} placeholder="e.g. Toyota, Honda, Tata" placeholderTextColor={theme.colors.text.muted} value={make} onChangeText={setMake} />
-          </View>
+      <KeyboardAvoidingView 
+        style={styles.container} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <MaterialIcons name="arrow-back" size={24} color={localColors.onSurfaceVariant} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Edit Vehicle</Text>
+          <View style={{ width: 40 }} />
+        </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Vehicle Model</Text>
-            <TextInput style={styles.input} placeholder="e.g. Camry, Civic, Nexon" placeholderTextColor={theme.colors.text.muted} value={model} onChangeText={setModel} />
-          </View>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Info Text */}
+          <Text style={styles.infoText}>
+            Update your vehicle details. Changes may require approval before you can accept new rides.
+          </Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Manufacturing Year</Text>
-            <TextInput style={styles.input} placeholder="e.g. 2022" placeholderTextColor={theme.colors.text.muted} keyboardType="number-pad" value={year} onChangeText={setYear} />
-          </View>
+          {/* Current Vehicle Card Preview */}
+          <View style={styles.previewCard}>
+            <View style={styles.previewIconBox}>
+              <MaterialIcons name="directions-car" size={32} color={localColors.primary} />
+            </View>
+            
+            <View style={styles.previewDetails}>
+              <Text style={styles.previewTitle}>{displayMakeModel}</Text>
+              <View style={styles.previewSubRow}>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{displayType.toUpperCase()}</Text>
+                </View>
+                <View style={styles.dot} />
+                <Text style={styles.previewReg}>{displayReg}</Text>
+              </View>
+            </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Vehicle Type</Text>
-            <View style={styles.typeRow}>
-              {VEHICLE_TYPES.map(item => (
-                <TouchableOpacity 
-                  key={item.type} 
-                  style={[styles.typeCard, vehicleType === item.type && styles.typeCardSelected]}
-                  onPress={() => setVehicleType(item.type)}
-                >
-                  <Text style={styles.typeIcon}>{item.icon}</Text>
-                  <Text style={[styles.typeText, vehicleType === item.type && styles.typeTextSelected]}>{item.type}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.activeStatus}>
+              <View style={styles.activeDot} />
+              <Text style={styles.activeText}>Active</Text>
             </View>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Color</Text>
-            <View style={styles.colorRow}>
-              {VEHICLE_COLORS.map(c => (
+          {/* Form Area */}
+          <View style={styles.formContainer}>
+            {/* Make & Model */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>MAKE & MODEL</Text>
+              <View style={styles.inputWrapper}>
+                <MaterialIcons name="local-offer" size={20} color={localColors.outline} style={styles.inputIcon} />
+                <TextInput 
+                  style={styles.input} 
+                  value={makeModel} 
+                  onChangeText={setMakeModel} 
+                  placeholder="Toyota Camry"
+                  placeholderTextColor={localColors.outlineVariant}
+                />
+              </View>
+            </View>
+
+            {/* Year */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>YEAR</Text>
+              <View style={styles.inputWrapper}>
+                <MaterialIcons name="calendar-today" size={20} color={localColors.outline} style={styles.inputIcon} />
+                <TextInput 
+                  style={styles.input} 
+                  value={year} 
+                  onChangeText={setYear} 
+                  keyboardType="number-pad"
+                  placeholder="2021"
+                  placeholderTextColor={localColors.outlineVariant}
+                />
+              </View>
+            </View>
+
+            {/* Registration Number */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>REGISTRATION NUMBER</Text>
+              <View style={styles.inputWrapper}>
+                <MaterialIcons name="pin" size={20} color={localColors.outline} style={styles.inputIcon} />
+                <TextInput 
+                  style={[styles.input, { textTransform: 'uppercase' }]} 
+                  value={licensePlate} 
+                  onChangeText={setLicensePlate} 
+                  placeholder="ABC-1234"
+                  autoCapitalize="characters"
+                  placeholderTextColor={localColors.outlineVariant}
+                />
+              </View>
+            </View>
+
+            {/* Vehicle Type Dropdown */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>VEHICLE TYPE</Text>
+              <TouchableOpacity 
+                style={styles.inputWrapper} 
+                activeOpacity={0.7}
+                onPress={() => setIsTypeDropdownOpen(true)}
+              >
+                <MaterialIcons name="category" size={20} color={localColors.outline} style={styles.inputIcon} />
+                <Text style={[styles.input, { lineHeight: 48, color: localColors.primary }]}>
+                  {vehicleType}
+                </Text>
+                <MaterialIcons name="expand-more" size={24} color={localColors.outline} style={styles.dropdownIcon} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Document Warning Card */}
+            <View style={styles.warningCard}>
+              <MaterialIcons name="info-outline" size={20} color={localColors.onSurfaceVariant} style={{ marginTop: 2 }} />
+              <View style={styles.warningTextCol}>
+                <Text style={styles.warningTitle}>Verification Required</Text>
+                <Text style={styles.warningDesc}>
+                  Changing your vehicle make, model, or registration will require you to upload new registration documents.
+                </Text>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* Bottom Action Area */}
+        <View style={styles.bottomBar}>
+          <TouchableOpacity 
+            style={styles.cancelBtn} 
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.cancelBtnText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.saveBtn} 
+            onPress={saveVehicle}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator color={localColors.surface} />
+            ) : (
+              <Text style={styles.saveBtnText}>Save Changes</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Custom Dropdown Modal */}
+        <Modal
+          visible={isTypeDropdownOpen}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setIsTypeDropdownOpen(false)}
+        >
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setIsTypeDropdownOpen(false)}>
+            <View style={styles.dropdownMenu}>
+              {VEHICLE_TYPES.map((type, idx) => (
                 <TouchableOpacity 
-                  key={c.name}
+                  key={type.value} 
                   style={[
-                    styles.colorCircle, 
-                    { backgroundColor: c.hex },
-                    c.name === 'White' && { borderWidth: 1, borderColor: '#ccc' }
+                    styles.dropdownItem, 
+                    idx !== VEHICLE_TYPES.length - 1 && styles.dropdownItemBorder
                   ]}
-                  onPress={() => setColor(c.name)}
+                  onPress={() => {
+                    setVehicleType(type.value);
+                    setIsTypeDropdownOpen(false);
+                  }}
                 >
-                  {color === c.name && (
-                    <Text style={[styles.colorCheck, (c.name === 'White' || c.name === 'Silver' || c.name === 'Gold') ? {color: '#000'} : {color: '#fff'}]}>✓</Text>
+                  <Text style={[
+                    styles.dropdownItemText, 
+                    vehicleType === type.value && { color: localColors.secondary, fontWeight: '700' }
+                  ]}>
+                    {type.label}
+                  </Text>
+                  {vehicleType === type.value && (
+                    <MaterialIcons name="check" size={20} color={localColors.secondary} />
                   )}
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>License Plate Number</Text>
-            <TextInput 
-              style={styles.input} 
-              placeholder="e.g. GJ01AB1234" 
-              placeholderTextColor={theme.colors.text.muted} 
-              autoCapitalize="characters"
-              value={licensePlate} 
-              onChangeText={setLicensePlate} 
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Total Passenger Seats</Text>
-            <TextInput style={styles.input} placeholder="e.g. 4" placeholderTextColor={theme.colors.text.muted} keyboardType="number-pad" value={seats} onChangeText={setSeats} />
-          </View>
-        </View>
-
-        <TouchableOpacity style={styles.submitBtn} onPress={saveVehicle} disabled={isSaving}>
-          {isSaving ? (
-            <ActivityIndicator color={theme.colors.text.light} />
-          ) : (
-            <Text style={styles.submitBtnText}>SAVE CHANGES</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
+          </TouchableOpacity>
+        </Modal>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: theme.colors.background },
-  container: { flex: 1, padding: theme.spacing.lg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
-  header: { fontSize: 32, fontWeight: '800', marginBottom: theme.spacing.xl, color: theme.colors.text.main, marginTop: theme.spacing.md },
-  card: { backgroundColor: theme.colors.card, padding: theme.spacing.lg, borderRadius: theme.radius.xl, marginBottom: theme.spacing.xl, ...theme.shadows.medium, borderWidth: 1, borderColor: theme.colors.border },
-  inputGroup: { marginBottom: theme.spacing.lg },
-  label: { fontSize: 14, fontWeight: '700', color: theme.colors.text.main, marginBottom: theme.spacing.sm, letterSpacing: 0.5 },
-  input: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, padding: theme.spacing.md, fontSize: 16, color: theme.colors.text.main, backgroundColor: theme.colors.surface },
-  typeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  typeCard: { flex: 1, alignItems: 'center', padding: 10, marginHorizontal: 4, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, backgroundColor: theme.colors.surface },
-  typeCardSelected: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primaryLight + '20' },
-  typeIcon: { fontSize: 24, marginBottom: 4 },
-  typeText: { fontSize: 12, color: theme.colors.text.muted, fontWeight: '600' },
-  typeTextSelected: { color: theme.colors.primary },
-  colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 },
-  colorCircle: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', ...theme.shadows.small },
-  colorCheck: { fontSize: 18, fontWeight: 'bold' },
-  submitBtn: { backgroundColor: theme.colors.primary, padding: theme.spacing.lg, borderRadius: theme.radius.full, alignItems: 'center', ...theme.shadows.medium },
-  submitBtnText: { color: theme.colors.text.light, fontSize: 16, fontWeight: '800', letterSpacing: 1 }
+  safeArea: {
+    flex: 1,
+    backgroundColor: localColors.background,
+  },
+  container: {
+    flex: 1,
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: localColors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    height: 60,
+    backgroundColor: 'rgba(248, 249, 255, 0.9)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: localColors.primary,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 100, // Space for bottom bar
+  },
+  infoText: {
+    fontSize: 16,
+    color: localColors.onSurfaceVariant,
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  previewCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: localColors.surfaceContainer,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: localColors.outlineVariant,
+    marginBottom: 24,
+  },
+  previewIconBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: localColors.surfaceContainerHigh,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(198, 198, 205, 0.5)',
+    marginRight: 16,
+  },
+  previewDetails: {
+    flex: 1,
+  },
+  previewTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: localColors.primary,
+    marginBottom: 4,
+  },
+  previewSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  badge: {
+    backgroundColor: '#d3e4fe',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: localColors.onSurfaceVariant,
+    letterSpacing: 0.5,
+  },
+  dot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: localColors.outline,
+    marginHorizontal: 8,
+  },
+  previewReg: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: localColors.onSurfaceVariant,
+    letterSpacing: 0.5,
+  },
+  activeStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(134, 242, 228, 0.3)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: localColors.secondary,
+    marginRight: 4,
+  },
+  activeText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: localColors.onSecondaryContainer,
+  },
+  formContainer: {
+    gap: 20,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: localColors.onSurfaceVariant,
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+  inputWrapper: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  inputIcon: {
+    position: 'absolute',
+    left: 12,
+    zIndex: 1,
+  },
+  dropdownIcon: {
+    position: 'absolute',
+    right: 12,
+    zIndex: 1,
+  },
+  input: {
+    width: '100%',
+    backgroundColor: localColors.surface,
+    borderWidth: 1,
+    borderColor: localColors.outlineVariant,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingLeft: 40,
+    paddingRight: 16,
+    fontSize: 16,
+    color: localColors.primary,
+    minHeight: 48,
+  },
+  warningCard: {
+    flexDirection: 'row',
+    backgroundColor: localColors.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: localColors.outlineVariant,
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 8,
+  },
+  warningTextCol: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: localColors.primary,
+    marginBottom: 4,
+  },
+  warningDesc: {
+    fontSize: 14,
+    color: localColors.onSurfaceVariant,
+    lineHeight: 20,
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+    gap: 16,
+  },
+  cancelBtn: {
+    flex: 1,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: localColors.outline,
+    borderRadius: 24,
+  },
+  cancelBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: localColors.primary,
+  },
+  saveBtn: {
+    flex: 1,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: localColors.primary,
+    borderRadius: 24,
+  },
+  saveBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: localColors.surface,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropdownMenu: {
+    width: '80%',
+    backgroundColor: localColors.surface,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+  dropdownItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: localColors.outlineVariant,
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: localColors.primary,
+  },
 });
 
 export default EditVehicleScreen;

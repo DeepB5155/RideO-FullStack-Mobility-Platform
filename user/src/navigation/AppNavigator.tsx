@@ -16,6 +16,9 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import WalletScreen from '../screens/WalletScreen';
 import EmergencyContactsScreen from '../screens/EmergencyContactsScreen';
 import SubscriptionsScreen from '../screens/SubscriptionsScreen';
+import SettingsScreen from '../screens/SettingsScreen';
+import RegisterScreen from '../screens/RegisterScreen';
+import ModalsShowcaseScreen from '../screens/ModalsShowcaseScreen';
 
 const Stack = createStackNavigator();
 
@@ -47,9 +50,14 @@ const AppNavigator = () => {
           <Stack.Screen name="Wallet" component={WalletScreen} />
           <Stack.Screen name="Emergency Contacts" component={EmergencyContactsScreen} />
           <Stack.Screen name="SubscriptionsScreen" component={SubscriptionsScreen} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="ModalsShowcase" component={ModalsShowcaseScreen} />
         </>
       ) : (
-        <Stack.Screen name="Login" component={LoginScreen} />
+        <>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+        </>
       )}
     </Stack.Navigator>
   );

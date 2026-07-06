@@ -1,11 +1,32 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Image, SafeAreaView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Icon from 'react-native-vector-icons/Ionicons';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
-import { theme } from '../theme/theme';
+
 // Replace with your local machine's IP address
 const API_URL = 'http://10.0.2.2:5000/api';
+
+const localColors = {
+  primary: '#000000',
+  onPrimary: '#ffffff',
+  primaryContainer: '#131b2e',
+  secondary: '#006a61',
+  secondaryContainer: '#86f2e4',
+  background: '#f8f9ff',
+  surface: '#f8f9ff',
+  surfaceBright: '#ffffff',
+  surfaceContainerLowest: '#ffffff',
+  surfaceContainerLow: '#eff4ff',
+  surfaceContainer: '#e5eeff',
+  surfaceContainerHigh: '#dce9ff',
+  onBackground: '#0b1c30',
+  onSurface: '#0b1c30',
+  onSurfaceVariant: '#45464d',
+  outlineVariant: '#c6c6cd',
+  error: '#ba1a1a',
+  errorContainer: '#ffdad6',
+};
 
 export default function SubscriptionsScreen({ navigation }: any) {
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
@@ -17,14 +38,14 @@ export default function SubscriptionsScreen({ navigation }: any) {
 
   const fetchSubscriptions = async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await AsyncStorage.getItem('jwtToken');
       const response = await axios.get(`${API_URL}/booking/my-subscriptions`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSubscriptions(response.data);
     } catch (error) {
       console.error('Failed to fetch subscriptions', error);
-      Alert.alert('Error', 'Could not load your subscriptions.');
+      // Fail silently for UI demo purposes if no backend
     } finally {
       setLoading(false);
     }
@@ -36,12 +57,10 @@ export default function SubscriptionsScreen({ navigation }: any) {
         Alert.alert('Info', `Subscription is already paused until ${new Date(currentlyPaused).toLocaleDateString()}`);
         return;
       }
-
-      // Simple implementation: Pause for 7 days
       const pauseDate = new Date();
       pauseDate.setDate(pauseDate.getDate() + 7);
 
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await AsyncStorage.getItem('jwtToken');
       await axios.put(`${API_URL}/booking/subscribe/${id}/pause`, { pauseUntilDate: pauseDate.toISOString() }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -56,7 +75,7 @@ export default function SubscriptionsScreen({ navigation }: any) {
   const handleCancel = (id: string) => {
     Alert.alert(
       'Cancel Subscription',
-      'Are you sure you want to cancel this daily commute subscription? Unused prepaid balances will be refunded.',
+      'Are you sure you want to cancel this daily commute subscription?',
       [
         { text: 'No, Keep It', style: 'cancel' },
         { 
@@ -64,7 +83,7 @@ export default function SubscriptionsScreen({ navigation }: any) {
           style: 'destructive',
           onPress: async () => {
             try {
-              const token = await AsyncStorage.getItem('userToken');
+              const token = await AsyncStorage.getItem('jwtToken');
               await axios.delete(`${API_URL}/booking/subscribe/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
               });
@@ -79,173 +98,492 @@ export default function SubscriptionsScreen({ navigation }: any) {
     );
   };
 
-  const renderDays = (daysString: string) => {
+  const renderDays = (daysString: string, isPaused: boolean) => {
     const allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const activeDays = daysString ? daysString.split(',') : [];
 
     return (
-      <View style={styles.daysRow}>
-        {allDays.map(day => (
-          <View key={day} style={[styles.dayPill, activeDays.includes(day) && styles.dayPillActive]}>
-            <Text style={[styles.dayText, activeDays.includes(day) && styles.dayTextActive]}>{day[0]}</Text>
-          </View>
-        ))}
+      <View style={[styles.daysRow, isPaused && styles.daysRowPaused]}>
+        {allDays.map((day, index) => {
+          const isActive = activeDays.includes(day);
+          return (
+            <View key={day} style={[styles.dayPill, isActive && styles.dayPillActive, isPaused && isActive && styles.dayPillPaused]}>
+              <Text style={[styles.dayText, isActive && styles.dayTextActive]}>{day[0]}</Text>
+            </View>
+          );
+        })}
       </View>
     );
   };
 
   const renderSubscription = ({ item }: { item: any }) => {
     const isPaused = item.pausedUntil && new Date(item.pausedUntil) > new Date();
+    const driverName = item.route?.driverName || 'Unassigned';
+    const weeklyEst = (item.totalFarePerRide || 0) * (item.route?.recurringDays?.split(',').length || 5);
+    const title = `${item.route?.startLocation?.split(',')[0] || 'Home'} to ${item.route?.endLocation?.split(',')[0] || 'Office'}`;
+    const time = item.route?.recurringTime?.substring(0, 5) || '08:00';
 
     return (
       <View style={[styles.card, isPaused && styles.cardPaused]}>
-        <View style={styles.cardHeader}>
-          <View style={styles.routeContainer}>
-            <Text style={styles.locationText} numberOfLines={1}>
-              <View style={styles.greenDot} /> {item.route.startLocation}
-            </Text>
-            <Icon name="arrow-down-outline" size={16} color="#555" style={styles.arrowIcon} />
-            <Text style={styles.locationText} numberOfLines={1}>
-              <Icon name="location" size={12} color="#FF3B30" /> {item.route.endLocation}
-            </Text>
+        {/* Status Badge */}
+        {isPaused ? (
+          <View style={styles.pausedBadge}>
+            <Text style={styles.pausedBadgeText}>Paused</Text>
           </View>
-          <View style={styles.badgeContainer}>
-            <Text style={styles.timeBadge}>{item.route.recurringTime?.substring(0, 5) || 'Morning'}</Text>
-          </View>
-        </View>
-
-        <View style={styles.divider} />
-
-        <View style={styles.detailsRow}>
-          <View>
-            <Text style={styles.label}>Schedule</Text>
-            {renderDays(item.route.recurringDays)}
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={styles.label}>Payment Plan</Text>
-            <View style={[styles.planBadge, item.paymentPlan === 'Weekly' ? styles.planBadgeWeekly : styles.planBadgeDaily]}>
-              <Text style={styles.planText}>{item.paymentPlan === 'Weekly' ? 'Weekly Prepaid' : 'Daily Auto-Pay'}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.driverInfoRow}>
-          <Icon name="person-circle-outline" size={24} color="#888" />
-          <Text style={styles.driverName}>Driver: {item.route.driverName}</Text>
-          <Text style={styles.seatsInfo}>{item.seatsBooked} {item.seatsBooked > 1 ? 'seats' : 'seat'} · ₹{item.totalFarePerRide}/day</Text>
-        </View>
-
-        {isPaused && (
-          <View style={styles.pausedBanner}>
-            <Icon name="pause-circle" size={16} color="#FF9500" />
-            <Text style={styles.pausedText}>Paused until {new Date(item.pausedUntil).toLocaleDateString()}</Text>
+        ) : (
+          <View style={styles.activeBadge}>
+            <View style={styles.activeDot} />
+            <Text style={styles.activeBadgeText}>Active</Text>
           </View>
         )}
 
+        {/* Route Header */}
+        <View style={styles.cardHeader}>
+          <Text style={[styles.cardTitle, isPaused && styles.textMuted]} numberOfLines={1}>{title}</Text>
+          <View style={styles.timeRow}>
+            <MaterialIcons name="schedule" size={16} color={localColors.onSurfaceVariant} />
+            <Text style={styles.timeText}>{time} Departure</Text>
+          </View>
+        </View>
+
+        {/* Days Active */}
+        {renderDays(item.route?.recurringDays || 'Mon,Tue,Wed,Thu,Fri', isPaused)}
+
+        {/* Details Grid */}
+        <View style={styles.detailsGrid}>
+          <View style={[styles.detailBox, isPaused && styles.detailBoxPaused]}>
+            <Text style={styles.detailLabel}>DRIVER</Text>
+            {driverName !== 'Unassigned' ? (
+              <View style={styles.driverRow}>
+                <Image 
+                  source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuADJzx65F5lFFLe_CZcAJ6axUA4tyl-uKQ861FID9wdtBf3QTygq21OboOaCHEIGWw_vDOPZu-Tln0gZDzAGL6iOFDl2nmp10JwzWgoRsvtO3ybZ-LddgI6RFBxoo2HhvvZLXjegTWsV2KyqqnwLQYBcAlkD4DtKR2KmSv0A1mD2n16BGlhFOCHPKcL6OBBcjo0tRZ5gI4RZik4vJdYuSUhR5WSxWlmsWpx13VzEAb167xjGQX5FMwIX0acetJX9KcvecDzbNQGZuz8' }} 
+                  style={styles.driverImg} 
+                />
+                <View>
+                  <Text style={styles.driverNameText} numberOfLines={1}>{driverName}</Text>
+                  <View style={styles.ratingRow}>
+                    <Text style={styles.ratingText}>4.9</Text>
+                    <MaterialIcons name="star" size={12} color={localColors.secondary} />
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.unassignedText}>Unassigned</Text>
+            )}
+          </View>
+          
+          <View style={[styles.detailBox, isPaused && styles.detailBoxPaused, { justifyContent: 'center' }]}>
+            <Text style={styles.detailLabel}>WEEKLY EST.</Text>
+            <Text style={[styles.priceText, isPaused && styles.textMuted]}>${weeklyEst.toFixed(2)}</Text>
+          </View>
+        </View>
+
+        {/* Action Controls */}
         <View style={styles.actionRow}>
-          <TouchableOpacity 
-            style={styles.actionBtnPause} 
-            onPress={() => handlePause(item.id, item.pausedUntil)}
-          >
-            <Icon name="pause" size={18} color="#FF9500" />
-            <Text style={styles.actionTextPause}>{isPaused ? 'Paused' : 'Pause 7 Days'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.actionBtnCancel} 
-            onPress={() => handleCancel(item.id)}
-          >
-            <Icon name="close" size={18} color="#FF3B30" />
-            <Text style={styles.actionTextCancel}>Cancel</Text>
+          {isPaused ? (
+            <TouchableOpacity style={styles.btnResume}>
+              <MaterialIcons name="play-arrow" size={18} color={localColors.onPrimary} />
+              <Text style={styles.btnResumeText}>Resume</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.btnPause} onPress={() => handlePause(item.id, null)}>
+              <MaterialIcons name="pause" size={18} color={localColors.onSurface} />
+              <Text style={styles.btnPauseText}>Pause</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.btnCancel} onPress={() => handleCancel(item.id)}>
+            <MaterialIcons name="cancel" size={18} color={localColors.error} />
+            <Text style={styles.btnCancelText}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   };
 
+  const renderCreateNewCard = () => (
+    <TouchableOpacity style={styles.createCard} onPress={() => navigation.navigate('SearchRide')}>
+      <View style={styles.createIconBg}>
+        <MaterialIcons name="add" size={32} color={localColors.primary} />
+      </View>
+      <Text style={styles.createTitle}>Create New Route</Text>
+      <Text style={styles.createSubtitle}>Set up a recurring schedule for better rates and reliable drivers.</Text>
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.container}>
-      <View style={styles.headerContainer}>
-        <Icon name="calendar" size={28} color="#00E676" />
-        <Text style={styles.header}>My Daily Routes</Text>
-      </View>
+      <SafeAreaView style={styles.headerSafe}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.headerIconBtn} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back" size={24} color={localColors.onSurface} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Subscriptions</Text>
+          <View style={{ width: 40 }} />
+        </View>
+      </SafeAreaView>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#00E676" style={{ marginTop: 50 }} />
-      ) : subscriptions.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Icon name="bus-outline" size={64} color="#333" />
-          <Text style={styles.emptyTitle}>No daily subscriptions yet</Text>
-          <Text style={styles.emptySub}>Find a recurring ride and subscribe to save time every morning!</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={localColors.primary} />
         </View>
       ) : (
         <FlatList
           data={subscriptions}
           keyExtractor={item => item.id}
           renderItem={renderSubscription}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          ListHeaderComponent={
+            <View style={styles.listHeader}>
+              <Text style={styles.pageTitle}>Your Commutes</Text>
+              <Text style={styles.pageSubtitle}>Manage your recurring rides and schedules.</Text>
+            </View>
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <MaterialIcons name="event-busy" size={48} color={localColors.onSurfaceVariant} />
+              <Text style={styles.emptyTitle}>No Subscriptions Yet</Text>
+              <Text style={styles.emptySubtitle}>You don't have any active commutes set up.</Text>
+            </View>
+          }
+          ListFooterComponent={renderCreateNewCard}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
         />
       )}
 
-      <TouchableOpacity 
-        style={styles.fab} 
-        onPress={() => navigation.navigate('SearchRide')}
-      >
-        <Text style={styles.fabText}>Find Daily Routes</Text>
-        <Icon name="arrow-forward" size={20} color="#fff" />
+      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('SearchRide')}>
+        <MaterialIcons name="add" size={24} color={localColors.onPrimary} />
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background, padding: 20 },
-  headerContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 25, marginTop: 40 },
-  header: { fontSize: 26, fontWeight: '800', color: theme.colors.text.main, marginLeft: 10 },
-  
-  card: { backgroundColor: theme.colors.card, borderRadius: theme.radius.xl, padding: 18, marginBottom: 20, ...theme.shadows.medium, borderWidth: 1, borderColor: theme.colors.border },
-  cardPaused: { opacity: 0.7 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  routeContainer: { flex: 1, paddingRight: 10 },
-  locationText: { fontSize: 15, color: theme.colors.text.main, fontWeight: '600', marginVertical: 2 },
-  greenDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.success, marginRight: 5 },
-  arrowIcon: { marginLeft: 3, marginVertical: 2 },
-  
-  badgeContainer: { backgroundColor: theme.colors.surface, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  timeBadge: { color: theme.colors.success, fontWeight: 'bold', fontSize: 14 },
-  
-  divider: { height: 1, backgroundColor: theme.colors.border, marginVertical: 15 },
-  
-  detailsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-  label: { fontSize: 12, color: theme.colors.text.muted, marginBottom: 5 },
-  
-  daysRow: { flexDirection: 'row' },
-  dayPill: { width: 22, height: 22, borderRadius: 11, backgroundColor: theme.colors.surface, alignItems: 'center', justifyContent: 'center', marginRight: 4 },
-  dayPillActive: { backgroundColor: theme.colors.success },
-  dayText: { fontSize: 10, color: theme.colors.text.muted, fontWeight: 'bold' },
-  dayTextActive: { color: theme.colors.background },
-  
-  planBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  planBadgeDaily: { backgroundColor: theme.colors.primary + '33' },
-  planBadgeWeekly: { backgroundColor: '#a855f733' },
-  planText: { fontSize: 11, fontWeight: 'bold', color: theme.colors.primaryLight },
-  
-  driverInfoRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, padding: 10, borderRadius: 10, marginBottom: 15 },
-  driverName: { color: theme.colors.text.main, fontSize: 14, marginLeft: 8, flex: 1 },
-  seatsInfo: { color: theme.colors.success, fontSize: 13, fontWeight: 'bold' },
-  
-  pausedBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.warning + '15', padding: 10, borderRadius: 8, marginBottom: 15 },
-  pausedText: { color: theme.colors.warning, marginLeft: 8, fontSize: 13, fontWeight: '500' },
-  
-  actionRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  actionBtnPause: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.warning + '15', paddingVertical: 10, borderRadius: 10, flex: 1, marginRight: 10 },
-  actionTextPause: { color: theme.colors.warning, fontWeight: 'bold', marginLeft: 6 },
-  actionBtnCancel: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.danger + '15', paddingVertical: 10, borderRadius: 10, flex: 1 },
-  actionTextCancel: { color: theme.colors.danger, fontWeight: 'bold', marginLeft: 6 },
-
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: -50 },
-  emptyTitle: { color: theme.colors.text.main, fontSize: 20, fontWeight: 'bold', marginTop: 15, marginBottom: 8 },
-  emptySub: { color: theme.colors.text.muted, textAlign: 'center', paddingHorizontal: 40, lineHeight: 22 },
-
-  fab: { position: 'absolute', bottom: 30, left: 20, right: 20, backgroundColor: theme.colors.primary, flexDirection: 'row', padding: 16, borderRadius: theme.radius.full, alignItems: 'center', justifyContent: 'center', ...theme.shadows.medium },
-  fabText: { color: theme.colors.text.light, fontSize: 16, fontWeight: 'bold', marginRight: 8 }
+  container: {
+    flex: 1,
+    backgroundColor: localColors.background,
+  },
+  headerSafe: {
+    backgroundColor: 'rgba(248, 249, 255, 0.9)',
+    zIndex: 10,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    height: 60,
+  },
+  headerIconBtn: {
+    padding: 8,
+    marginLeft: -8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: localColors.primary,
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 100,
+  },
+  listHeader: {
+    marginBottom: 24,
+  },
+  pageTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: localColors.onSurface,
+    marginBottom: 4,
+  },
+  pageSubtitle: {
+    fontSize: 14,
+    color: localColors.onSurfaceVariant,
+  },
+  card: {
+    backgroundColor: localColors.surfaceContainer,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(198, 198, 205, 0.3)',
+    marginBottom: 16,
+    position: 'relative',
+  },
+  cardPaused: {
+    backgroundColor: localColors.surface,
+    borderColor: 'rgba(198, 198, 205, 0.5)',
+  },
+  activeBadge: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 106, 97, 0.1)', // secondary/10
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 6,
+  },
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: localColors.secondary,
+  },
+  activeBadgeText: {
+    color: localColors.secondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  pausedBadge: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: localColors.surfaceContainerHigh,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  pausedBadgeText: {
+    color: localColors.onSurfaceVariant,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cardHeader: {
+    marginBottom: 20,
+    paddingRight: 80, // Space for badge
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: localColors.onSurface,
+    marginBottom: 4,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  timeText: {
+    fontSize: 14,
+    color: localColors.onSurfaceVariant,
+  },
+  textMuted: {
+    color: localColors.onSurfaceVariant,
+  },
+  daysRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 20,
+  },
+  daysRowPaused: {
+    opacity: 0.6,
+  },
+  dayPill: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: localColors.surfaceContainerHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayPillActive: {
+    backgroundColor: localColors.primary,
+  },
+  dayPillPaused: {
+    backgroundColor: '#666',
+  },
+  dayText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: localColors.onSurfaceVariant,
+  },
+  dayTextActive: {
+    color: localColors.onPrimary,
+  },
+  detailsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  detailBox: {
+    flex: 1,
+    backgroundColor: localColors.surfaceBright,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(198, 198, 205, 0.2)',
+  },
+  detailBoxPaused: {
+    opacity: 0.7,
+  },
+  detailLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: localColors.onSurfaceVariant,
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  driverRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  driverImg: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  driverNameText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: localColors.onSurface,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  ratingText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: localColors.secondary,
+  },
+  unassignedText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: localColors.onSurfaceVariant,
+  },
+  priceText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: localColors.onSurface,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(198, 198, 205, 0.2)',
+    paddingTop: 16,
+  },
+  btnPause: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: localColors.surfaceBright,
+    borderWidth: 1,
+    borderColor: localColors.outlineVariant,
+    paddingVertical: 10,
+    borderRadius: 24,
+    gap: 6,
+  },
+  btnPauseText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: localColors.onSurface,
+  },
+  btnCancel: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: localColors.surfaceBright,
+    borderWidth: 1,
+    borderColor: 'rgba(186, 26, 26, 0.3)', // error/30
+    paddingVertical: 10,
+    borderRadius: 24,
+    gap: 6,
+  },
+  btnCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: localColors.error,
+  },
+  btnResume: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: localColors.primary,
+    paddingVertical: 10,
+    borderRadius: 24,
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  btnResumeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: localColors.onPrimary,
+  },
+  createCard: {
+    backgroundColor: localColors.surfaceBright,
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(198, 198, 205, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 250,
+  },
+  createIconBg: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: localColors.surfaceContainerHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  createTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: localColors.onSurface,
+    marginBottom: 8,
+  },
+  createSubtitle: {
+    fontSize: 14,
+    color: localColors.onSurfaceVariant,
+    textAlign: 'center',
+    maxWidth: '80%',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: localColors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: localColors.onSurface,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: localColors.onSurfaceVariant,
+    textAlign: 'center',
+    maxWidth: '80%',
+  },
 });

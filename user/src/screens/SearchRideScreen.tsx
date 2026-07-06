@@ -1,13 +1,37 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, FlatList, ActivityIndicator, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { 
+  View, Text, TextInput, TouchableOpacity, StyleSheet, 
+  Alert, FlatList, ActivityIndicator, Keyboard, 
+  TouchableWithoutFeedback, ImageBackground, Image, Platform
+} from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { theme } from '../theme/theme';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 // IMPORTANT: User should replace this with their actual Mapbox token
 const MAPBOX_TOKEN = 'pk.eyJ1IjoiZGVlcC01MTU1Iiwi' + 'YSI6ImNtb2xicG42bzBhcWcyb3BoNW81Ynh4YWgifQ.FvuveCsGrnRfM0VJdGGUXw';
 
+const localColors = {
+  background: '#f8f9ff',
+  primary: '#000000',
+  onPrimary: '#ffffff',
+  onSurfaceVariant: '#45464d',
+  surfaceContainerLowest: '#ffffff',
+  surfaceContainerLow: '#eff4ff',
+  outlineVariant: '#c6c6cd',
+  outline: '#76777d',
+  onSurface: '#0b1c30',
+  surfaceContainer: '#e5eeff',
+  surfaceVariant: '#d3e4fe',
+  surface: '#ffffff',
+  secondary: '#006a61',
+  onSecondary: '#ffffff',
+  onBackground: '#0b1c30',
+};
+
+const mapBgUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuAwEihdVVURAqIQe9V9OV7lDhsqNiIY3jRdQGMWSGhVjh0_WBXQg3eTMi1bYIP5U6AaEzEcBWR4q02lft_PxDEvJQvl-Yp6mQFA2dJQzjO_BpcIPC7Az09spSX-pKNasyI3qVRxU789iMZF6bsPkN2hUX8UIgy6xrIWTbvTqPALHxZ8Huv0vwwCfPT7R04xPKNW-wzeYTguugGOZVBttUa9204AyJVg1Nebbh4_hll2YPV8_bYTKfrXQ6EVklgauOkOhIXQpgw71Cmo";
+
 export default function SearchRideScreen({ navigation }: any) {
+  const [rideType, setRideType] = useState<'one-time' | 'recurring'>('one-time');
   const [pickupText, setPickupText] = useState('');
   const [dropoffText, setDropoffText] = useState('');
 
@@ -17,7 +41,8 @@ export default function SearchRideScreen({ navigation }: any) {
   const [dropLat, setDropLat] = useState<number | null>(null);
   const [dropLng, setDropLng] = useState<number | null>(null);
 
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState('Today');
+  const [time, setTime] = useState('Now');
   const [seats, setSeats] = useState(1);
 
   // Suggestions State
@@ -102,7 +127,6 @@ export default function SearchRideScreen({ navigation }: any) {
         setPickupLng(longitude);
 
         try {
-          // Reverse geocode to get name
           const response = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${MAPBOX_TOKEN}`);
           const data = await response.json();
           if (data.features && data.features.length > 0) {
@@ -125,7 +149,7 @@ export default function SearchRideScreen({ navigation }: any) {
   };
 
   const handleSearch = () => {
-    if (!pickupText || !dropoffText || !date) {
+    if (!pickupText || !dropoffText) {
       Alert.alert('Error', 'Please fill all fields');
       return;
     }
@@ -134,6 +158,8 @@ export default function SearchRideScreen({ navigation }: any) {
       return;
     }
 
+    let searchDate = new Date().toISOString().split('T')[0];
+
     navigation.navigate('RideResults', {
       pickupText,
       dropoffText,
@@ -141,7 +167,7 @@ export default function SearchRideScreen({ navigation }: any) {
       pickupLng,
       dropLat,
       dropLng,
-      date,
+      date: searchDate,
       seats
     });
   };
@@ -155,7 +181,7 @@ export default function SearchRideScreen({ navigation }: any) {
 
   const renderSuggestionItem = ({ item }: { item: any }, type: 'pickup' | 'dropoff') => (
     <TouchableOpacity style={styles.suggestionItem} onPress={() => selectSuggestion(item, type)}>
-      <Icon name="location-outline" size={20} color={theme.colors.text.muted} style={{ marginRight: 10 }} />
+      <MaterialIcons name="location-on" size={20} color={localColors.onSurfaceVariant} style={{ marginRight: 12 }} />
       <View style={{ flex: 1 }}>
         <Text style={styles.suggestionTitle}>{item.text}</Text>
         <Text style={styles.suggestionSubtitle} numberOfLines={1}>{item.place_name}</Text>
@@ -166,105 +192,150 @@ export default function SearchRideScreen({ navigation }: any) {
   return (
     <TouchableWithoutFeedback onPress={() => { setActiveField(null); Keyboard.dismiss(); }}>
       <View style={styles.container}>
-        <View style={styles.headerContainer}>
-          <Text style={styles.header}>Where to?</Text>
-          <Text style={styles.subHeader}>Find a comfortable ride for your daily commute</Text>
-        </View>
-
-        <View style={styles.card}>
-          {/* Pickup Field */}
-          <View style={styles.inputWrapper}>
-            <View style={styles.iconContainer}>
-              <View style={styles.greenDot} />
+        {/* Map Background Layer */}
+        <ImageBackground source={{ uri: mapBgUrl }} style={styles.mapBg} resizeMode="cover" />
+        
+        <View style={styles.innerContainer}>
+          {/* Top Header */}
+          <View style={styles.headerContainer}>
+            <View style={styles.header}>
+              <TouchableOpacity style={styles.headerIconBtn} onPress={() => navigation.toggleDrawer && navigation.toggleDrawer()}>
+                <MaterialIcons name="menu" size={24} color={localColors.onSurfaceVariant} />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>RideO</Text>
+              <TouchableOpacity style={styles.avatarBtn} onPress={() => navigation.navigate('Profile')}>
+                <Image 
+                  source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBWVQUK0SltHj54uz_CNivkxxV5zur2TM1Xbr5o0evZm5I4IsSJc5YORxot8ErWrde12zumgnFFGe6zG2A2EZYTS8oGrl8OP38Bjcz3R-YLcYd3WIMWr5Z2-5b_tD_bGMLgTF-PS_lfgq700zBaQ0EJ1SLCcZfNMSWDg4UU-N6VnUvHJGtVo99SC1qvqSQg3tj87XjSoV-MJzF9i-v3PEhR189flJ7SDNVG8xhVTwKO-YdC_uK2iMDRv86Ws6bTHuCEUjW39CF7CYeK' }} 
+                  style={styles.avatarImg} 
+                />
+              </TouchableOpacity>
             </View>
-            <TextInput
-              style={styles.input}
-              placeholder="Leaving from..."
-              placeholderTextColor={theme.colors.text.muted}
-              value={pickupText}
-              onChangeText={handlePickupChange}
-              onFocus={() => setActiveField('pickup')}
-            />
-            {isPickupSearching && <ActivityIndicator size="small" color={theme.colors.success} style={styles.spinner} />}
           </View>
 
-          {activeField === 'pickup' && pickupSuggestions.length === 0 && pickupText.length < 2 && (
-            <TouchableOpacity style={styles.currentLocationBtn} onPress={useCurrentLocation}>
-              <Icon name="navigate-outline" size={18} color={theme.colors.success} />
-              <Text style={styles.currentLocationText}>Use Current Location</Text>
+          {/* Bottom Sheet UI */}
+          <View style={styles.bottomSheet}>
+            <View style={styles.handleBar} />
+            
+            <Text style={styles.sheetTitle}>Where to?</Text>
+            
+            {/* Ride Type Toggle */}
+            <View style={styles.toggleContainer}>
+              <TouchableOpacity 
+                style={[styles.toggleBtn, rideType === 'one-time' && styles.toggleBtnActive]}
+                onPress={() => setRideType('one-time')}
+              >
+                <Text style={[styles.toggleBtnText, rideType === 'one-time' && styles.toggleBtnTextActive]}>One-time</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.toggleBtn, rideType === 'recurring' && styles.toggleBtnActive]}
+                onPress={() => setRideType('recurring')}
+              >
+                <Text style={[styles.toggleBtnText, rideType === 'recurring' && styles.toggleBtnTextActive]}>Recurring</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Locations Input Group */}
+            <View style={styles.locationsGroup}>
+              <View style={styles.connectionLine} />
+
+              {/* Pickup */}
+              <View style={[styles.inputWrapper, activeField === 'pickup' && styles.inputWrapperActive]}>
+                <View style={styles.pickupIconBox}>
+                  <View style={styles.pickupDot} />
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Current Location"
+                  placeholderTextColor={localColors.onSurfaceVariant}
+                  value={pickupText}
+                  onChangeText={handlePickupChange}
+                  onFocus={() => setActiveField('pickup')}
+                />
+                {pickupText === '' && !activeField && (
+                  <TouchableOpacity onPress={useCurrentLocation} style={styles.locationBtn}>
+                    <MaterialIcons name="my-location" size={20} color={localColors.primary} />
+                  </TouchableOpacity>
+                )}
+                {isPickupSearching && <ActivityIndicator size="small" color={localColors.primary} />}
+              </View>
+
+              {/* Dropoff */}
+              <View style={[styles.inputWrapper, activeField === 'dropoff' && styles.inputWrapperActive]}>
+                <View style={styles.dropoffIconBox}>
+                  <View style={styles.dropoffSquare} />
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Where to?"
+                  placeholderTextColor={localColors.outlineVariant}
+                  value={dropoffText}
+                  onChangeText={handleDropoffChange}
+                  onFocus={() => setActiveField('dropoff')}
+                />
+                {isDropoffSearching && <ActivityIndicator size="small" color={localColors.primary} />}
+              </View>
+            </View>
+
+            {/* Suggestions Overlay */}
+            {(activeField === 'pickup' && pickupSuggestions.length > 0) && (
+              <View style={styles.suggestionsContainer}>
+                <FlatList
+                  data={pickupSuggestions}
+                  keyExtractor={(item) => item.id}
+                  renderItem={(item) => renderSuggestionItem(item, 'pickup')}
+                  keyboardShouldPersistTaps="handled"
+                />
+              </View>
+            )}
+            
+            {(activeField === 'dropoff' && dropoffSuggestions.length > 0) && (
+              <View style={styles.suggestionsContainer}>
+                <FlatList
+                  data={dropoffSuggestions}
+                  keyExtractor={(item) => item.id}
+                  renderItem={(item) => renderSuggestionItem(item, 'dropoff')}
+                  keyboardShouldPersistTaps="handled"
+                />
+              </View>
+            )}
+
+            {/* Date and Time */}
+            <View style={styles.dateTimeRow}>
+              <TouchableOpacity style={styles.dateTimeField}>
+                <MaterialIcons name="calendar-today" size={20} color={localColors.onSurfaceVariant} />
+                <Text style={styles.dateTimeInput}>{date}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.dateTimeField}>
+                <MaterialIcons name="schedule" size={20} color={localColors.onSurfaceVariant} />
+                <Text style={styles.dateTimeInput}>{time}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Passengers */}
+            <View style={styles.stepperContainer}>
+              <View style={styles.stepperLeft}>
+                <MaterialIcons name="people" size={20} color={localColors.primary} />
+                <Text style={styles.stepperLabel}>Passengers</Text>
+              </View>
+              <View style={styles.stepperControls}>
+                <TouchableOpacity onPress={() => adjustSeats(-1)} style={styles.stepperBtn}>
+                  <MaterialIcons name="remove" size={16} color={localColors.onSurface} />
+                </TouchableOpacity>
+                <Text style={styles.stepperValue}>{seats}</Text>
+                <TouchableOpacity onPress={() => adjustSeats(1)} style={styles.stepperBtn}>
+                  <MaterialIcons name="add" size={16} color={localColors.onSurface} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Action Button */}
+            <TouchableOpacity style={styles.actionBtn} onPress={handleSearch}>
+              <Text style={styles.actionBtnText}>Find Rides</Text>
+              <MaterialIcons name="arrow-forward" size={20} color={localColors.onPrimary} />
             </TouchableOpacity>
-          )}
 
-          {activeField === 'pickup' && pickupSuggestions.length > 0 && (
-            <View style={styles.suggestionsList}>
-              <FlatList
-                data={pickupSuggestions}
-                keyExtractor={(item) => item.id}
-                renderItem={(props) => renderSuggestionItem(props, 'pickup')}
-                keyboardShouldPersistTaps="handled"
-              />
-            </View>
-          )}
-
-          <View style={styles.verticalLine} />
-
-          {/* Dropoff Field */}
-          <View style={[styles.inputWrapper, { marginBottom: 20 }]}>
-            <View style={styles.iconContainer}>
-              <Icon name="location" size={16} color="#FF3B30" />
-            </View>
-            <TextInput
-              style={styles.input}
-              placeholder="Going to..."
-              placeholderTextColor={theme.colors.text.muted}
-              value={dropoffText}
-              onChangeText={handleDropoffChange}
-              onFocus={() => setActiveField('dropoff')}
-            />
-            {isDropoffSearching && <ActivityIndicator size="small" color={theme.colors.danger} style={styles.spinner} />}
-          </View>
-
-          {activeField === 'dropoff' && dropoffSuggestions.length > 0 && (
-            <View style={styles.suggestionsList}>
-              <FlatList
-                data={dropoffSuggestions}
-                keyExtractor={(item) => item.id}
-                renderItem={(props) => renderSuggestionItem(props, 'dropoff')}
-                keyboardShouldPersistTaps="handled"
-              />
-            </View>
-          )}
-
-          <View style={styles.row}>
-            {/* Date Selector */}
-            <View style={styles.halfWidth}>
-              <Text style={styles.label}>Date</Text>
-              <View style={styles.datePickerBtn}>
-                <Icon name="calendar-outline" size={18} color="#fff" />
-                <Text style={styles.dateText}>{date}</Text>
-              </View>
-            </View>
-
-            {/* Passengers Selector */}
-            <View style={styles.halfWidth}>
-              <Text style={styles.label}>Passengers</Text>
-              <View style={styles.seatSelector}>
-                <TouchableOpacity onPress={() => adjustSeats(-1)} style={styles.seatBtn}>
-                  <Text style={styles.seatBtnText}>-</Text>
-                </TouchableOpacity>
-                <Text style={styles.seatCount}>{seats}</Text>
-                <TouchableOpacity onPress={() => adjustSeats(1)} style={styles.seatBtn}>
-                  <Text style={styles.seatBtnText}>+</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
           </View>
         </View>
-
-        <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-          <Text style={styles.searchBtnText}>Search Rides</Text>
-          <Icon name="arrow-forward" size={20} color={theme.colors.text.light} style={{ marginLeft: 8 }} />
-        </TouchableOpacity>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -273,192 +344,270 @@ export default function SearchRideScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
-    padding: theme.spacing.xl,
-    paddingTop: 60,
+    backgroundColor: localColors.background,
+  },
+  innerContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  mapBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '60%',
   },
   headerContainer: {
-    marginBottom: theme.spacing.xl,
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    zIndex: 50,
   },
   header: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: theme.colors.text.main,
-    marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    height: 64,
   },
-  subHeader: {
-    fontSize: 16,
-    color: theme.colors.text.muted,
+  headerIconBtn: {
+    padding: 8,
   },
-  card: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.xl,
-    ...theme.shadows.large,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginBottom: theme.spacing.xl,
-    zIndex: 10,
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: localColors.primary,
+  },
+  avatarBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: localColors.surfaceVariant,
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  bottomSheet: {
+    backgroundColor: localColors.surface,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 20,
+  },
+  handleBar: {
+    width: 48,
+    height: 4,
+    backgroundColor: localColors.outlineVariant,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: -8,
+    marginBottom: 24,
+  },
+  sheetTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: localColors.onBackground,
+    marginBottom: 20,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: localColors.surfaceContainerLow,
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 24,
+  },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  toggleBtnActive: {
+    backgroundColor: localColors.primary,
+  },
+  toggleBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: localColors.onSurfaceVariant,
+  },
+  toggleBtnTextActive: {
+    color: localColors.onPrimary,
+  },
+  locationsGroup: {
+    position: 'relative',
+    marginBottom: 24,
+  },
+  connectionLine: {
+    position: 'absolute',
+    left: 23,
+    top: 36,
+    bottom: 36,
+    width: 2,
+    backgroundColor: localColors.outlineVariant,
+    zIndex: 1,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
+    backgroundColor: localColors.surfaceContainerLow,
+    borderRadius: 12,
+    marginBottom: 12,
+    paddingRight: 16,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    paddingHorizontal: theme.spacing.md,
-    height: 56,
+    borderColor: 'transparent',
+    zIndex: 2,
   },
-  iconContainer: {
-    width: 24,
+  inputWrapperActive: {
+    borderColor: localColors.primary,
+    backgroundColor: localColors.surface,
+  },
+  pickupIconBox: {
+    width: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
   },
-  greenDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: theme.colors.success,
+  pickupDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 3,
+    borderColor: localColors.primary,
+    backgroundColor: localColors.surface,
+  },
+  dropoffIconBox: {
+    width: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dropoffSquare: {
+    width: 12,
+    height: 12,
+    backgroundColor: localColors.secondary,
+    borderRadius: 2,
   },
   input: {
     flex: 1,
-    color: theme.colors.text.main,
+    height: 56,
     fontSize: 16,
-    fontWeight: '500',
+    color: localColors.onBackground,
   },
-  spinner: {
-    marginLeft: 10,
+  locationBtn: {
+    padding: 8,
   },
-  verticalLine: {
-    width: 2,
-    height: 15,
-    backgroundColor: theme.colors.border,
-    marginLeft: 26,
-    marginVertical: 4,
-  },
-  currentLocationBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    backgroundColor: theme.colors.success + '15',
-    borderRadius: theme.radius.sm,
-    marginTop: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.success,
-  },
-  currentLocationText: {
-    color: theme.colors.success,
-    fontWeight: '600',
-    marginLeft: 8,
-    fontSize: 14,
-  },
-  suggestionsList: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginTop: 8,
-    marginBottom: 8,
+  suggestionsContainer: {
+    position: 'absolute',
+    top: 130,
+    left: 0,
+    right: 0,
+    backgroundColor: localColors.surface,
+    borderRadius: 12,
+    padding: 8,
     maxHeight: 200,
-    overflow: 'hidden',
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: localColors.outlineVariant,
   },
   suggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
+    padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: localColors.surfaceContainerLow,
   },
   suggestionTitle: {
-    color: theme.colors.text.main,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 3,
+    color: localColors.onBackground,
+    marginBottom: 2,
   },
   suggestionSubtitle: {
-    color: theme.colors.text.muted,
-    fontSize: 13,
+    fontSize: 12,
+    color: localColors.onSurfaceVariant,
   },
-  row: {
+  dateTimeRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 16,
+    marginBottom: 24,
   },
-  halfWidth: {
-    width: '47%',
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.text.muted,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-  },
-  datePickerBtn: {
+  dateTimeField: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
+    backgroundColor: localColors.surfaceContainerLow,
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    height: 56,
+    borderColor: 'transparent',
   },
-  dateText: {
-    color: theme.colors.text.main,
+  dateTimeInput: {
+    flex: 1,
+    marginLeft: 8,
     fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 10,
+    color: localColors.onBackground,
+    padding: 0,
   },
-  seatSelector: {
+  stepperContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    paddingHorizontal: 10,
-    borderRadius: theme.radius.md,
-    height: 56,
+    backgroundColor: localColors.surfaceContainerLow,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 24,
   },
-  seatBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: theme.colors.background,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  seatBtnText: {
-    color: theme.colors.text.main,
-    fontSize: 20,
-    fontWeight: '500',
-  },
-  seatCount: {
-    color: theme.colors.text.main,
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  searchBtn: {
+  stepperLeft: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.primary,
-    padding: theme.spacing.lg,
-    borderRadius: theme.radius.full,
+    alignItems: 'center',
+  },
+  stepperLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: localColors.onBackground,
+    marginLeft: 8,
+  },
+  stepperControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  stepperBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: localColors.surface,
+    borderWidth: 1,
+    borderColor: localColors.outlineVariant,
     alignItems: 'center',
     justifyContent: 'center',
-    ...theme.shadows.medium,
   },
-  searchBtnText: {
-    color: theme.colors.text.light,
+  stepperValue: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: localColors.onBackground,
+    width: 24,
+    textAlign: 'center',
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: localColors.primary,
+    borderRadius: 32,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  actionBtnText: {
     fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontWeight: '600',
+    color: localColors.onPrimary,
   }
 });
-
-export default SearchRideScreen;

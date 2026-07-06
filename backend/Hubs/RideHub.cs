@@ -63,6 +63,25 @@ namespace RideO.API.Hubs
             await Groups.AddToGroupAsync(Context.ConnectionId, "AdminMonitors");
         }
 
+        // Driver calls this from HomeScreen when online but not in a ride
+        public async Task BroadcastDriverLocation(string driverUserId, double lat, double lng)
+        {
+            // Broadcast to Admin Monitors (null for routeId since they are idle)
+            await Clients.Group("AdminMonitors").SendAsync("ReceiveDriverLocation", driverUserId, null, lat, lng);
+
+            // Log to MongoDB for auditing
+            var locationLog = new LocationLog
+            {
+                DriverId = driverUserId,
+                Location = new GeoJsonPoint
+                {
+                    Coordinates = new double[] { lng, lat } // GeoJSON is [longitude, latitude]
+                },
+                Timestamp = DateTime.UtcNow
+            };
+            await _mongoDb.LocationLogs.InsertOneAsync(locationLog);
+        }
+
         // --- CHAT LOGIC ---
 
         public async Task JoinChat(string bookingId)

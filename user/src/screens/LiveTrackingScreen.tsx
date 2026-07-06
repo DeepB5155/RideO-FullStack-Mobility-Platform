@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axiosInstance from '../api/axios';
 
 const LiveTrackingScreen = ({ route, navigation }: any) => {
-  const { routeId, driverName, pickup, dropoff, bookingId, trackingId } = route.params;
+  const { routeId, driverName, pickup, dropoff, bookingId, trackingId, driverUserId } = route.params;
   const [driverLocation, setDriverLocation] = useState<{lat: number, lng: number} | null>(null);
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
 
@@ -49,7 +49,7 @@ const LiveTrackingScreen = ({ route, navigation }: any) => {
 
     const connectSignalR = async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
+        const token = await AsyncStorage.getItem('jwtToken');
         
         hubConnection = new signalR.HubConnectionBuilder()
           .withUrl(SIGNALR_HUB_URL || 'http://192.168.1.182:5248/ridehub', {
@@ -67,9 +67,9 @@ const LiveTrackingScreen = ({ route, navigation }: any) => {
         hubConnection.on('BookingStatusUpdated', (data: any) => {
           if (data.Status === 'Completed') {
             navigation.replace('Rating', {
-              targetUserId: null, // Should pass actual driver id if available, mock for now
+              targetUserId: driverUserId || data.DriverUserId || routeId,
               targetRole: 'Driver',
-              routeId: routeId,
+              routeId: bookingId || routeId,
               targetName: driverName
             });
           }

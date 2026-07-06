@@ -72,7 +72,7 @@ const HomeScreen = ({ navigation }: any) => {
       .withAutomaticReconnect()
       .build();
 
-    newConnection.on('NewRideRequest', (rideDetails) => setIncomingRide(rideDetails));
+    newConnection.on('BookingRequested', (rideDetails) => setIncomingRide(rideDetails));
     setConnection(newConnection);
     requestLocationPermission();
 
@@ -119,10 +119,8 @@ const HomeScreen = ({ navigation }: any) => {
   const acceptRide = async () => {
     if (!incomingRide || !location) return;
     try {
-      await api.post(`/ride/${incomingRide.id}/accept`, {
-        latitude: location.latitude,
-        longitude: location.longitude,
-      });
+      // The correct backend endpoint is PUT /booking/{id}/approve (Driver role)
+      await api.put(`/booking/${incomingRide.bookingId || incomingRide.id}/approve`);
       setActiveRide(incomingRide);
       setIncomingRide(null);
       Alert.alert('Ride Accepted ✅', 'Follow the route to pick up your passenger.');

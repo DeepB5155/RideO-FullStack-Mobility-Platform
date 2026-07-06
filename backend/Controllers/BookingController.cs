@@ -196,7 +196,8 @@ namespace RideO.API.Controllers
                     b.BookedAt,
                     Route = new {
                         b.Route!.StartTime,
-                        DriverName = b.Route.Driver!.User!.FullName
+                        DriverName = b.Route.Driver!.User!.FullName,
+                        DriverUserId = b.Route.Driver!.UserId
                     }
                 })
                 .ToListAsync();

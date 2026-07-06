@@ -25,7 +25,7 @@ const HomeScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     const setupSignalR = async () => {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await AsyncStorage.getItem('jwtToken');
       const newConnection = new signalR.HubConnectionBuilder()
         .withUrl(SIGNALR_HUB_URL || 'http://10.0.2.2:5248/ridehub', {
           accessTokenFactory: () => token || '',
@@ -126,7 +126,7 @@ const HomeScreen = ({ navigation }: any) => {
                 <Icon name="menu-outline" size={30} color="#000000" />
               </TouchableOpacity>
               <Text style={styles.headerTitle}>RideO</Text>
-              <TouchableOpacity style={styles.headerAvatar} onPress={() => navigation.navigate('Profile')}>
+              <TouchableOpacity style={styles.headerAvatar} onPress={() => navigation.navigate('Settings')}>
                 <Icon name="person" size={20} color="#ffffff" />
               </TouchableOpacity>
             </>
@@ -294,9 +294,17 @@ const HomeScreen = ({ navigation }: any) => {
             <Icon name="car-outline" size={24} color="#45464d" />
             <Text style={styles.tabText}>Rides</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('SubscriptionsScreen')}>
+            <Icon name="repeat-outline" size={24} color="#45464d" />
+            <Text style={styles.tabText}>Commutes</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Wallet')}>
             <Icon name="wallet-outline" size={24} color="#45464d" />
             <Text style={styles.tabText}>Wallet</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Notifications')}>
+            <Icon name="notifications-outline" size={24} color="#45464d" />
+            <Text style={styles.tabText}>Alerts</Text>
           </TouchableOpacity>
         </View>
       )}

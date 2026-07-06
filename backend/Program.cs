@@ -135,3 +135,5 @@ app.MapControllers();
 app.MapHub<RideHub>("/rideHub");
 
 app.Run();
+
+public partial class Program { }

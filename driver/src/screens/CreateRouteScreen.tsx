@@ -20,15 +20,19 @@ const CreateRouteScreen = ({ navigation }: any) => {
   const [vehicleId, setVehicleId] = useState('00000000-0000-0000-0000-000000000000');
 
   // Form State
-  const [startLoc, setStartLoc] = useState('Mumbai Central');
-  const [endLoc, setEndLoc] = useState('Pune Airport (PNQ)');
+  const [startLoc, setStartLoc] = useState('');
+  const [endLoc, setEndLoc] = useState('');
+
+  // Geocoded Coordinates
+  const [startCoords, setStartCoords] = useState<{lat: number, lng: number} | null>(null);
+  const [endCoords, setEndCoords] = useState<{lat: number, lng: number} | null>(null);
   
   const [dateObj, setDateObj] = useState(new Date());
-  const [date, setDate] = useState('15/11/2023');
-  const [time, setTime] = useState('07:30 AM');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
 
-  const [isRecurring, setIsRecurring] = useState(true);
-  const [selectedDays, setSelectedDays] = useState<string[]>(['M', 'T', 'W', 'T', 'F']);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [selectedDays, setSelectedDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
   const [seats, setSeats] = useState(3);
   const [price, setPrice] = useState('450');
 
@@ -64,6 +68,25 @@ const CreateRouteScreen = ({ navigation }: any) => {
     { label: 'S', id: 'Sat' },
   ];
 
+  // Geocode a location name using Mapbox Geocoding API
+  const geocodeLocation = async (locationName: string): Promise<{lat: number, lng: number} | null> => {
+    try {
+      const { MAPBOX_ACCESS_TOKEN } = require('@env');
+      const encoded = encodeURIComponent(locationName);
+      const res = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?country=in&limit=1&access_token=${MAPBOX_ACCESS_TOKEN}`
+      );
+      const data = await res.json();
+      if (data.features && data.features.length > 0) {
+        const [lng, lat] = data.features[0].center;
+        return { lat, lng };
+      }
+    } catch (e) {
+      console.error('Geocoding failed:', e);
+    }
+    return null;
+  };
+
   useEffect(() => {
     const fetchKYC = async () => {
       try {
@@ -88,21 +111,34 @@ const CreateRouteScreen = ({ navigation }: any) => {
 
   const handlePublish = async () => {
     if (!startLoc || !endLoc || !price || !seats) {
-      Alert.alert('Error', 'Please fill required fields');
+      Alert.alert('Error', 'Please fill required fields: start location, end location, price, and seats.');
       return;
     }
 
     try {
-      // Mocking DateTime parsing
-      const startTime = new Date(); // In real app, parse from date/time inputs
-      startTime.setHours(startTime.getHours() + 24); // Future time
-      
+      // Geocode locations if not already resolved
+      let sCoords = startCoords;
+      let eCoords = endCoords;
+      if (!sCoords) sCoords = await geocodeLocation(startLoc);
+      if (!eCoords) eCoords = await geocodeLocation(endLoc);
+
+      if (!sCoords || !eCoords) {
+        Alert.alert('Location Error', 'Could not resolve one or more locations. Please be more specific (e.g. city, landmark).');
+        return;
+      }
+
+      // Build actual departure time from the dateObj picker value
+      const startTime = new Date(dateObj);
       const endTime = new Date(startTime);
-      endTime.setHours(endTime.getHours() + 2); // 2 hours later
+      endTime.setHours(endTime.getHours() + 2);
 
       await axiosInstance.post('/route/publish', {
         startLocation: startLoc,
+        startLat: sCoords.lat,
+        startLng: sCoords.lng,
         endLocation: endLoc,
+        endLat: eCoords.lat,
+        endLng: eCoords.lng,
         startTime: startTime.toISOString(),
         estimatedEndTime: endTime.toISOString(),
         availableSeats: seats,
@@ -110,16 +146,16 @@ const CreateRouteScreen = ({ navigation }: any) => {
         pricePerSeat: parseFloat(price) || 0,
         pricePerKm: 0,
         vehicleId: vehicleId,
-        isLuggageAllowed: true, // Defaulting true
+        isLuggageAllowed: true,
         autoApprove: false,
         isRecurring: isRecurring,
         recurringDays: isRecurring ? selectedDays.join(',') : null,
-        recurringTime: isRecurring ? '08:30:00' : null,
+        recurringTime: isRecurring ? `${dateObj.getHours().toString().padStart(2,'0')}:${dateObj.getMinutes().toString().padStart(2,'0')}:00` : null,
         rideNotes: '',
         stops: []
       });
 
-      Alert.alert('Success', 'Route published successfully!');
+      Alert.alert('✅ Success', 'Route published successfully! Passengers can now search for your ride.');
       navigation.navigate('MainTabs');
     } catch (e: any) {
       Alert.alert('Error', e.response?.data || 'Failed to publish route');
@@ -155,10 +191,17 @@ const CreateRouteScreen = ({ navigation }: any) => {
               <View style={styles.locationInputContainer}>
                 <TextInput 
                   style={styles.locationInput} 
-                  placeholder="Enter pickup location" 
+                  placeholder="Enter pickup location (e.g. Mumbai Central)" 
                   placeholderTextColor="#c6c6cd"
                   value={startLoc}
-                  onChangeText={setStartLoc}
+                  onChangeText={(t) => { setStartLoc(t); setStartCoords(null); }}
+                  onBlur={async () => {
+                    if (startLoc) {
+                      const c = await geocodeLocation(startLoc);
+                      setStartCoords(c);
+                    }
+                  }}
+                  returnKeyType="next"
                 />
               </View>
             </View>
@@ -168,10 +211,16 @@ const CreateRouteScreen = ({ navigation }: any) => {
               <View style={[styles.locationInputContainer, { borderBottomWidth: 0, paddingBottom: 0 }]}>
                 <TextInput 
                   style={styles.locationInput} 
-                  placeholder="Enter drop-off location" 
+                  placeholder="Enter drop-off location (e.g. Pune Airport)" 
                   placeholderTextColor="#c6c6cd"
                   value={endLoc}
-                  onChangeText={setEndLoc}
+                  onChangeText={(t) => { setEndLoc(t); setEndCoords(null); }}
+                  onBlur={async () => {
+                    if (endLoc) {
+                      const c = await geocodeLocation(endLoc);
+                      setEndCoords(c);
+                    }
+                  }}
                 />
               </View>
             </View>

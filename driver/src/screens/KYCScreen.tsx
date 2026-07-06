@@ -1,11 +1,33 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, SafeAreaView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, StatusBar, Modal } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axiosInstance from '../api/axios';
 import * as signalR from '@microsoft/signalr';
-import Icon from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import Icon from 'react-native-vector-icons/Ionicons';
+
+// Local colors matching HTML mockup
+const localColors = {
+  background: '#f8f9ff',
+  primary: '#000000',
+  primaryContainer: '#131b2e',
+  onPrimaryFixedVariant: '#3f465c',
+  onSurface: '#0b1c30',
+  onSurfaceVariant: '#45464d',
+  surfaceContainerLowest: '#ffffff',
+  surfaceContainerLow: '#eff4ff',
+  surfaceContainerHigh: '#dce9ff',
+  surfaceContainer: '#e5eeff',
+  outlineVariant: '#c6c6cd',
+  secondaryContainer: '#86f2e4',
+  onSecondaryContainer: '#006f66',
+  outline: '#76777d',
+  secondary: '#006a61',
+  surface: '#f8f9ff',
+  onPrimary: '#ffffff',
+  onBackground: '#0b1c30',
+};
 
 const KYCScreen = ({ route, navigation }: any) => {
   const fromProfile = route?.params?.fromProfile;
@@ -14,13 +36,17 @@ const KYCScreen = ({ route, navigation }: any) => {
   const [isLoading, setIsLoading] = useState(true);
 
   // Document states
-  const [licenseUrl, setLicenseUrl] = useState('https://lh3.googleusercontent.com/aida-public/AB6AXuBEfVGJ6XZV_-ua9XJv9YDFUqj588ESdBkpT5DQ9qmJHOwX2jScyr_Dw58g2kHiuscmHzzo9woXuY4KGk42kSz5AiC0Hn5VqGcZcpDpf1TBgYC5ymHbik1H96p0yP6gVRxHRNeUC6-_k5Upq_SO0wtdz3nU_Tc0JJk-CSoNYXcRKHP7-40O_Ok567gby-vRYuH8eL-BqOR45I9ar0OHe88sXSR4Zowe7X3GwO9oPk8U4lSewDrIOfNnFnOYWZ3G7ujuTYtFy_8uSceD');
+  const [licenseUrl, setLicenseUrl] = useState('');
   const [rcUrl, setRcUrl] = useState('');
-  const [insuranceUrl, setInsuranceUrl] = useState('https://lh3.googleusercontent.com/aida-public/AB6AXuAnZ_e1bl65mp6ZHB5uW_spC_Q_3PWz87Sz9_ybpr7_krj7Y48fB76YH-Yj9wtDi0IeHnqBKzsrYfVqa4junFNTmRd7vI0Wdszj6Cqk5CXJAECQVMRcd4KsdkgemKBVQtjT5WmGimLMMVVXssb5Al8a0HPlkllTXG-itl4AeRLvsMgM2e1xHCQrPk5QVkUqvHLq_IEwXY47MLOW70Iw-7dPpqFE5aOB4-rBLOQWz_zhhoy0l7vNFgp09gRsGJdFFLkz1hf4ZavQY9y9');
-  const [bgCheckUrl, setBgCheckUrl] = useState('');
+  const [insuranceUrl, setInsuranceUrl] = useState('');
 
-  // Processing state for insurance
-  const [isInsuranceProcessing, setIsInsuranceProcessing] = useState(true);
+  // Processing states for simulated upload
+  const [isUploadingLicense, setIsUploadingLicense] = useState(false);
+  const [isUploadingRc, setIsUploadingRc] = useState(false);
+  const [isUploadingInsurance, setIsUploadingInsurance] = useState(false);
+
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const checkStatus = async () => {
     try {
@@ -71,44 +97,47 @@ const KYCScreen = ({ route, navigation }: any) => {
     };
   }, [status]);
 
-  const simulateUploadRC = () => {
-    // Simulate upload delay
+  const simulateUpload = (setter: any, loadingSetter: any) => {
+    loadingSetter(true);
     setTimeout(() => {
-      setRcUrl('https://lh3.googleusercontent.com/aida-public/AB6AXuAnZ_e1bl65mp6ZHB5uW_spC_Q_3PWz87Sz9_ybpr7_krj7Y48fB76YH-Yj9wtDi0IeHnqBKzsrYfVqa4junFNTmRd7vI0Wdszj6Cqk5CXJAECQVMRcd4KsdkgemKBVQtjT5WmGimLMMVVXssb5Al8a0HPlkllTXG-itl4AeRLvsMgM2e1xHCQrPk5QVkUqvHLq_IEwXY47MLOW70Iw-7dPpqFE5aOB4-rBLOQWz_zhhoy0l7vNFgp09gRsGJdFFLkz1hf4ZavQY9y9');
-    }, 500);
-  };
-
-  const simulateUploadBg = () => {
-    setTimeout(() => {
-      setBgCheckUrl('https://lh3.googleusercontent.com/aida-public/AB6AXuBEfVGJ6XZV_-ua9XJv9YDFUqj588ESdBkpT5DQ9qmJHOwX2jScyr_Dw58g2kHiuscmHzzo9woXuY4KGk42kSz5AiC0Hn5VqGcZcpDpf1TBgYC5ymHbik1H96p0yP6gVRxHRNeUC6-_k5Upq_SO0wtdz3nU_Tc0JJk-CSoNYXcRKHP7-40O_Ok567gby-vRYuH8eL-BqOR45I9ar0OHe88sXSR4Zowe7X3GwO9oPk8U4lSewDrIOfNnFnOYWZ3G7ujuTYtFy_8uSceD');
-    }, 500);
+      setter('https://lh3.googleusercontent.com/dummy_url'); // Dummy URL
+      loadingSetter(false);
+    }, 1200);
   };
 
   const submitKYC = async () => {
     try {
-      setIsLoading(true);
+      setIsSubmitting(true);
+      
+      const vDetails = route?.params?.vehicleDetails || {};
+      
       await axiosInstance.post('/kyc/submit', {
         licenseNumber: 'DL-DEFAULT',
-        make: 'Mock Make',
-        model: 'Mock Model',
-        year: 2023,
-        color: 'White',
-        licensePlate: 'ABC-1234',
-        vehicleType: 'Sedan',
-        totalSeats: 4,
+        make: vDetails.make || 'Mock Make',
+        model: vDetails.model || 'Mock Model',
+        year: vDetails.year || 2023,
+        color: vDetails.color || 'White',
+        licensePlate: vDetails.licensePlate || 'ABC-1234',
+        vehicleType: vDetails.vehicleType || 'Sedan',
+        totalSeats: vDetails.totalSeats || 4,
         licenseFrontUrl: licenseUrl,
         licenseBackUrl: licenseUrl,
         rcUrl: rcUrl || licenseUrl
       });
       
-      Alert.alert('Success', 'KYC Submitted successfully. Pending Admin review.');
-      await checkStatus();
+      setShowSuccessModal(true);
     } catch (e: any) {
       console.log('Failed to submit KYC', e);
-      Alert.alert('Error', 'Failed to submit KYC');
+      alert('Failed to submit KYC');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
+  };
+
+  const handleModalClose = async () => {
+    setShowSuccessModal(false);
+    setIsLoading(true);
+    await checkStatus();
   };
 
   useEffect(() => {
@@ -119,85 +148,44 @@ const KYCScreen = ({ route, navigation }: any) => {
     }
   }, [status, navigation, fromProfile]);
 
-  // Derived states
-  let approvedCount = 0;
-  if (licenseUrl) approvedCount++;
-  if (rcUrl) approvedCount++;
-  if (insuranceUrl && !isInsuranceProcessing) approvedCount++;
-  
-  const allRequiredApproved = licenseUrl && rcUrl && insuranceUrl && !isInsuranceProcessing;
-  const canSubmit = allRequiredApproved && bgCheckUrl;
+  const allRequiredApproved = licenseUrl && rcUrl && insuranceUrl;
 
-  const DocumentCard = ({ title, iconName, state, imageUrl, onPress }: any) => {
-    const isApproved = state === 'Approved';
-    const isRequired = state === 'Required';
-    const isProcessing = state === 'Processing';
-    const isLocked = state === 'Locked';
-
-    let borderColor = 'rgba(198, 198, 205, 0.3)';
-    let bgColor = 'rgba(248, 249, 255, 0.7)';
-    let borderStyle = 'solid' as any;
-
-    if (isRequired) {
-      borderColor = 'rgba(198, 198, 205, 0.8)';
-      borderStyle = 'dashed';
-      bgColor = 'rgba(248, 249, 255, 0.5)';
-    } else if (isProcessing) {
-      borderColor = 'rgba(137, 245, 231, 0.5)';
-      bgColor = 'rgba(137, 245, 231, 0.05)';
-    }
+  const DocumentSlot = ({ title, desc, iconName, url, isUploading, onPress, fileName }: any) => {
+    const isUploaded = !!url;
 
     return (
       <TouchableOpacity 
-        style={[styles.docCard, { borderColor, backgroundColor: bgColor, borderStyle, borderWidth: isRequired ? 2 : 1 }]} 
+        style={[
+          styles.uploadSlot, 
+          isUploaded ? styles.uploadSlotSuccess : null,
+          isUploading ? { opacity: 0.5 } : null
+        ]} 
         onPress={onPress}
-        disabled={isLocked || isApproved || isProcessing}
+        disabled={isUploaded || isUploading}
+        activeOpacity={0.9}
       >
-        <View style={styles.docHeader}>
-          <View style={styles.docTitleRow}>
-            <View style={[styles.docIconWrap, isRequired ? styles.docIconReq : isLocked ? styles.docIconLocked : styles.docIconAppr]}>
-              <MaterialIcons name={iconName} size={20} color={isRequired || isLocked ? '#45464d' : '#000000'} />
-            </View>
-            <View>
-              <Text style={[styles.docTitle, isLocked && { color: '#45464d' }]}>{title}</Text>
-              {isApproved && (
-                <Text style={styles.statusApproved}><Icon name="checkmark-circle" size={12} /> Approved</Text>
-              )}
-              {isRequired && (
-                <Text style={styles.statusRequired}><Icon name="hourglass-outline" size={12} /> Required</Text>
-              )}
-              {isProcessing && (
-                <Text style={styles.statusProcessing}>Processing</Text>
-              )}
-              {isLocked && (
-                <Text style={styles.statusLocked}>Unlock after documents</Text>
-              )}
-            </View>
+        <View style={styles.slotContent}>
+          <View style={[styles.slotIconWrap, isUploaded ? styles.slotIconWrapSuccess : null]}>
+            <MaterialIcons name={iconName} size={32} color={isUploaded ? localColors.onPrimary : localColors.primary} />
           </View>
-          {isApproved && <MaterialIcons name="more-vert" size={20} color="#45464d" />}
-          {isLocked && <MaterialIcons name="lock" size={20} color="#c6c6cd" />}
+          <View style={styles.slotTextWrap}>
+            <Text style={styles.slotTitle}>{title}</Text>
+            <Text style={styles.slotDesc}>{desc}</Text>
+            {!isUploaded && (
+              <View style={styles.tapToUploadWrap}>
+                <MaterialIcons name={iconName === 'badge' ? "add-a-photo" : iconName === 'description' ? "upload-file" : "add-a-photo"} size={20} color={localColors.primary} />
+                <Text style={styles.tapToUploadText}>{isUploading ? 'Uploading...' : 'Tap to upload'}</Text>
+              </View>
+            )}
+          </View>
         </View>
 
-        <View style={[styles.docPreview, isRequired && styles.docPreviewReq, isLocked && styles.docPreviewLocked]}>
-          {isApproved && imageUrl ? (
-            <Image source={{ uri: imageUrl }} style={styles.previewImage} />
-          ) : isProcessing && imageUrl ? (
-            <View style={styles.processingOverlay}>
-              <Image source={{ uri: imageUrl }} style={[styles.previewImage, { opacity: 0.5 }]} />
-              <ActivityIndicator size="large" color="#000" style={styles.spinner} />
-            </View>
-          ) : isRequired ? (
-            <View style={styles.reqContent}>
-              <MaterialIcons name="add-photo-alternate" size={32} color="#c6c6cd" />
-              <Text style={styles.tapToUpload}>Tap to upload</Text>
-            </View>
-          ) : isLocked ? (
-            <View style={styles.lockedLines}>
-              <View style={styles.lockedLine1} />
-              <View style={styles.lockedLine2} />
-            </View>
-          ) : null}
-        </View>
+        {isUploaded && (
+          <View style={styles.uploadedPreviewBox}>
+            <MaterialIcons name="check-circle" size={20} color={localColors.onSecondaryContainer} />
+            <Text style={styles.uploadedFileName} numberOfLines={1}>{fileName}</Text>
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -205,7 +193,7 @@ const KYCScreen = ({ route, navigation }: any) => {
   if (isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#000000" />
+        <ActivityIndicator size="large" color={localColors.primary} />
       </View>
     );
   }
@@ -213,11 +201,11 @@ const KYCScreen = ({ route, navigation }: any) => {
   if (status === 'Approved') {
     return (
       <View style={styles.center}>
-        {!fromProfile && <ActivityIndicator size="large" color="#006a61" />}
-        <Text style={[styles.title, { marginTop: 15, color: '#006a61' }]}>
+        {!fromProfile && <ActivityIndicator size="large" color={localColors.secondary} />}
+        <Text style={[styles.statusTitle, { marginTop: 15, color: localColors.secondary }]}>
           Verified!
         </Text>
-        <Text style={styles.subtitle}>
+        <Text style={styles.statusSubtitle}>
           {fromProfile ? 'Your documents and account are fully approved.' : 'Loading Dashboard...'}
         </Text>
         {fromProfile && (
@@ -232,8 +220,8 @@ const KYCScreen = ({ route, navigation }: any) => {
   if (status === 'Pending') {
     return (
       <View style={styles.center}>
-        <Text style={styles.title}>Under Review ⏳</Text>
-        <Text style={styles.subtitle}>Your documents are currently being verified by an admin.</Text>
+        <Text style={styles.statusTitle}>Under Review ⏳</Text>
+        <Text style={styles.statusSubtitle}>Your documents are currently being verified by an admin.</Text>
         <TouchableOpacity style={styles.buttonOutline} onPress={checkStatus}>
           <Text style={styles.buttonOutlineText}>Refresh Status</Text>
         </TouchableOpacity>
@@ -243,72 +231,112 @@ const KYCScreen = ({ route, navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="rgba(248, 249, 255, 0.8)" />
+      
+      {/* Top Navigation */}
       <View style={styles.appBar}>
-        <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
-          <Icon name="close" size={28} color="#000000" />
-        </TouchableOpacity>
-        <Text style={styles.appTitle}>RideO</Text>
-        <View style={{ width: 40 }} />
+        <View style={styles.appBarLeft}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back" size={24} color={localColors.primary} />
+          </TouchableOpacity>
+          <Text style={styles.appTitle}>RideO</Text>
+        </View>
+        <View style={styles.stepBadge}>
+          <Text style={styles.stepBadgeText}>Step 3 of 3</Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerArea}>
-          <View style={styles.headerRow}>
-            <Text style={styles.mainHeading}>Document Verification</Text>
-            <View style={styles.pendingChip}>
-              <View style={styles.pendingDot} />
-              <Text style={styles.pendingText}>Pending</Text>
-            </View>
-          </View>
-          <Text style={styles.headerDesc}>Please upload clear photos of the required documents to activate your driver profile.</Text>
+        {/* Progress Bar */}
+        <View style={styles.progressBarBg}>
+          <View style={styles.progressBarFill} />
         </View>
 
-        <View style={styles.grid}>
-          <DocumentCard 
+        {/* Title Section */}
+        <View style={styles.titleSection}>
+          <Text style={styles.mainHeading}>Upload Documents</Text>
+          <Text style={styles.headerDesc}>We need a few legal documents to verify your profile and vehicle eligibility.</Text>
+        </View>
+
+        {/* Document Slots */}
+        <View style={styles.slotsContainer}>
+          <DocumentSlot 
             title="Driving License"
+            desc="Front and back of your valid permit"
             iconName="badge"
-            state={licenseUrl ? 'Approved' : 'Required'}
-            imageUrl={licenseUrl}
+            url={licenseUrl}
+            isUploading={isUploadingLicense}
+            onPress={() => simulateUpload(setLicenseUrl, setIsUploadingLicense)}
+            fileName="license_front_v2.jpg"
           />
-          <DocumentCard 
-            title="Vehicle Registration"
-            iconName="directions-car"
-            state={rcUrl ? 'Approved' : 'Required'}
-            imageUrl={rcUrl}
-            onPress={simulateUploadRC}
+          <DocumentSlot 
+            title="Vehicle Registration (RC)"
+            desc="Certificate of registration for your vehicle"
+            iconName="description"
+            url={rcUrl}
+            isUploading={isUploadingRc}
+            onPress={() => simulateUpload(setRcUrl, setIsUploadingRc)}
+            fileName="registration_cert.pdf"
           />
-          <DocumentCard 
+          <DocumentSlot 
             title="Vehicle Insurance"
-            iconName="shield"
-            state={isInsuranceProcessing ? 'Processing' : insuranceUrl ? 'Approved' : 'Required'}
-            imageUrl={insuranceUrl}
-            onPress={() => setIsInsuranceProcessing(false)}
+            desc="Active third-party or comprehensive policy"
+            iconName="verified-user"
+            url={insuranceUrl}
+            isUploading={isUploadingInsurance}
+            onPress={() => simulateUpload(setInsuranceUrl, setIsUploadingInsurance)}
+            fileName="insurance_policy.pdf"
           />
-          <DocumentCard 
-            title="Background Check"
-            iconName="assignment-ind"
-            state={allRequiredApproved ? (bgCheckUrl ? 'Approved' : 'Required') : 'Locked'}
-            imageUrl={bgCheckUrl}
-            onPress={simulateUploadBg}
-          />
+        </View>
+
+        {/* Helper Text */}
+        <View style={styles.helperCard}>
+          <MaterialIcons name="info" size={20} color={localColors.secondary} style={{ marginTop: 2 }} />
+          <Text style={styles.helperText}>
+            Please ensure photos are clear and all text is readable. PDF, JPG, or PNG formats are accepted (Max 5MB per file).
+          </Text>
         </View>
       </ScrollView>
 
+      {/* Bottom Actions */}
       <View style={styles.bottomBar}>
-        <View style={styles.bottomContent}>
-          <View style={styles.infoRow}>
-            <Icon name="information-circle-outline" size={16} color="#45464d" />
-            <Text style={styles.infoText}>{approvedCount} of 3 documents approved</Text>
-          </View>
-          <TouchableOpacity 
-            style={[styles.submitActionBtn, !canSubmit && styles.submitActionBtnDisabled]} 
-            onPress={submitKYC}
-            disabled={!canSubmit}
-          >
-            <Text style={styles.submitActionText}>Submit for Review</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity 
+          style={[styles.submitBtn, !allRequiredApproved && styles.submitBtnDisabled]} 
+          onPress={submitKYC}
+          disabled={!allRequiredApproved || isSubmitting}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator color={localColors.onPrimary} />
+          ) : (
+            <>
+              <Text style={styles.submitBtnText}>{allRequiredApproved ? 'Finish Registration' : 'Submit Application'}</Text>
+              <MaterialIcons name={allRequiredApproved ? "check-circle" : "rocket-launch"} size={20} color={localColors.onPrimary} style={{ marginLeft: 8 }} />
+            </>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.backActionBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backActionText}>Back</Text>
+        </TouchableOpacity>
       </View>
+
+      {/* Success Modal */}
+      <Modal visible={showSuccessModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalIconWrap}>
+              <MaterialIcons name="check-circle" size={48} color={localColors.onSecondaryContainer} />
+            </View>
+            <Text style={styles.modalTitle}>Application Sent!</Text>
+            <Text style={styles.modalBody}>
+              Our team will review your documents within 24-48 hours. You'll be notified as soon as you're ready to hit the road.
+            </Text>
+            <TouchableOpacity style={styles.modalBtn} onPress={handleModalClose}>
+              <Text style={styles.modalBtnText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 };
@@ -316,29 +344,29 @@ const KYCScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f8f9ff',
+    backgroundColor: localColors.surface,
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    backgroundColor: '#f8f9ff',
+    backgroundColor: localColors.surface,
   },
-  title: {
+  statusTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#000000',
+    color: localColors.primary,
   },
-  subtitle: {
+  statusSubtitle: {
     fontSize: 16,
-    color: '#45464d',
+    color: localColors.onSurfaceVariant,
     textAlign: 'center',
     marginTop: 8,
   },
   buttonOutline: {
     borderWidth: 2,
-    borderColor: '#000000',
+    borderColor: localColors.primary,
     padding: 16,
     borderRadius: 30,
     marginTop: 24,
@@ -346,7 +374,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonOutlineText: {
-    color: '#000000',
+    color: localColors.primary,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -356,228 +384,242 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     height: 64,
+    backgroundColor: 'rgba(248, 249, 255, 0.8)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(198, 198, 205, 0.2)',
   },
-  closeBtn: {
+  appBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backBtn: {
     padding: 8,
     marginLeft: -8,
   },
   appTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#000000',
+    color: localColors.primary,
+    letterSpacing: -0.5,
+    marginLeft: 4,
   },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 120,
-  },
-  headerArea: {
-    marginBottom: 24,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  mainHeading: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0b1c30',
-  },
-  pendingChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(198, 198, 205, 0.2)',
+  stepBadge: {
+    backgroundColor: localColors.primaryContainer,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 16,
   },
-  pendingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#76777d',
-    marginRight: 6,
-  },
-  pendingText: {
+  stepBadgeText: {
     fontSize: 12,
-    color: '#45464d',
     fontWeight: '500',
+    color: localColors.onPrimaryFixedVariant,
     fontFamily: 'JetBrains Mono',
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 150, // Space for bottom bar
+  },
+  progressBarBg: {
+    width: '100%',
+    height: 6,
+    backgroundColor: localColors.surfaceContainerHigh,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 32,
+  },
+  progressBarFill: {
+    width: '100%', // Step 3 of 3 is full
+    height: '100%',
+    backgroundColor: localColors.onSecondaryContainer,
+  },
+  titleSection: {
+    marginBottom: 24,
+  },
+  mainHeading: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: localColors.onSurface,
+    marginBottom: 4,
   },
   headerDesc: {
     fontSize: 16,
-    color: '#45464d',
+    color: localColors.onSurfaceVariant,
     lineHeight: 24,
   },
-  grid: {
+  slotsContainer: {
     flexDirection: 'column',
     gap: 16,
   },
-  docCard: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+  uploadSlot: {
+    padding: 24,
+    backgroundColor: localColors.surfaceContainerLowest,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: localColors.outline,
+    borderStyle: 'dashed',
   },
-  docHeader: {
+  uploadSlotSuccess: {
+    backgroundColor: 'rgba(134, 242, 228, 0.2)', // secondaryContainer with opacity
+    borderColor: localColors.secondary,
+    borderStyle: 'solid',
+  },
+  slotContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
-    zIndex: 10,
   },
-  docTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  slotIconWrap: {
+    backgroundColor: localColors.surfaceContainerHigh,
+    padding: 16,
+    borderRadius: 12,
+    marginRight: 16,
   },
-  docIconWrap: {
-    padding: 8,
-    borderRadius: 8,
-    marginRight: 12,
+  slotIconWrapSuccess: {
+    backgroundColor: localColors.primary,
   },
-  docIconReq: {
-    backgroundColor: '#eff4ff',
+  slotTextWrap: {
+    flex: 1,
   },
-  docIconLocked: {
-    backgroundColor: '#d3e4fe',
-  },
-  docIconAppr: {
-    backgroundColor: '#e5eeff',
-  },
-  docTitle: {
+  slotTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#0b1c30',
+    color: localColors.onSurface,
+    marginBottom: 4,
   },
-  statusApproved: {
+  slotDesc: {
     fontSize: 12,
-    color: '#006a61',
-    fontWeight: '500',
+    color: localColors.onSurfaceVariant,
     fontFamily: 'JetBrains Mono',
-    marginTop: 4,
+    marginBottom: 12,
   },
-  statusRequired: {
+  tapToUploadWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tapToUploadText: {
     fontSize: 12,
-    color: '#45464d',
-    fontWeight: '500',
-    fontFamily: 'JetBrains Mono',
-    marginTop: 4,
+    fontWeight: '600',
+    color: localColors.primary,
+    marginLeft: 4,
   },
-  statusProcessing: {
-    fontSize: 12,
-    color: '#000000',
-    fontWeight: '500',
-    fontFamily: 'JetBrains Mono',
-    marginTop: 4,
-  },
-  statusLocked: {
-    fontSize: 12,
-    color: '#45464d',
-    fontWeight: '500',
-    fontFamily: 'JetBrains Mono',
-    marginTop: 4,
-  },
-  docPreview: {
-    width: '100%',
-    height: 130,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#eff4ff',
+  uploadedPreviewBox: {
+    marginTop: 16,
     borderWidth: 1,
-    borderColor: 'rgba(198, 198, 205, 0.2)',
-  },
-  docPreviewReq: {
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    borderWidth: 0,
-  },
-  docPreviewLocked: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderWidth: 0,
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  processingOverlay: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
+    borderColor: localColors.outlineVariant,
+    borderRadius: 8,
+    padding: 8,
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: localColors.surfaceContainer,
   },
-  spinner: {
-    position: 'absolute',
-  },
-  reqContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tapToUpload: {
+  uploadedFileName: {
     fontSize: 12,
-    color: '#000000',
-    fontWeight: '500',
-    marginTop: 8,
-  },
-  lockedLines: {
+    color: localColors.onSurfaceVariant,
+    marginLeft: 8,
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  lockedLine1: {
-    width: 60,
-    height: 8,
-    backgroundColor: 'rgba(198, 198, 205, 0.2)',
-    borderRadius: 4,
-    marginBottom: 8,
+  helperCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: localColors.surfaceContainerLow,
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 24,
   },
-  lockedLine2: {
-    width: 90,
-    height: 8,
-    backgroundColor: 'rgba(198, 198, 205, 0.2)',
-    borderRadius: 4,
+  helperText: {
+    fontSize: 14,
+    color: localColors.onSurfaceVariant,
+    lineHeight: 20,
+    marginLeft: 8,
+    flex: 1,
   },
   bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(248, 249, 255, 0.9)',
+    backgroundColor: localColors.surface,
     borderTopWidth: 1,
     borderTopColor: 'rgba(198, 198, 205, 0.2)',
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 32, // Safe area
+    paddingBottom: Platform.OS === 'ios' ? 32 : 24,
   },
-  bottomContent: {
-    flexDirection: 'column',
-    gap: 8,
-  },
-  infoRow: {
+  submitBtn: {
     flexDirection: 'row',
+    width: '100%',
+    backgroundColor: localColors.primary,
+    paddingVertical: 16,
+    borderRadius: 30,
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
     marginBottom: 8,
   },
-  infoText: {
-    fontSize: 12,
-    color: '#45464d',
-    fontFamily: 'JetBrains Mono',
+  submitBtnDisabled: {
+    opacity: 0.5,
   },
-  submitActionBtn: {
+  submitBtnText: {
+    color: localColors.onPrimary,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  backActionBtn: {
     width: '100%',
-    backgroundColor: '#000000',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  backActionText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: localColors.onSurfaceVariant,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(11, 28, 48, 0.9)', // on-background/90
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  modalContent: {
+    backgroundColor: localColors.surface,
+    borderRadius: 24,
+    padding: 32,
+    width: '100%',
+    maxWidth: 384, // ~sm
+    alignItems: 'center',
+  },
+  modalIconWrap: {
+    width: 96,
+    height: 96,
+    backgroundColor: localColors.secondaryContainer,
+    borderRadius: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 32,
+    fontWeight: '600',
+    color: localColors.onSurface,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalBody: {
+    fontSize: 16,
+    color: localColors.onSurfaceVariant,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  modalBtn: {
+    width: '100%',
+    backgroundColor: localColors.primary,
     paddingVertical: 16,
     borderRadius: 30,
     alignItems: 'center',
   },
-  submitActionBtnDisabled: {
-    backgroundColor: '#c6c6cd',
-    opacity: 0.8,
-  },
-  submitActionText: {
-    color: '#ffffff',
+  modalBtnText: {
+    color: localColors.onPrimary,
     fontSize: 18,
     fontWeight: '600',
   }

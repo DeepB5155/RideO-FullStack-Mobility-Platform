@@ -1,6 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, ImageBackground, Image, SafeAreaView, ScrollView } from 'react-native';
 import axiosInstance from '../api/axios';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+
+const localColors = {
+  background: '#f8f9ff',
+  primary: '#000000',
+  onPrimary: '#ffffff',
+  onSurfaceVariant: '#45464d',
+  surfaceContainerLowest: '#ffffff',
+  surfaceContainerLow: '#eff4ff',
+  outlineVariant: '#c6c6cd',
+  outline: '#76777d',
+  onSurface: '#0b1c30',
+  surfaceContainer: '#e5eeff',
+  surfaceVariant: '#d3e4fe',
+  surface: '#ffffff',
+  secondary: '#006a61',
+  onSecondary: '#ffffff',
+  onBackground: '#0b1c30',
+};
+
+const mapBgUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuAwEihdVVURAqIQe9V9OV7lDhsqNiIY3jRdQGMWSGhVjh0_WBXQg3eTMi1bYIP5U6AaEzEcBWR4q02lft_PxDEvJQvl-Yp6mQFA2dJQzjO_BpcIPC7Az09spSX-pKNasyI3qVRxU789iMZF6bsPkN2hUX8UIgy6xrIWTbvTqPALHxZ8Huv0vwwCfPT7R04xPKNW-wzeYTguugGOZVBttUa9204AyJVg1Nebbh4_hll2YPV8_bYTKfrXQ6EVklgauOkOhIXQpgw71Cmo";
 
 const RideResultsScreen = ({ route, navigation }: any) => {
   const { pickupText, dropoffText, pickupLat, pickupLng, dropLat, dropLng, date, seats } = route.params;
@@ -68,142 +89,153 @@ const RideResultsScreen = ({ route, navigation }: any) => {
     }
   };
 
-  const getVehicleIcon = (type: string) => {
+  const getVehicleImage = (type: string) => {
     switch (type) {
-      case 'Hatchback': return '🚗';
-      case 'SUV': return '🛻';
-      case 'MPV': return '🚐';
+      case 'Hatchback': return 'https://lh3.googleusercontent.com/aida-public/AB6AXuDg_NszC1yrHi5YKHyLce7w_kfJAdDz8xdAzk5omtedTHkUY6ce1wP34TH8-3W4wlRUOSxCzb10-iF5ayQyz6RHZmkLGHtWK8RXyuYtz7p317CQDptwm0uZcJx5FVQ6-y8tW_EZKzjbNWYwa0-d6xwsZipW83KiyvQmnmpzGzw52LYq7rl0aXdiahU-0whG4bHyqjI8A5IqBjFqAcktLHdv2PVjZwEuFVeSP86ojPQdIdi1BWkCCpd0L0w1lEUkTPulRqUxwLwX6AFO';
+      case 'SUV': return 'https://lh3.googleusercontent.com/aida-public/AB6AXuDh6tq4h4bnGm_YaqUDK8L5EBBmkCFLg6Skx0sFfBrdKu64jV00R46NOsrAzv7LkxAc_i_Oh2F9dyTBIaEdCziLNsVLMZazOz5WHOWiOd8qioNYTgOHrsGpvragztvVAkrZUzEERVzFF--KiQ3o1wRcEHnzHiM-UOzQuvG8PtkeXKLcLF5vOjfTP2XmMKANAdL-guIYSgSZcYGuUgawriGPgNv8F217aSOt2DtSM-K-LZQnKACJO2Tqbki20Au8N7YVe9nR-lRDvrWy';
+      case 'MPV': return 'https://lh3.googleusercontent.com/aida-public/AB6AXuDh6tq4h4bnGm_YaqUDK8L5EBBmkCFLg6Skx0sFfBrdKu64jV00R46NOsrAzv7LkxAc_i_Oh2F9dyTBIaEdCziLNsVLMZazOz5WHOWiOd8qioNYTgOHrsGpvragztvVAkrZUzEERVzFF--KiQ3o1wRcEHnzHiM-UOzQuvG8PtkeXKLcLF5vOjfTP2XmMKANAdL-guIYSgSZcYGuUgawriGPgNv8F217aSOt2DtSM-K-LZQnKACJO2Tqbki20Au8N7YVe9nR-lRDvrWy';
       case 'Sedan':
-      default: return '🚙';
+      default: return 'https://lh3.googleusercontent.com/aida-public/AB6AXuD9-id9q-fJfngduI5dT2HVbOLkEShbEl4YU3jeNK3E8pRerhGwOjAX37iKhRv83_BIvsKYZrT3juDPLXmsedyoGBuuK12y7LekW1bbLOIuLpYEiFMpSwUJkWqIIlb-W1LtD8Wi2rfw9AVqr_3SWG8cA04VZsX6q7wT82l7QU8ZA1_srD-Sx9lUZfDf4J2aCtFt7yoDQpqG8fEgT1kYJigoaDcg0IuraemFKNgXkxU5N9drDXHcLJQ_9bw-Dpya5cF7R2rtbsCEP06U';
     }
   };
 
-  const renderItem = ({ item }: { item: any }) => (
-    <View style={[styles.card, { borderLeftColor: item.isRecurring ? '#10B981' : '#3B82F6' }]}>
-      {/* TOP ROW */}
-      <View style={styles.topRow}>
-        <View style={styles.driverAvatarContainer}>
-          <View style={styles.driverAvatar}>
-            <Text style={styles.driverInitials}>{item.driver.name.charAt(0)}</Text>
+  const renderItem = ({ item, index }: { item: any; index: number }) => {
+    const isFirst = index === 0;
+    return (
+      <TouchableOpacity 
+        style={[styles.rideCard, isFirst && styles.rideCardHighlighted]} 
+        onPress={() => item.isRecurring ? openSubscribeModal(item) : handleRequestSeat(item)}
+      >
+        {isFirst && (
+          <View style={styles.fastestBadge}>
+            <Text style={styles.fastestBadgeText}>Fastest</Text>
           </View>
-          {item.isProDriver && (
-            <View style={styles.proBadgeOverlay}>
-              <Text style={styles.proBadgeTextOverlay}>PRO</Text>
+        )}
+        
+        <View style={styles.cardTopRow}>
+          <View style={styles.carInfoLeft}>
+            <Image source={{ uri: getVehicleImage(item.vehicle.vehicleType) }} style={styles.carImg} resizeMode="contain" />
+            <View>
+              <Text style={styles.carTitle}>RideO {item.vehicle.vehicleType}</Text>
+              <Text style={styles.carSubtitle}>{new Date(item.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {item.availableSeats} seats left</Text>
             </View>
-          )}
-        </View>
-        <View style={styles.driverDetails}>
-          <Text style={styles.driverName}>{item.driver.name}</Text>
-          <Text style={styles.driverRating}>⭐ {item.driver.rating.toFixed(1)}</Text>
-        </View>
-      </View>
-      
-      {/* SAFETY INDICATOR */}
-      <View style={styles.safetyRow}>
-        <Text style={styles.safetyText}>🛡️ Verified Driver · ID checked · RideO Safe</Text>
-      </View>
-      
-      {/* ROUTE ROW */}
-      <View style={styles.routeRow}>
-        <View style={styles.routeTimeline}>
-          <View style={styles.dotGreen} />
-          <View style={styles.dashedLine} />
-          <View style={styles.dotRed} />
-        </View>
-        <View style={styles.routeDetails}>
-          <View style={styles.routePoint}>
-            <Text style={styles.routeText}>{item.matchedPickup}</Text>
-            <Text style={styles.timeText}>{new Date(item.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
           </View>
-          <View style={styles.routePoint}>
-            <Text style={styles.routeText}>{item.matchedDropoff}</Text>
+          <View style={styles.priceContainer}>
+            <Text style={styles.priceText}>₹{item.pricePerSeat}</Text>
           </View>
         </View>
-      </View>
 
-      {/* VEHICLE ROW */}
-      <View style={styles.vehicleRow}>
-        <View style={styles.vehicleInfo}>
-          <View style={[styles.vehicleColorCircle, { backgroundColor: item.vehicle.color === 'White' ? '#FFF' : item.vehicle.color === 'Silver' ? '#C0C0C0' : item.vehicle.color === 'Black' ? '#000' : item.vehicle.color === 'Red' ? '#F00' : item.vehicle.color === 'Blue' ? '#00F' : item.vehicle.color === 'Grey' ? '#808080' : item.vehicle.color === 'Gold' ? '#FFD700' : item.vehicle.color === 'Brown' ? '#A52A2A' : '#CCC' }]} />
-          <Text style={styles.vehicleText}>{item.vehicle.color} {item.vehicle.make} {item.vehicle.model}</Text>
-          <Text style={styles.vehicleIcon}>{getVehicleIcon(item.vehicle.vehicleType)}</Text>
-        </View>
-        <View style={styles.licensePlate}>
-          <Text style={styles.licensePlateText}>{item.vehicle.licensePlate}</Text>
-        </View>
-      </View>
-      
-      {/* BOTTOM ROW */}
-      <View style={styles.bottomRow}>
-        <View style={styles.badgesCol}>
-          <View style={styles.badgeNeutral}>
-            <Text style={styles.badgeNeutralText}>{item.availableSeats} seats left</Text>
+        <View style={styles.cardBottomRow}>
+          <View style={styles.driverInfo}>
+            <MaterialIcons name="person" size={16} color={isFirst ? localColors.secondary : localColors.onSurfaceVariant} />
+            <Text style={styles.driverText}>{item.driver.name} • {item.driver.rating.toFixed(1)} ★</Text>
           </View>
-          <View style={styles.tagsRow}>
-            {item.isRecurring && (
-              <View style={styles.badgeRecurring}>
-                <Text style={styles.badgeRecurringText}>Daily Route 🔄</Text>
-              </View>
-            )}
-            {item.autoApprove && (
-              <View style={styles.badgeInstant}>
-                <Text style={styles.badgeInstantText}>Instant ⚡</Text>
-              </View>
-            )}
+          
+          <View style={styles.actionBtn}>
+            <Text style={styles.actionBtnText}>{item.isRecurring ? 'Subscribe' : (item.autoApprove ? 'Select' : 'Request')}</Text>
           </View>
         </View>
-        <View style={styles.actionCol}>
-          <Text style={styles.priceText}>₹{item.pricePerSeat}/seat</Text>
-          <TouchableOpacity 
-            style={[styles.actionBtn, item.isRecurring ? styles.actionBtnSubscribe : styles.actionBtnBook]} 
-            onPress={() => item.isRecurring ? openSubscribeModal(item) : handleRequestSeat(item)}
-          >
-            <Text style={styles.actionBtnText}>
-              {item.isRecurring ? 'Subscribe Daily' : (item.autoApprove ? 'Book' : 'Request')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-        <Text style={styles.backBtnText}>&larr; Modify Search</Text>
-      </TouchableOpacity>
+      {/* Map Background Layer */}
+      <ImageBackground source={{ uri: mapBgUrl }} style={styles.mapBg} resizeMode="cover" />
       
-      <Text style={styles.title}>{pickupText} to {dropoffText}</Text>
-      <Text style={styles.subtitle}>{date} • {seats} Passenger(s)</Text>
+      <View style={styles.innerContainer}>
+        {/* Top Header */}
+        <View style={styles.headerContainer}>
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.headerIconBtn} onPress={() => navigation.goBack()}>
+              <MaterialIcons name="arrow-back" size={24} color={localColors.onSurfaceVariant} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>RideO</Text>
+            <TouchableOpacity style={styles.avatarBtn} onPress={() => navigation.navigate('Profile')}>
+              <Image 
+                source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBWVQUK0SltHj54uz_CNivkxxV5zur2TM1Xbr5o0evZm5I4IsSJc5YORxot8ErWrde12zumgnFFGe6zG2A2EZYTS8oGrl8OP38Bjcz3R-YLcYd3WIMWr5Z2-5b_tD_bGMLgTF-PS_lfgq700zBaQ0EJ1SLCcZfNMSWDg4UU-N6VnUvHJGtVo99SC1qvqSQg3tj87XjSoV-MJzF9i-v3PEhR189flJ7SDNVG8xhVTwKO-YdC_uK2iMDRv86Ws6bTHuCEUjW39CF7CYeK' }} 
+                style={styles.avatarImg} 
+              />
+            </TouchableOpacity>
+          </View>
 
-      <Text style={styles.paymentTitle}>Select Payment Method:</Text>
-      <View style={styles.paymentSelector}>
-        {['Wallet', 'Cash', 'UPI'].map((method) => (
-          <TouchableOpacity 
-            key={method} 
-            style={[styles.paymentOption, paymentMethod === method && styles.paymentOptionActive]}
-            onPress={() => setPaymentMethod(method as any)}
-          >
-            <Text style={[styles.paymentOptionText, paymentMethod === method && styles.paymentOptionTextActive]}>
-              {method}
-            </Text>
-          </TouchableOpacity>
-        ))}
+          {/* Search Header Floating */}
+          <View style={styles.searchFloating}>
+            <View style={styles.searchSummaryBox}>
+              <View style={styles.searchSummaryLeft}>
+                <View style={styles.summaryRow}>
+                  <View style={styles.summaryDotBlack} />
+                  <Text style={styles.summaryTextPrimary} numberOfLines={1}>{pickupText}</Text>
+                </View>
+                <View style={styles.summaryLine} />
+                <View style={styles.summaryRow}>
+                  <View style={styles.summaryDotGreen} />
+                  <Text style={styles.summaryTextSecondary} numberOfLines={1}>{dropoffText}</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.tuneBtn} onPress={() => navigation.goBack()}>
+                <MaterialIcons name="tune" size={20} color={localColors.primary} />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll}>
+              <TouchableOpacity style={styles.filterChipActive}>
+                <Text style={styles.filterChipActiveText}>Recommended</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.filterChip}>
+                <Text style={styles.filterChipText}>Fastest</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.filterChip}>
+                <Text style={styles.filterChipText}>Lowest Price</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.filterChip}>
+                <Text style={styles.filterChipText}>Eco-Friendly</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+
+        {/* Bottom Sheet UI */}
+        <View style={styles.bottomSheet}>
+          <View style={styles.handleBar} />
+          
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Available Rides</Text>
+            <Text style={styles.sheetSubtitle}>{results.length} options for {date}</Text>
+          </View>
+
+          {/* Payment Selector injected cleanly */}
+          <View style={styles.paymentSelector}>
+            {['Wallet', 'Cash', 'UPI'].map((method) => (
+              <TouchableOpacity 
+                key={method} 
+                style={[styles.paymentOption, paymentMethod === method && styles.paymentOptionActive]}
+                onPress={() => setPaymentMethod(method as any)}
+              >
+                <Text style={[styles.paymentOptionText, paymentMethod === method && styles.paymentOptionTextActive]}>
+                  {method}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {loading ? (
+            <ActivityIndicator size="large" color={localColors.primary} style={{ marginTop: 40 }} />
+          ) : (
+            <FlatList
+              data={results}
+              keyExtractor={(item) => item.routeId}
+              renderItem={renderItem}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>No rides found along this route for your date.</Text>
+              }
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </View>
       </View>
-
-      {loading ? (
-        <ActivityIndicator size="large" color="#007AFF" style={{ marginTop: 50 }} />
-      ) : (
-        <FlatList
-          data={results}
-          keyExtractor={(item) => item.routeId}
-          renderItem={renderItem}
-          ListEmptyComponent={
-            <Text style={styles.empty}>No rides found along this route for your date.</Text>
-          }
-          contentContainerStyle={{ paddingBottom: 30 }}
-        />
-      )}
 
       {/* Subscription Modal */}
       <Modal visible={isSubscribeModalVisible} animationType="slide" transparent={true}>
@@ -212,16 +244,16 @@ const RideResultsScreen = ({ route, navigation }: any) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Daily Subscription</Text>
               <TouchableOpacity onPress={() => setSubscribeModalVisible(false)}>
-                <Text style={styles.closeBtn}>✕</Text>
+                <MaterialIcons name="close" size={24} color={localColors.onSurfaceVariant} />
               </TouchableOpacity>
             </View>
 
             {selectedRoute && (
               <>
                 <View style={styles.summaryBox}>
-                  <Text style={styles.summaryText}>📍 {selectedRoute.matchedPickup} to {selectedRoute.matchedDropoff}</Text>
-                  <Text style={styles.summaryText}>🕐 Departs daily at {new Date(selectedRoute.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-                  <Text style={styles.summaryText}>💺 {seats} seat(s) · ₹{selectedRoute.pricePerSeat * seats}/day</Text>
+                  <Text style={styles.modalSummaryText}>📍 {selectedRoute.matchedPickup} to {selectedRoute.matchedDropoff}</Text>
+                  <Text style={styles.modalSummaryText}>🕐 Departs daily at {new Date(selectedRoute.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                  <Text style={styles.modalSummaryText}>💺 {seats} seat(s) · ₹{selectedRoute.pricePerSeat * seats}/day</Text>
                 </View>
 
                 <Text style={styles.planTitle}>Select Payment Plan:</Text>
@@ -254,304 +286,401 @@ const RideResultsScreen = ({ route, navigation }: any) => {
   );
 };
 
-import { theme } from '../theme/theme';
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background, padding: 15, paddingTop: 50 },
-  backBtn: { marginBottom: 15 },
-  backBtnText: { color: theme.colors.primary, fontSize: 16, fontWeight: '500' },
-  title: { fontSize: 22, fontWeight: 'bold', color: theme.colors.text.main },
-  subtitle: { fontSize: 14, color: theme.colors.text.muted, marginBottom: 20 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  driverInfoContainer: { flexDirection: 'row', alignItems: 'center' },
-  proBadge: { backgroundColor: theme.colors.warning + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8, borderWidth: 1, borderColor: theme.colors.warning },
-  paymentTitle: { fontSize: 16, fontWeight: '600', color: theme.colors.text.main, marginBottom: 10 },
-  paymentSelector: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  paymentOption: { flex: 1, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, marginHorizontal: 4, backgroundColor: theme.colors.surface },
-  paymentOptionActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '20' },
-  paymentOptionText: { fontSize: 14, color: theme.colors.text.muted, fontWeight: '500' },
-  paymentOptionTextActive: {
-    color: theme.colors.primary,
-    fontWeight: 'bold'
+  container: {
+    flex: 1,
+    backgroundColor: localColors.background,
   },
-  card: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.xl,
-    marginBottom: theme.spacing.lg,
-    borderLeftWidth: 6,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    ...theme.shadows.medium,
+  innerContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
   },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  driverAvatarContainer: {
-    marginRight: 12,
-    position: 'relative'
-  },
-  driverAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: theme.colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.border
-  },
-  driverInitials: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: theme.colors.text.main
-  },
-  proBadgeOverlay: {
+  mapBg: {
     position: 'absolute',
-    bottom: -4,
-    left: 4,
-    backgroundColor: theme.colors.warning,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.card
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '60%', 
   },
-  proBadgeTextOverlay: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: theme.colors.background,
+  headerContainer: {
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    zIndex: 50,
   },
-  safetyRow: {
-    backgroundColor: theme.colors.success + '15',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-    marginBottom: 16,
+  header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.success
+    paddingHorizontal: 16,
+    height: 64,
   },
-  safetyText: {
-    color: theme.colors.success,
-    fontSize: 12,
-    fontWeight: '600',
+  headerIconBtn: {
+    padding: 8,
+    marginLeft: -8,
   },
-  driverDetails: {
-    flex: 1,
-  },
-  driverName: {
-    fontSize: 16,
+  headerTitle: {
+    fontSize: 28,
     fontWeight: '700',
-    color: theme.colors.text.main,
-    marginBottom: 2
+    color: localColors.primary,
+    letterSpacing: -0.5,
   },
-  driverRating: {
-    fontSize: 13,
-    color: theme.colors.text.muted,
-    fontWeight: '600'
+  avatarBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: localColors.surfaceVariant,
   },
-  routeRow: {
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  searchFloating: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  searchSummaryBox: {
     flexDirection: 'row',
+    backgroundColor: localColors.surface,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    alignItems: 'center',
     marginBottom: 16,
   },
-  routeTimeline: {
-    width: 20,
-    alignItems: 'center',
-    marginRight: 12
+  searchSummaryLeft: {
+    flex: 1,
+    position: 'relative',
   },
-  dotGreen: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: theme.colors.success,
-    marginTop: 4
-  },
-  dashedLine: {
+  summaryLine: {
+    position: 'absolute',
+    left: 4,
+    top: 14,
+    bottom: 14,
     width: 2,
-    flex: 1,
-    backgroundColor: theme.colors.border,
-    marginVertical: 4
+    backgroundColor: localColors.outlineVariant,
+    zIndex: 1,
   },
-  dotRed: {
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 4,
+    zIndex: 2,
+  },
+  summaryDotBlack: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: theme.colors.danger,
-    marginBottom: 4
+    borderWidth: 3,
+    borderColor: localColors.primary,
+    backgroundColor: localColors.surface,
+    marginRight: 12,
   },
-  routeDetails: {
-    flex: 1,
-    justifyContent: 'space-between',
-    minHeight: 50
+  summaryDotGreen: {
+    width: 10,
+    height: 10,
+    backgroundColor: localColors.secondary,
+    borderRadius: 2,
+    marginRight: 12,
   },
-  routePoint: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  routeText: {
+  summaryTextPrimary: {
     fontSize: 14,
-    fontWeight: '500',
-    color: theme.colors.text.main,
-    flex: 1,
-    marginRight: 8
+    color: localColors.onSurfaceVariant,
   },
-  timeText: {
-    fontSize: 13,
+  summaryTextSecondary: {
+    fontSize: 16,
     fontWeight: '600',
-    color: theme.colors.success
+    color: localColors.onBackground,
   },
-  vehicleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  tuneBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: localColors.surfaceContainerLow,
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: theme.colors.border
+    justifyContent: 'center',
   },
-  vehicleInfo: {
+  filtersScroll: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 10
   },
-  vehicleColorCircle: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+  filterChipActive: {
+    backgroundColor: localColors.primary + '15',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  filterChipActiveText: {
+    color: localColors.onSurface,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  filterChip: {
+    backgroundColor: localColors.surfaceContainerLowest,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: theme.colors.border
+    borderColor: localColors.outlineVariant,
   },
-  vehicleText: {
-    fontSize: 13,
+  filterChipText: {
+    color: localColors.onSurfaceVariant,
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  bottomSheet: {
+    flex: 1,
+    backgroundColor: localColors.surface,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    marginTop: 20,
+    paddingTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 20,
+  },
+  handleBar: {
+    width: 48,
+    height: 4,
+    backgroundColor: localColors.outlineVariant,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  sheetHeader: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  sheetTitle: {
+    fontSize: 24,
     fontWeight: '600',
-    color: theme.colors.text.main,
-    marginRight: 6
+    color: localColors.onBackground,
   },
-  vehicleIcon: {
-    fontSize: 16,
+  sheetSubtitle: {
+    fontSize: 12,
+    color: localColors.onSurfaceVariant,
+    marginTop: 4,
   },
-  licensePlate: {
-    backgroundColor: theme.colors.background,
+  paymentSelector: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    gap: 8,
+  },
+  paymentOption: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2
+    borderColor: localColors.outlineVariant,
+    borderRadius: 8,
+    backgroundColor: localColors.surfaceContainerLowest,
   },
-  licensePlateText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: theme.colors.text.main,
-    letterSpacing: 0.5
+  paymentOptionActive: {
+    borderColor: localColors.primary,
+    backgroundColor: localColors.primary + '10',
   },
-  bottomRow: {
+  paymentOptionText: {
+    fontSize: 12,
+    color: localColors.onSurfaceVariant,
+    fontWeight: '500',
+  },
+  paymentOptionTextActive: {
+    color: localColors.primary,
+    fontWeight: '600',
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+    gap: 12,
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: localColors.onSurfaceVariant,
+    marginTop: 40,
+  },
+  rideCard: {
+    backgroundColor: localColors.surface,
+    borderWidth: 1,
+    borderColor: localColors.outlineVariant,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  rideCardHighlighted: {
+    borderWidth: 2,
+    borderColor: localColors.primary,
+  },
+  fastestBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: localColors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderBottomLeftRadius: 12,
+  },
+  fastestBadgeText: {
+    color: localColors.onPrimary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  cardTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end'
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
-  badgesCol: {
-    flex: 1,
-    gap: 8,
-    marginRight: 12
-  },
-  tagsRow: {
+  carInfoLeft: {
     flexDirection: 'row',
-    gap: 6,
-    flexWrap: 'wrap'
+    alignItems: 'center',
+    flex: 1,
   },
-  badgeNeutral: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.colors.surface,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6
+  carImg: {
+    width: 64,
+    height: 40,
+    marginRight: 16,
   },
-  badgeNeutralText: {
-    fontSize: 12,
+  carTitle: {
+    fontSize: 18,
     fontWeight: '600',
-    color: theme.colors.text.muted
+    color: localColors.onBackground,
+    marginBottom: 2,
   },
-  badgeRecurring: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.colors.primary + '15',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6
+  carSubtitle: {
+    fontSize: 12,
+    color: localColors.onSurfaceVariant,
   },
-  badgeRecurringText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.colors.primaryLight
-  },
-  badgeInstant: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.colors.warning + '15',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6
-  },
-  badgeInstantText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.colors.warning
-  },
-  actionCol: {
+  priceContainer: {
     alignItems: 'flex-end',
-    gap: 8
   },
   priceText: {
     fontSize: 20,
-    fontWeight: '800',
-    color: theme.colors.success
+    fontWeight: '600',
+    color: localColors.onBackground,
+  },
+  cardBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: localColors.outlineVariant,
+    paddingTop: 12,
+  },
+  driverInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  driverText: {
+    fontSize: 12,
+    color: localColors.onSurface,
+    marginLeft: 6,
   },
   actionBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: theme.radius.full,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  actionBtnBook: {
-    backgroundColor: theme.colors.primary
-  },
-  actionBtnSubscribe: {
-    backgroundColor: theme.colors.primaryLight
+    backgroundColor: localColors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   actionBtnText: {
-    color: theme.colors.text.light,
+    color: localColors.onPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: localColors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
     fontWeight: '700',
-    fontSize: 14
+    color: localColors.onBackground,
   },
-  empty: {
-    textAlign: 'center',
-    marginTop: 50,
+  summaryBox: {
+    backgroundColor: localColors.surfaceContainerLow,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: localColors.outlineVariant,
+  },
+  modalSummaryText: {
+    fontSize: 14,
+    color: localColors.onBackground,
+    marginBottom: 6,
+    fontWeight: '500',
+  },
+  planTitle: {
     fontSize: 16,
-    color: theme.colors.text.muted
+    fontWeight: '600',
+    marginBottom: 12,
+    color: localColors.onBackground,
   },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: theme.colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, minHeight: 400 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text.main },
-  closeBtn: { fontSize: 24, color: theme.colors.text.muted, paddingHorizontal: 10 },
-  summaryBox: { backgroundColor: theme.colors.surface, padding: 15, borderRadius: 10, marginBottom: 20 },
-  summaryText: { fontSize: 15, color: theme.colors.text.main, marginBottom: 5, fontWeight: '500' },
-  planTitle: { fontSize: 16, fontWeight: '600', marginBottom: 10, color: theme.colors.text.main },
-  planCard: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 15, marginBottom: 10, backgroundColor: theme.colors.surface },
-  planCardActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '15' },
-  planCardTitle: { fontSize: 16, fontWeight: 'bold', color: theme.colors.text.main, marginBottom: 4 },
-  planCardTitleActive: { color: theme.colors.primaryLight },
-  planCardDesc: { fontSize: 13, color: theme.colors.text.muted },
-  confirmBtn: { backgroundColor: theme.colors.success, padding: 16, borderRadius: theme.radius.full, alignItems: 'center', marginTop: 15 },
-  confirmBtnText: { color: theme.colors.text.light, fontSize: 16, fontWeight: 'bold' }
+  planCard: {
+    borderWidth: 1,
+    borderColor: localColors.outlineVariant,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    backgroundColor: localColors.surface,
+  },
+  planCardActive: {
+    borderColor: localColors.primary,
+    backgroundColor: localColors.primary + '05',
+  },
+  planCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: localColors.onBackground,
+    marginBottom: 4,
+  },
+  planCardTitleActive: {
+    color: localColors.primary,
+  },
+  planCardDesc: {
+    fontSize: 13,
+    color: localColors.onSurfaceVariant,
+  },
+  confirmBtn: {
+    backgroundColor: localColors.primary,
+    padding: 16,
+    borderRadius: 30,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  confirmBtnText: {
+    color: localColors.onPrimary,
+    fontSize: 16,
+    fontWeight: '700',
+  }
 });
 
 export default RideResultsScreen;

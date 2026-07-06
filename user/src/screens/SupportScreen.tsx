@@ -18,7 +18,7 @@ const SupportScreen = ({ navigation }: any) => {
       setIsLoading(true);
       await axiosInstance.post(`/complaint`, {
         subject,
-        message
+        description: message
       });
       
       Alert.alert('Complaint Submitted', 'Our support team will review your report shortly.');

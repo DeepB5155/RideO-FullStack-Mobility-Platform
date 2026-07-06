@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using RideO.API.Data;
 using RideO.API.Models;
@@ -265,6 +266,33 @@ namespace RideO.API.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "FCM token updated successfully." });
+        }
+
+        [Authorize]
+        [HttpGet("me")]
+        public async Task<IActionResult> GetMe()
+        {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized();
+
+            var user = await _context.Users
+                .Where(u => u.Id == userId)
+                .Select(u => new {
+                    u.Id,
+                    u.FullName,
+                    u.Email,
+                    u.PhoneNumber,
+                    u.Role,
+                    u.AverageRating,
+                    u.ReferralCode,
+                    u.CreatedAt
+                })
+                .FirstOrDefaultAsync();
+
+            if (user == null) return NotFound();
+
+            return Ok(user);
         }
 
         [HttpGet("update-passwords")]

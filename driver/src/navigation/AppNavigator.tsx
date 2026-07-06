@@ -24,6 +24,8 @@ import WalletScreen from '../screens/WalletScreen';
 import InsightsScreen from '../screens/InsightsScreen';
 import DailyCommuteSetupScreen from '../screens/DailyCommuteSetupScreen';
 import EditVehicleScreen from '../screens/EditVehicleScreen';
+import VehicleDetailsScreen from '../screens/VehicleDetailsScreen';
+import WithdrawScreen from '../screens/WithdrawScreen';
 
 // Context
 import { AuthContext } from '../context/AuthContext';
@@ -138,9 +140,11 @@ const AuthStack = () => {
 const MainStack = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="VehicleDetails" component={VehicleDetailsScreen} />
       <Stack.Screen name="KYC" component={KYCScreen} />
       <Stack.Screen name="MainTabs" component={MainTabs} />
       {/* Secondary screens reachable via navigation.navigate() */}
+      <Stack.Screen name="Withdraw" component={WithdrawScreen} />
       <Stack.Screen name="Create Route" component={CreateRouteScreen} />
       <Stack.Screen name="Route Bookings" component={RouteBookingsScreen} />
       <Stack.Screen name="Active Ride" component={ActiveRideScreen} />

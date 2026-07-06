@@ -51,7 +51,7 @@ const ChatScreen = ({ route, navigation }: any) => {
         });
 
         await hubConnection.start();
-        await hubConnection.invoke('JoinBookingGroup', bookingId);
+        await hubConnection.invoke('JoinChat', bookingId);
         
         setConnection(hubConnection);
       } catch (err) {
@@ -96,7 +96,7 @@ const ChatScreen = ({ route, navigation }: any) => {
 
     return () => {
       if (hubConnection) {
-        hubConnection.invoke('LeaveBookingGroup', bookingId).catch(console.log);
+        hubConnection.invoke('LeaveChat', bookingId).catch(console.log);
         hubConnection.stop();
       }
     };
