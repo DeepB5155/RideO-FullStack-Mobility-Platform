@@ -10,7 +10,8 @@ import {
   SafeAreaView,
   ScrollView,
   Image,
-  ActivityIndicator
+  ActivityIndicator,
+  DeviceEventEmitter
 } from 'react-native';
 import Mapbox from '@rnmapbox/maps';
 import Geolocation from '@react-native-community/geolocation';
@@ -76,7 +77,15 @@ const HomeScreen = ({ navigation }: any) => {
     setConnection(newConnection);
     requestLocationPermission();
 
+    // Listen to FCM Background/Foreground Data payload
+    const pushListener = DeviceEventEmitter.addListener('onPushNotification', (data) => {
+      if (data.type === 'RIDE_REQUEST') {
+        setIncomingRide(data);
+      }
+    });
+
     return () => {
+      pushListener.remove();
       if (locationWatchId.current !== null) Geolocation.clearWatch(locationWatchId.current);
       if (newConnection.state !== signalR.HubConnectionState.Disconnected) newConnection.stop();
     };
@@ -199,12 +208,12 @@ const HomeScreen = ({ navigation }: any) => {
             <View style={styles.incomingBadge}>
               <Text style={styles.incomingBadgeText}>🚀 NEW RIDE REQUEST</Text>
             </View>
-            <Text style={styles.incomingFare}>₹{incomingRide.fare}</Text>
+            <Text style={styles.incomingFare}>₹{incomingRide.totalFare || incomingRide.fare}</Text>
             <Text style={styles.incomingSubtext}>Passenger is nearby and waiting</Text>
-            {incomingRide.pickupLocation && (
+            {(incomingRide.pickupLocationName || incomingRide.pickupLocation) && (
               <View style={styles.routePreview}>
-                <Text style={styles.routePreviewText}>📍 {incomingRide.pickupLocation}</Text>
-                <Text style={[styles.routePreviewText, { color: '#ba1a1a' }]}>🏁 {incomingRide.dropoffLocation || 'Destination'}</Text>
+                <Text style={styles.routePreviewText}>📍 {incomingRide.pickupLocationName || incomingRide.pickupLocation}</Text>
+                <Text style={[styles.routePreviewText, { color: '#ba1a1a' }]}>🏁 {incomingRide.dropoffLocationName || incomingRide.dropoffLocation || 'Destination'}</Text>
               </View>
             )}
             <View style={styles.modalActions}>

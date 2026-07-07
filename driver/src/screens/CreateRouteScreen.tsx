@@ -9,19 +9,26 @@ import {
   Alert, 
   Switch, 
   SafeAreaView,
-  StatusBar
+  StatusBar,
+  PermissionsAndroid,
+  Platform
 } from 'react-native';
 import axiosInstance from '../api/axios';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
+import Geolocation from '@react-native-community/geolocation';
+import { MAPBOX_ACCESS_TOKEN } from '@env';
+
 
 const CreateRouteScreen = ({ navigation }: any) => {
   const [vehicleId, setVehicleId] = useState('00000000-0000-0000-0000-000000000000');
 
-  // Form State
   const [startLoc, setStartLoc] = useState('');
   const [endLoc, setEndLoc] = useState('');
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [activeInput, setActiveInput] = useState<'start'|'end'|null>(null);
+  const [currentLoc, setCurrentLoc] = useState<{lat: number, lng: number} | null>(null);
 
   // Geocoded Coordinates
   const [startCoords, setStartCoords] = useState<{lat: number, lng: number} | null>(null);
@@ -71,7 +78,7 @@ const CreateRouteScreen = ({ navigation }: any) => {
   // Geocode a location name using Mapbox Geocoding API
   const geocodeLocation = async (locationName: string): Promise<{lat: number, lng: number} | null> => {
     try {
-      const { MAPBOX_ACCESS_TOKEN } = require('@env');
+
       const encoded = encodeURIComponent(locationName);
       const res = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?country=in&limit=1&access_token=${MAPBOX_ACCESS_TOKEN}`
@@ -87,6 +94,25 @@ const CreateRouteScreen = ({ navigation }: any) => {
     return null;
   };
 
+  const fetchSuggestions = async (query: string) => {
+    if (query.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    try {
+      const encoded = encodeURIComponent(query);
+      let url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?country=in&limit=5&access_token=${MAPBOX_ACCESS_TOKEN}`;
+      if (currentLoc) {
+        url += `&proximity=${currentLoc.lng},${currentLoc.lat}`;
+      }
+      const res = await fetch(url);
+      const data = await res.json();
+      setSuggestions(data.features || []);
+    } catch (e) {
+      console.error('Autocomplete failed:', e);
+    }
+  };
+
   useEffect(() => {
     const fetchKYC = async () => {
       try {
@@ -99,6 +125,32 @@ const CreateRouteScreen = ({ navigation }: any) => {
       }
     };
     fetchKYC();
+
+    const requestLocation = async () => {
+      try {
+        if (Platform.OS === 'android') {
+          const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            console.log('Location permission denied, using default proximity (Gandhinagar)');
+            setCurrentLoc({ lat: 23.2156, lng: 72.6369 }); // Gandhinagar fallback
+            return;
+          }
+        }
+        Geolocation.getCurrentPosition(
+          (position) => {
+            setCurrentLoc({ lat: position.coords.latitude, lng: position.coords.longitude });
+          },
+          (error) => {
+            console.log('Geolocation error:', error);
+            setCurrentLoc({ lat: 23.2156, lng: 72.6369 }); // Gandhinagar fallback
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+        );
+      } catch (err) {
+        console.warn(err);
+      }
+    };
+    requestLocation();
   }, []);
 
   const toggleDay = (dayId: string) => {
@@ -128,7 +180,14 @@ const CreateRouteScreen = ({ navigation }: any) => {
       }
 
       // Build actual departure time from the dateObj picker value
-      const startTime = new Date(dateObj);
+      let startTime = new Date(dateObj);
+      
+      // If time is in the past (e.g. user left default time when opening screen)
+      // bump it slightly into the future so backend validation passes
+      if (startTime < new Date()) {
+        startTime = new Date(Date.now() + 5 * 60000); 
+      }
+
       const endTime = new Date(startTime);
       endTime.setHours(endTime.getHours() + 2);
 
@@ -181,9 +240,9 @@ const CreateRouteScreen = ({ navigation }: any) => {
         showsVerticalScrollIndicator={false}
       >
         {/* ── 1. Locations Section ── */}
-        <View style={styles.section}>
+        <View style={[styles.section, { zIndex: 1000, elevation: 1000 }]}>
           <Text style={styles.sectionTitle}>Route Points</Text>
-          <View style={styles.locationsCard}>
+          <View style={[styles.locationsCard, { zIndex: 1000 }]}>
             <View style={styles.dashedLine} />
             
             <View style={styles.locationRow}>
@@ -194,9 +253,15 @@ const CreateRouteScreen = ({ navigation }: any) => {
                   placeholder="Enter pickup location (e.g. Mumbai Central)" 
                   placeholderTextColor="#c6c6cd"
                   value={startLoc}
-                  onChangeText={(t) => { setStartLoc(t); setStartCoords(null); }}
+                  onChangeText={(t) => { 
+                    setStartLoc(t); 
+                    setStartCoords(null); 
+                    setActiveInput('start');
+                    fetchSuggestions(t);
+                  }}
+                  onFocus={() => { setActiveInput('start'); setSuggestions([]); }}
                   onBlur={async () => {
-                    if (startLoc) {
+                    if (startLoc && !startCoords) {
                       const c = await geocodeLocation(startLoc);
                       setStartCoords(c);
                     }
@@ -214,9 +279,15 @@ const CreateRouteScreen = ({ navigation }: any) => {
                   placeholder="Enter drop-off location (e.g. Pune Airport)" 
                   placeholderTextColor="#c6c6cd"
                   value={endLoc}
-                  onChangeText={(t) => { setEndLoc(t); setEndCoords(null); }}
+                  onChangeText={(t) => { 
+                    setEndLoc(t); 
+                    setEndCoords(null); 
+                    setActiveInput('end');
+                    fetchSuggestions(t);
+                  }}
+                  onFocus={() => { setActiveInput('end'); setSuggestions([]); }}
                   onBlur={async () => {
-                    if (endLoc) {
+                    if (endLoc && !endCoords) {
                       const c = await geocodeLocation(endLoc);
                       setEndCoords(c);
                     }
@@ -225,10 +296,37 @@ const CreateRouteScreen = ({ navigation }: any) => {
               </View>
             </View>
           </View>
+
+          {/* Autocomplete Dropdown */}
+          {suggestions.length > 0 && activeInput && (
+            <View style={styles.autocompleteDropdown}>
+              {suggestions.map((item, index) => (
+                <TouchableOpacity 
+                  key={index} 
+                  style={styles.suggestionItem}
+                  onPress={() => {
+                    if (activeInput === 'start') {
+                      setStartLoc(item.place_name);
+                      setStartCoords({ lng: item.center[0], lat: item.center[1] });
+                    } else {
+                      setEndLoc(item.place_name);
+                      setEndCoords({ lng: item.center[0], lat: item.center[1] });
+                    }
+                    setSuggestions([]);
+                    setActiveInput(null);
+                  }}
+                >
+                  <Icon name="map-marker-outline" size={16} color="#76777d" style={{ marginRight: 8 }} />
+                  <Text style={styles.suggestionText} numberOfLines={1}>{item.place_name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
         </View>
 
         {/* ── 2. Schedule Section ── */}
-        <View style={styles.section}>
+        <View style={[styles.section, { zIndex: 1, elevation: 1 }]}>
           <Text style={styles.sectionTitle}>Departure Time</Text>
           <View style={styles.scheduleRow}>
             <TouchableOpacity 
@@ -403,16 +501,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0b1c30',
     marginBottom: 12,
+    position: 'relative',
   },
 
   // Locations Card
   locationsCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#c6c6cd',
+    borderColor: 'rgba(198,198,205,0.5)',
     padding: 16,
-    position: 'relative',
   },
   dashedLine: {
     position: 'absolute',
@@ -632,6 +730,35 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  autocompleteDropdown: {
+    position: 'absolute',
+    top: 158, // position it just under the card
+    left: 16,
+    right: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e2e8',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 10,
+    zIndex: 1000,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f1f5',
+  },
+  suggestionText: {
+    fontSize: 14,
+    color: '#000000',
+    flex: 1,
   },
 
 });

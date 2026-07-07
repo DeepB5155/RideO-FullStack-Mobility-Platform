@@ -2,6 +2,7 @@ using FirebaseAdmin;
 using FirebaseAdmin.Messaging;
 using Google.Apis.Auth.OAuth2;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -36,7 +37,7 @@ namespace RideO.API.Services
             }
         }
 
-        public async Task<bool> SendNotificationAsync(string deviceToken, string title, string body)
+        public async Task<bool> SendNotificationAsync(string deviceToken, string title, string body, Dictionary<string, string> data = null)
         {
             if (string.IsNullOrEmpty(deviceToken) || FirebaseApp.DefaultInstance == null)
             {
@@ -51,7 +52,8 @@ namespace RideO.API.Services
                 {
                     Title = title,
                     Body = body
-                }
+                },
+                Data = data
             };
 
             try

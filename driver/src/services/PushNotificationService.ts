@@ -1,5 +1,5 @@
 import messaging from '@react-native-firebase/messaging';
-import { Platform } from 'react-native';
+import { Platform, DeviceEventEmitter } from 'react-native';
 import axiosInstance from '../api/axios';
 
 export class PushNotificationService {
@@ -52,7 +52,9 @@ export class PushNotificationService {
     // Handle foreground messages
     const unsubscribe = messaging().onMessage(async remoteMessage => {
       console.log('A new FCM message arrived in foreground!', JSON.stringify(remoteMessage));
-      // In a real app, you might show an in-app toast or local notification here.
+      if (remoteMessage.data) {
+        DeviceEventEmitter.emit('onPushNotification', remoteMessage.data);
+      }
     });
 
     return unsubscribe;

@@ -41,7 +41,7 @@ const KYCManagement = () => {
   const handleApprove = async () => {
     try {
       const token = localStorage.getItem('adminToken');
-      await axios.post(`${import.meta.env.VITE_API_BASE_URL}/admin/kyc/${selectedDriver.driver.id}/approve`, {}, {
+      await axios.post(`${import.meta.env.VITE_API_BASE_URL}/admin/kyc/${selectedDriver?.driver?.id || selectedDriver?.id}/approve`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSelectedDriver(null);
@@ -54,7 +54,7 @@ const KYCManagement = () => {
   const handleReject = async () => {
     try {
       const token = localStorage.getItem('adminToken');
-      await axios.post(`${import.meta.env.VITE_API_BASE_URL}/admin/kyc/${selectedDriver.driver.id}/reject`, "Invalid documents", {
+      await axios.post(`${import.meta.env.VITE_API_BASE_URL}/admin/kyc/${selectedDriver?.driver?.id || selectedDriver?.id}/reject`, "Invalid documents", {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -93,8 +93,8 @@ const KYCManagement = () => {
             <tbody>
               {pendingDrivers.map((d) => (
                 <tr key={d.id}>
-                  <td><strong>{d.user.fullName}</strong></td>
-                  <td>{d.user.email}</td>
+                  <td><strong>{d.user?.fullName || 'Unknown'}</strong></td>
+                  <td>{d.user?.email || 'N/A'}</td>
                   <td>{d.licenseNumber}</td>
                   <td><span className="badge badge-warning">Pending</span></td>
                   <td>
@@ -120,10 +120,10 @@ const KYCManagement = () => {
             <div>
               <h3 className="section-title">Personal Info</h3>
               <div style={{ color: 'var(--text-main)', marginBottom: '30px' }}>
-                <p><strong>Name:</strong> {selectedDriver.user.fullName}</p>
-                <p><strong>Email:</strong> {selectedDriver.user.email}</p>
-                <p><strong>Phone:</strong> {selectedDriver.user.phoneNumber}</p>
-                <p><strong>License:</strong> {selectedDriver.driver.licenseNumber}</p>
+                <p><strong>Name:</strong> {selectedDriver.user?.fullName || 'Unknown'}</p>
+                <p><strong>Email:</strong> {selectedDriver.user?.email || 'N/A'}</p>
+                <p><strong>Phone:</strong> {selectedDriver.user?.phoneNumber || 'N/A'}</p>
+                <p><strong>License:</strong> {selectedDriver.driver?.licenseNumber || 'N/A'}</p>
               </div>
               
               <h3 className="section-title">Vehicle Info</h3>
@@ -142,14 +142,19 @@ const KYCManagement = () => {
             <div>
               <h3 className="section-title">Documents</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                {selectedDriver.documents.map(doc => (
+                {selectedDriver.documents?.map(doc => (
                   <div key={doc.id} style={{ border: '1px solid var(--surface-border)', padding: '10px', borderRadius: 'var(--radius-md)' }}>
                     <p style={{ margin: '0 0 10px 0', color: 'var(--text-muted)', fontWeight: 'bold' }}>{doc.documentType}</p>
                     <img 
                       src={doc.documentUrl.startsWith('http') ? doc.documentUrl : `${import.meta.env.VITE_API_BASE_URL?.replace('/api', '')}${doc.documentUrl}`} 
                       alt={doc.documentType} 
                       style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--bg-color)' }} 
-                      onError={(e) => { e.target.onerror = null; e.target.src="https://via.placeholder.com/300?text=No+Image+Available" }}
+                      onError={(e) => { 
+                        const fallback = "https://placehold.co/300x200/png?text=No+Image";
+                        if (e.target.src !== fallback) {
+                          e.target.src = fallback;
+                        }
+                      }}
                     />
                   </div>
                 ))}

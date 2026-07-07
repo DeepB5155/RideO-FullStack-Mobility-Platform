@@ -167,7 +167,15 @@ namespace RideO.API.Controllers
             var driverUser = await _context.Users.FindAsync(route.Driver!.UserId);
             if (driverUser?.FcmDeviceToken != null)
             {
-                await _fcmService.SendNotificationAsync(driverUser.FcmDeviceToken, notification.Title, notification.Message);
+                var data = new System.Collections.Generic.Dictionary<string, string>
+                {
+                    { "type", "RIDE_REQUEST" },
+                    { "bookingId", booking.Id.ToString() },
+                    { "totalFare", booking.TotalFare.ToString() },
+                    { "pickupLocationName", booking.PickupLocationName },
+                    { "dropoffLocationName", booking.DropoffLocationName }
+                };
+                await _fcmService.SendNotificationAsync(driverUser.FcmDeviceToken, notification.Title, notification.Message, data);
             }
 
             return Ok(new { message = "Booking requested successfully", booking });
@@ -421,7 +429,10 @@ namespace RideO.API.Controllers
             var userId = GetCurrentUserId();
             if (userId == null) return Unauthorized();
 
-            var booking = await _context.Bookings.Include(b => b.Route).FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
+            var booking = await _context.Bookings
+                .Include(b => b.Route)
+                .ThenInclude(r => r.Driver)
+                .FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
             if (booking == null) return NotFound("Booking not found");
 
             if (booking.Status == "Completed" || booking.Status == "Started" || booking.Status == "Cancelled")
