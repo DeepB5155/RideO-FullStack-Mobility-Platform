@@ -28,6 +28,9 @@ namespace RideO.API.Models
 
         public bool IsVerified { get; set; } = false; // KYC status
 
+        [MaxLength(1000)]
+        public string? KycRejectionReason { get; set; }
+
         [Column(TypeName = "decimal(18,2)")]
         public decimal Balance { get; set; } = 0.0m; // Driver wallet
         

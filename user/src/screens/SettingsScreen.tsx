@@ -22,7 +22,28 @@ const localColors = {
 };
 
 const SettingsScreen = ({ navigation }: any) => {
-  const { logout } = useContext(AuthContext);
+  const { user, logout } = useContext(AuthContext);
+
+  const handleDeleteAccount = async () => {
+    Alert.alert('Delete Account', 'Are you sure you want to permanently delete your account? This action cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await axiosInstance.delete('/auth/account');
+            if (logout) {
+              await logout();
+            } else {
+              await AsyncStorage.removeItem('userToken');
+              navigation.replace('Login');
+            }
+          } catch (error) {
+            console.error('Failed to delete account', error);
+            Alert.alert('Error', 'Failed to delete account. Please try again later.');
+          }
+        }
+      },
+    ]);
+  };
 
   const handleLogout = async () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -72,19 +93,24 @@ const SettingsScreen = ({ navigation }: any) => {
         {/* User Profile Summary Card */}
         <View style={styles.profileCard}>
           <View style={styles.avatarWrap}>
-            <Image 
-              source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCH2nCrLXxBUfOhTiq3FjfmKi_NcJlaK3ea7NFsLpn7cyxRyJ9Qbpx0FhgfQ5TY5TM1GKlzZPGXk5dKJ0npJoXuXpDsOv0bh5DnEkzCLcwjQOdV9fG607gYKS1V2GQLWD5CLVRES5tNf3AH5-sQyc7y7yMJwY7WtqWN7nf8kx1lpf-9Hx6bpBVpm6gzsJDUUnokxOAdumOsos19KSS8MExdrrrN-KfZOz5FftBpg9g3nIkgeHX4Z5uY-Fimj1t0eHZCD_JPnj_VFSDt' }} 
-              style={styles.avatarImage} 
-            />
+            {user?.profilePicture ? (
+              <Image source={{ uri: user.profilePicture }} style={styles.avatarImage} />
+            ) : (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#e5eeff' }}>
+                <Text style={{ fontSize: 24, fontWeight: 'bold', color: localColors.secondary }}>
+                  {user?.name ? user.name.substring(0, 2).toUpperCase() : 'U'}
+                </Text>
+              </View>
+            )}
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Alex Mercer</Text>
-            <Text style={styles.profilePhone}>+1 (555) 019-2834</Text>
+            <Text style={styles.profileName}>{user?.name || 'User'}</Text>
+            {user?.phoneNumber && <Text style={styles.profilePhone}>{user.phoneNumber}</Text>}
             <View style={styles.proBadge}>
-              <Text style={styles.proBadgeText}>RIDER PRO</Text>
+              <Text style={styles.proBadgeText}>{user?.role === 'User' ? 'RIDER PRO' : user?.role?.toUpperCase()}</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.editBtn}>
+          <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('ProfileInformation')}>
             <MaterialIcons name="edit" size={24} color={localColors.primary} />
           </TouchableOpacity>
         </View>
@@ -95,9 +121,9 @@ const SettingsScreen = ({ navigation }: any) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>ACCOUNT</Text>
             <View style={styles.sectionBox}>
-              <SettingItem icon="person" title="Profile Information" />
-              <SettingItem icon="lock" title="Security" />
-              <SettingItem icon="payments" title="Payment Methods" showBorder={false} onPress={() => navigation.navigate('Payment')} />
+              <SettingItem icon="person" title="Profile Information" onPress={() => navigation.navigate('ProfileInformation')} />
+              <SettingItem icon="lock" title="Security" onPress={() => navigation.navigate('Security')} />
+              <SettingItem icon="payments" title="Payment Methods" showBorder={false} onPress={() => navigation.navigate('PaymentMethods')} />
             </View>
           </View>
 
@@ -128,7 +154,7 @@ const SettingsScreen = ({ navigation }: any) => {
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <Text style={styles.logoutBtnText}>Log Out</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.deleteBtn}>
+          <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteAccount}>
             <Text style={styles.deleteBtnText}>Delete Account</Text>
           </TouchableOpacity>
         </View>

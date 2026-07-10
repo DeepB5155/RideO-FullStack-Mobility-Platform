@@ -101,7 +101,7 @@ const Bookings = () => {
                         </thead>
                         <tbody>
                             {bookings.map(booking => (
-                                <tr key={booking.id} style={{ backgroundColor: booking.status === 'Cancelled' ? '#fef2f2' : 'transparent' }}>
+                                <tr key={booking.id} style={{ backgroundColor: booking.status === 'Cancelled' ? 'rgba(239, 68, 68, 0.1)' : 'transparent' }}>
                                     <td><strong>{booking.user.fullName}</strong></td>
                                     <td style={{ fontSize: '13px' }}>{booking.route.startLocation.split(',')[0]} &rarr; {booking.route.endLocation.split(',')[0]}</td>
                                     <td>{booking.seatsBooked}</td>
@@ -137,14 +137,14 @@ const Bookings = () => {
                             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                 
                                 {/* Header Info */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '15px', backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155' }}>
                                     <div>
                                         <h3 style={{ margin: '0 0 5px 0', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <User size={18} color="#3b82f6" /> {bookingDetails.booking.user.fullName}
                                         </h3>
-                                        <p style={{ margin: '0 0 5px 0', color: '#475569' }}><strong>Email:</strong> {bookingDetails.booking.user.email}</p>
-                                        <p style={{ margin: '0 0 5px 0', color: '#475569' }}><strong>Seats Booked:</strong> {bookingDetails.booking.seatsBooked}</p>
-                                        <p style={{ margin: '0', color: '#475569' }}><strong>Booked On:</strong> {new Date(bookingDetails.booking.bookedAt).toLocaleString()}</p>
+                                        <p style={{ margin: '0 0 5px 0', color: '#94a3b8' }}><strong>Email:</strong> {bookingDetails.booking.user.email}</p>
+                                        <p style={{ margin: '0 0 5px 0', color: '#94a3b8' }}><strong>Seats Booked:</strong> {bookingDetails.booking.seatsBooked}</p>
+                                        <p style={{ margin: '0', color: '#94a3b8' }}><strong>Booked On:</strong> {new Date(bookingDetails.booking.bookedAt).toLocaleString()}</p>
                                     </div>
                                     <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
                                         <span className={`status-badge ${bookingDetails.booking.status.toLowerCase()}`} style={{ fontSize: '14px', padding: '6px 12px' }}>
@@ -157,9 +157,9 @@ const Bookings = () => {
                                 </div>
 
                                 {/* Route Info */}
-                                <div style={{ padding: '15px', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                                <div style={{ padding: '15px', border: '1px solid #334155', borderRadius: '8px' }}>
                                     <h4 style={{ margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '8px' }}><MapPin size={18} color="#10b981" /> Route Information</h4>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', color: '#475569', fontSize: '14px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', color: '#94a3b8', fontSize: '14px' }}>
                                         <div>
                                             <p style={{ margin: '0 0 5px 0' }}><strong>Driver:</strong> {bookingDetails.booking.route.driver.user.fullName}</p>
                                             <p style={{ margin: '0 0 5px 0' }}><strong>Route Status:</strong> <span className={`status-badge ${bookingDetails.booking.route.status.toLowerCase()}`} style={{ fontSize: '11px' }}>{bookingDetails.booking.route.status}</span></p>
@@ -172,10 +172,10 @@ const Bookings = () => {
                                 </div>
 
                                 {/* Payment Info */}
-                                <div style={{ padding: '15px', border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: bookingDetails.payment ? '#f0fdf4' : '#f8fafc' }}>
+                                <div style={{ padding: '15px', border: '1px solid #334155', borderRadius: '8px', backgroundColor: bookingDetails.payment ? 'rgba(16, 185, 129, 0.1)' : 'transparent' }}>
                                     <h4 style={{ margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '8px' }}><CreditCard size={18} color={bookingDetails.payment ? "#10b981" : "#64748b"} /> Payment Information</h4>
                                     {bookingDetails.payment ? (
-                                        <div style={{ color: '#475569', fontSize: '14px' }}>
+                                        <div style={{ color: '#94a3b8', fontSize: '14px' }}>
                                             <p style={{ margin: '0 0 5px 0' }}><strong>Transaction ID:</strong> {bookingDetails.payment.transactionId}</p>
                                             <p style={{ margin: '0 0 5px 0' }}><strong>Amount:</strong> ${bookingDetails.payment.amount.toFixed(2)}</p>
                                             <p style={{ margin: '0 0 5px 0' }}><strong>Method:</strong> {bookingDetails.payment.paymentMethod}</p>

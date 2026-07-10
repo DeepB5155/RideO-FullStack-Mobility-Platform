@@ -51,8 +51,16 @@ namespace RideO.API.Models
         [MaxLength(20)]
         public string Status { get; set; } = "Pending"; // Pending, Approved, Rejected, Cancelled, Started, Completed, No-show
 
+        [MaxLength(10)]
+        public string? Otp { get; set; }
+
         public DateTime BookedAt { get; set; } = DateTime.UtcNow;
 
         public Guid? TrackingId { get; set; }
+
+        public string? CancellationReason { get; set; }
+        
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal CancellationFee { get; set; } = 0.0m;
     }
 }

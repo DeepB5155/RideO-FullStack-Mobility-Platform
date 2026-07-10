@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert, Image, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert, Image, SafeAreaView, ScrollView, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import api from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
@@ -32,6 +32,12 @@ const WalletScreen = ({ navigation }: any) => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalType, setModalType] = useState<'add' | 'withdraw'>('add');
+  const [amount, setAmount] = useState('');
+  const [processing, setProcessing] = useState(false);
+
   useEffect(() => {
     fetchWalletData();
   }, []);
@@ -51,13 +57,35 @@ const WalletScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleQuickAdd = async (amount: number) => {
+  const handleOpenModal = (type: 'add' | 'withdraw', defaultAmount: string = '') => {
+    setModalType(type);
+    setAmount(defaultAmount);
+    setModalVisible(true);
+  };
+
+  const handleTransaction = async () => {
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0.');
+      return;
+    }
+
     try {
-      const res = await api.post('/wallet/add-funds', { amount: amount, upiId: 'quick@upi' });
-      Alert.alert('Success', `Successfully added ₹${amount} to your wallet.`);
-      fetchWalletData(); // Refresh
-    } catch (err) {
-      Alert.alert('Error', 'Failed to add funds.');
+      setProcessing(true);
+      if (modalType === 'add') {
+        await api.post('/wallet/add-funds', { amount: numAmount, upiId: 'custom@upi' });
+        Alert.alert('Success', `Successfully added ₹${numAmount} to your wallet.`);
+      } else {
+        await api.post('/wallet/withdraw', { amount: numAmount });
+        Alert.alert('Success', `Successfully withdrew ₹${numAmount} from your wallet.`);
+      }
+      setModalVisible(false);
+      setAmount('');
+      fetchWalletData();
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data || `Failed to ${modalType} funds.`);
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -100,35 +128,8 @@ const WalletScreen = ({ navigation }: any) => {
     );
   };
 
-  // Mock Data Fallback
-  const displayTransactions = transactions.length > 0 ? transactions : [
-    { id: '1', type: 'Ride to Airport', amount: -24.50, createdAt: new Date(Date.now() - 3600000).toISOString() },
-    { id: '2', type: 'Added Funds', amount: 50.00, createdAt: new Date(Date.now() - 86400000).toISOString() },
-    { id: '3', type: 'Ride to Downtown', amount: -12.00, createdAt: new Date(Date.now() - 172800000).toISOString() }
-  ];
-  
-  const displayBalance = balance > 0 || transactions.length > 0 ? balance : 124.50;
-
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <SafeAreaView style={styles.headerSafe}>
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-              <MaterialIcons name="arrow-back" size={24} color={localColors.primary} />
-            </TouchableOpacity>
-            <Text style={styles.logoText}>RideO</Text>
-          </View>
-          <TouchableOpacity style={styles.profileBtn}>
-            <Image 
-              source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA_0okcLb4rbu2IWDksHWyQJYwQBDNGjKJXKdQLu2MhZUK8xpc58Mjgn-QMoKM_DapVHPRqet4uITqHqMho5Br8peoPhj6bKL08iZ_6KzGZpTwYFc8bK2fSDouJzXnbbdT2wOuT2MNWQwJTGLcDJkaDitMttlo0iXAdyO1oGbfrdm9NPi1YLuHhAeOmluoooBuLPpqZeK6t-Q-O1IItQMIAYFWwieyxUx3T8kn8QcfJdEa8Nht4RyeReV-2ahE7upDUO9wShjDZT1gw' }} 
-              style={styles.avatar} 
-            />
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={localColors.primary} />
@@ -144,15 +145,15 @@ const WalletScreen = ({ navigation }: any) => {
               <Text style={styles.balanceLabel}>Current Balance</Text>
               <View style={styles.balanceRow}>
                 <Text style={styles.currencySymbol}>₹</Text>
-                <Text style={styles.balanceAmount}>{displayBalance.toFixed(2)}</Text>
+                <Text style={styles.balanceAmount}>{balance.toFixed(2)}</Text>
               </View>
             </View>
             <View style={styles.cardActions}>
-              <TouchableOpacity style={styles.btnPrimary} onPress={() => handleQuickAdd(20)}>
+              <TouchableOpacity style={styles.btnPrimary} onPress={() => handleOpenModal('add')}>
                 <Text style={styles.btnPrimaryText}>Add Funds</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.btnOutline}>
-                <Text style={styles.btnOutlineText}>Send</Text>
+              <TouchableOpacity style={styles.btnOutline} onPress={() => handleOpenModal('withdraw')}>
+                <Text style={styles.btnOutlineText}>Withdraw</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -161,19 +162,19 @@ const WalletScreen = ({ navigation }: any) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Quick Add</Text>
             <View style={styles.quickAddGrid}>
-              <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleQuickAdd(20)}>
+              <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleOpenModal('add', '20')}>
                 <Text style={styles.quickAddText}>₹20</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleQuickAdd(50)}>
+              <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleOpenModal('add', '50')}>
                 <Text style={styles.quickAddText}>₹50</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleQuickAdd(100)}>
+              <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleOpenModal('add', '100')}>
                 <Text style={styles.quickAddText}>₹100</Text>
               </TouchableOpacity>
             </View>
 
             <Text style={styles.labelSmall}>Payment Method</Text>
-            <TouchableOpacity style={styles.paymentMethodBtn}>
+            <TouchableOpacity style={styles.paymentMethodBtn} onPress={() => navigation.navigate('PaymentMethods')}>
               <View style={styles.paymentMethodLeft}>
                 <MaterialIcons name="account-balance" size={20} color={localColors.primary} />
                 <Text style={styles.paymentMethodText}>UPI (Google Pay)</Text>
@@ -192,17 +193,59 @@ const WalletScreen = ({ navigation }: any) => {
             </View>
 
             <View style={styles.txListContainer}>
-              {displayTransactions.map((item: any, index: number) => (
-                <View key={item.id}>
-                  {renderTransaction({ item })}
-                  {index < displayTransactions.length - 1 && <View style={styles.divider} />}
+              {transactions.length > 0 ? (
+                transactions.map((item: any, index: number) => (
+                  <View key={item.id}>
+                    {renderTransaction({ item })}
+                    {index < transactions.length - 1 && <View style={styles.divider} />}
+                  </View>
+                ))
+              ) : (
+                <View style={{ padding: 32, alignItems: 'center' }}>
+                  <MaterialIcons name="receipt-long" size={48} color={localColors.outlineVariant} />
+                  <Text style={{ marginTop: 16, fontSize: 16, color: localColors.onSurfaceVariant, fontWeight: '500' }}>No transactions yet</Text>
                 </View>
-              ))}
+              )}
             </View>
           </View>
 
         </ScrollView>
       )}
+
+      {/* Transaction Modal */}
+      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{modalType === 'add' ? 'Add Funds' : 'Withdraw Funds'}</Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <MaterialIcons name="close" size={24} color={localColors.onSurface} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.modalLabel}>Enter Amount (₹)</Text>
+              <TextInput
+                style={styles.modalInput}
+                keyboardType="numeric"
+                value={amount}
+                onChangeText={setAmount}
+                placeholder="0.00"
+                placeholderTextColor={localColors.outlineVariant}
+                autoFocus
+              />
+
+              <TouchableOpacity 
+                style={[styles.modalSubmitBtn, processing && { opacity: 0.7 }]} 
+                onPress={handleTransaction}
+                disabled={processing}
+              >
+                {processing ? <ActivityIndicator color={localColors.surface} /> : <Text style={styles.modalSubmitText}>{modalType === 'add' ? 'Proceed to Pay' : 'Confirm Withdrawal'}</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 };
@@ -445,6 +488,56 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: localColors.outlineVariant,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: localColors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: localColors.onSurface,
+  },
+  modalLabel: {
+    fontSize: 14,
+    color: localColors.onSurfaceVariant,
+    marginBottom: 8,
+  },
+  modalInput: {
+    backgroundColor: localColors.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: localColors.outlineVariant,
+    borderRadius: 12,
+    fontSize: 24,
+    fontWeight: '600',
+    color: localColors.onSurface,
+    padding: 16,
+    marginBottom: 24,
+  },
+  modalSubmitBtn: {
+    backgroundColor: localColors.primary,
+    borderRadius: 24,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  modalSubmitText: {
+    color: localColors.surface,
+    fontSize: 16,
+    fontWeight: '600',
   }
 });
 

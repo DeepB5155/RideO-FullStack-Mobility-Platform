@@ -68,17 +68,6 @@ const ProfileScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* Mobile Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.headerBtn}>
-            <MaterialIcon name="menu" size={24} color="#000000" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>RideO</Text>
-          <View style={styles.headerAvatar}>
-            <Text style={styles.headerAvatarText}>{initials}</Text>
-          </View>
-        </View>
-
         <View style={styles.container}>
           {/* Profile Info */}
           <View style={styles.profileSection}>
@@ -145,6 +134,24 @@ const ProfileScreen = () => {
               </View>
             </TouchableOpacity>
           </View>
+
+          {/* Leaderboard Action */}
+          <TouchableOpacity 
+            style={styles.leaderboardBtn} 
+            onPress={() => navigation.navigate('Leaderboard')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.leaderboardContent}>
+              <View style={styles.iconBoxGold}>
+                <MaterialIcon name="emoji-events" size={24} color="#b45309" />
+              </View>
+              <View style={styles.leaderboardTextCont}>
+                <Text style={styles.leaderboardTitle}>🏆 Driver Leaderboard</Text>
+                <Text style={styles.leaderboardSub}>See top drivers in your city</Text>
+              </View>
+            </View>
+            <MaterialIcon name="arrow-forward" size={24} color="#76777d" />
+          </TouchableOpacity>
 
           {/* Vehicle Details */}
           <View style={styles.vehicleCard}>
@@ -356,8 +363,8 @@ const styles = StyleSheet.create({
   },
   kycSubtitle: {
     fontSize: 12,
-    color: '#45464d',
-    marginTop: 2,
+    color: '#000000',
+    marginTop: 4,
   },
   kycDetailsBtn: {
     paddingHorizontal: 12,
@@ -411,6 +418,47 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: '#0b1c30',
+  },
+
+  leaderboardBtn: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  leaderboardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconBoxGold: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#fef3c7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  leaderboardTextCont: {
+    justifyContent: 'center',
+  },
+  leaderboardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  leaderboardSub: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginTop: 2,
   },
 
   // Vehicle Details

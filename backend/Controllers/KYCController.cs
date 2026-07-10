@@ -53,6 +53,8 @@ namespace RideO.API.Controllers
             public string LicenseFrontUrl { get; set; } = string.Empty;
             public string LicenseBackUrl { get; set; } = string.Empty;
             public string RCUrl { get; set; } = string.Empty;
+            public string VehicleImageUrl { get; set; } = string.Empty;
+            public string DriverFaceUrl { get; set; } = string.Empty;
             public string LicenseNumber { get; set; } = string.Empty;
             public string PhoneNumber { get; set; } = string.Empty;
             
@@ -98,6 +100,7 @@ namespace RideO.API.Controllers
             {
                 driver.LicenseNumber = request.LicenseNumber;
                 driver.IsVerified = false; // Reset verification on new submission
+                driver.KycRejectionReason = null; // Clear rejection reason
             }
 
             // Ensure Vehicle record exists
@@ -137,7 +140,9 @@ namespace RideO.API.Controllers
             _context.DriverDocuments.AddRange(
                 new DriverDocument { DriverId = driver.Id, DocumentType = "LicenseFront", DocumentUrl = request.LicenseFrontUrl },
                 new DriverDocument { DriverId = driver.Id, DocumentType = "LicenseBack", DocumentUrl = request.LicenseBackUrl },
-                new DriverDocument { DriverId = driver.Id, DocumentType = "RC", DocumentUrl = request.RCUrl }
+                new DriverDocument { DriverId = driver.Id, DocumentType = "RC", DocumentUrl = request.RCUrl },
+                new DriverDocument { DriverId = driver.Id, DocumentType = "VehicleImage", DocumentUrl = request.VehicleImageUrl },
+                new DriverDocument { DriverId = driver.Id, DocumentType = "DriverFace", DocumentUrl = request.DriverFaceUrl }
             );
 
             await _context.SaveChangesAsync();
@@ -166,7 +171,7 @@ namespace RideO.API.Controllers
                 return Ok(new { status = "Approved", isVerified = true, vehicleId, licenseNumber = driver.LicenseNumber });
 
             if (documents.Any(d => d.Status == "Rejected"))
-                return Ok(new { status = "Rejected", isVerified = false, vehicleId, licenseNumber = driver.LicenseNumber });
+                return Ok(new { status = "Rejected", isVerified = false, vehicleId, licenseNumber = driver.LicenseNumber, rejectionReason = driver.KycRejectionReason });
 
             return Ok(new { status = "Pending", isVerified = false, vehicleId, licenseNumber = driver.LicenseNumber });
         }

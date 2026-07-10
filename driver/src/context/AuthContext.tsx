@@ -10,6 +10,7 @@ export interface User {
   email: string;
   phoneNumber: string;
   role: string;
+  isVerified: boolean;
 }
 
 interface AuthContextData {
@@ -17,6 +18,7 @@ interface AuthContextData {
   isLoading: boolean;
   login: (token: string, userData: User) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (data: Partial<User>) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -68,8 +70,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateUser = async (data: Partial<User>) => {
+    if (!user) return;
+    const updated = { ...user, ...data };
+    setUser(updated);
+    await AsyncStorage.setItem('userData', JSON.stringify(updated));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

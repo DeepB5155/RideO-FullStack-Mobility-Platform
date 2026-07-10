@@ -46,6 +46,11 @@ const RegisterScreen = ({ navigation }: any) => {
       return;
     }
 
+    if (password.length < 6) {
+      Alert.alert('Validation Error', 'Password must be at least 6 characters.');
+      return;
+    }
+
     setLoading(true);
     try {
       await api.post('/auth/register', { 

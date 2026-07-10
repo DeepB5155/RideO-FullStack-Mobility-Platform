@@ -56,6 +56,15 @@ const SupportScreen = ({ navigation }: any) => {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <TouchableOpacity 
+            style={styles.historyBtn} 
+            onPress={() => navigation.navigate('MyComplaints')}
+          >
+            <Icon name="history" size={24} color="#000000" style={{ marginRight: 12 }} />
+            <Text style={styles.historyBtnText}>View My Ticket History</Text>
+            <Icon name="chevron-right" size={24} color="#76777d" style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
+
           <View style={styles.sheet}>
             <View style={styles.sheetHeader}>
               <Icon name="help-circle-outline" size={32} color="#000000" style={styles.helpIcon} />
@@ -177,6 +186,26 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 24,
     paddingBottom: 40,
+  },
+  historyBtn: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    borderRadius: 24,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  historyBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000000',
   },
   sheet: {
     backgroundColor: '#f8f9ff',

@@ -44,11 +44,26 @@ const LoginScreen = ({ navigation }: any) => {
       return;
     }
 
+    if (!isForgotPassword && password.length < 6) {
+      Alert.alert('Validation Error', 'Password must be at least 6 characters.');
+      return;
+    }
+
     setLoading(true);
     try {
       if (isForgotPassword) {
         const response = await api.post('/auth/forgot-password', { email });
-        Alert.alert('Reset Link Sent', response.data.message);
+        
+        if (response.data.debug_token) {
+          Alert.alert(
+            'Reset Link Sent', 
+            `Your debug token is: ${response.data.debug_token}\n\nUse this to test the reset password flow.`,
+            [{ text: 'OK', onPress: () => navigation.navigate('ResetPassword') }]
+          );
+        } else {
+          Alert.alert('Reset Link Sent', response.data.message);
+        }
+        
         setIsForgotPassword(false);
         return;
       }

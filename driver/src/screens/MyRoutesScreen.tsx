@@ -10,10 +10,13 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Image,
-  StatusBar
+  StatusBar,
+  Modal,
+  Platform
 } from 'react-native';
 import axiosInstance from '../api/axios';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 type RouteStatus = 'Draft' | 'Published' | 'Started' | 'Completed' | 'Cancelled';
 
@@ -21,6 +24,13 @@ const MyRoutesScreen = ({ navigation }: any) => {
   const [routes, setRoutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'All' | 'Active'>('All');
+  
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [optionsModalVisible, setOptionsModalVisible] = useState(false);
+  const [selectedRoute, setSelectedRoute] = useState<any>(null);
+  const [selectedRouteForCancel, setSelectedRouteForCancel] = useState<string | null>(null);
+  const [cancelDate, setCancelDate] = useState(new Date());
+  const [showPicker, setShowPicker] = useState(false);
 
   const fetchRoutes = async () => {
     try {
@@ -50,6 +60,19 @@ const MyRoutesScreen = ({ navigation }: any) => {
     }
   };
 
+  const handleCancelDay = async () => {
+    if (!selectedRouteForCancel) return;
+    try {
+      const dateStr = cancelDate.toISOString().split('T')[0];
+      await axiosInstance.post(`/route/${selectedRouteForCancel}/cancel-day`, { date: dateStr });
+      Alert.alert('Success', `Ride on ${dateStr} cancelled.`);
+      setCancelModalVisible(false);
+      fetchRoutes();
+    } catch (e: any) {
+      Alert.alert('Error', e.response?.data || 'Failed to cancel specific day');
+    }
+  };
+
   const filteredRoutes = routes.filter(r => {
     if (filter === 'Active') return r.status === 'Started' || r.status === 'Published';
     return true;
@@ -61,8 +84,9 @@ const MyRoutesScreen = ({ navigation }: any) => {
     const isStarted = status === 'Started';
     const isPublished = status === 'Published';
     
-    const seatsBooked = (item.totalSeats || 0) - (item.availableSeats || 0);
-    const isFull = seatsBooked >= (item.totalSeats || 0);
+    const totalSeats = item.vehicle?.totalSeats || item.totalSeats || 0;
+    const seatsBooked = totalSeats - (item.availableSeats || 0);
+    const isFull = seatsBooked >= totalSeats;
 
     // Format times
     const startTime = new Date(item.startTime);
@@ -79,18 +103,8 @@ const MyRoutesScreen = ({ navigation }: any) => {
         activeOpacity={0.9}
         onPress={() => {
           if (isPublished || isStarted) {
-            Alert.alert(
-              'Manage Route',
-              'What would you like to do?',
-              [
-                isPublished ? { text: 'Start Ride', onPress: () => {
-                    updateStatus(item.id, 'Started');
-                    navigation.navigate('Active Ride', { routeId: item.id, startLoc: item.startLocation, endLoc: item.endLocation });
-                }} : { text: 'Complete Ride', onPress: () => updateStatus(item.id, 'Completed') },
-                { text: 'View Passengers', onPress: () => navigation.navigate('Route Bookings', { routeId: item.id }) },
-                { text: 'Cancel', style: 'cancel' }
-              ]
-            );
+            setSelectedRoute(item);
+            setOptionsModalVisible(true);
           }
         }}
       >
@@ -116,6 +130,9 @@ const MyRoutesScreen = ({ navigation }: any) => {
           )}
 
           <View style={styles.cardTopRight}>
+            {(item.isRecurring || item.IsRecurring) && (
+              <Text style={{ fontSize: 10, color: '#006a61', fontWeight: 'bold', marginBottom: 2 }}>WEEKLY TEMPLATE</Text>
+            )}
             <Text style={[styles.cardDate, isCompleted && styles.textCompleted]}>{dateString}</Text>
             {isStarted ? (
               <Text style={styles.etaText}>ACTIVE NOW</Text>
@@ -139,11 +156,18 @@ const MyRoutesScreen = ({ navigation }: any) => {
           </View>
         </View>
 
+        {/* ── Passenger Details ── */}
+        <View style={styles.passengerBreakdown}>
+           <Text style={styles.breakdownText}>Subscribers: <Text style={{fontWeight:'700', color: '#0b1c30'}}>{item.subscribersCount || 0}</Text></Text>
+           <Text style={styles.breakdownText}>One-Time: <Text style={{fontWeight:'700', color: '#0b1c30'}}>{item.oneTimeBookingsCount || 0}</Text></Text>
+           <Text style={styles.breakdownText}>Empty Seats: <Text style={{fontWeight:'700', color: '#0b1c30'}}>{item.availableSeats || 0}</Text></Text>
+        </View>
+
         {/* ── Bottom Row ── */}
         <View style={[styles.cardBottomRow, isCompleted && { opacity: 0.7 }]}>
           <View style={styles.paxInfo}>
             <Icon name="account-group-outline" size={16} color="#45464d" />
-            <Text style={styles.paxText}>{seatsBooked}/{item.totalSeats} {isFull && 'Full'}</Text>
+            <Text style={styles.paxText}>{seatsBooked}/{totalSeats} {isFull && 'Full'}</Text>
           </View>
           <Text style={[styles.priceText, isCompleted && { textDecorationLine: 'line-through', opacity: 0.7 }]}>
             ₹{item.pricePerSeat}
@@ -157,17 +181,6 @@ const MyRoutesScreen = ({ navigation }: any) => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#f8f9ff" />
       
-      {/* ── Top App Bar ── */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.headerIconBtn} onPress={() => navigation.openDrawer && navigation.openDrawer()}>
-          <Icon name="menu" size={24} color="#0b1c30" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>RideO</Text>
-        <TouchableOpacity style={styles.headerProfileBtn} onPress={() => navigation.navigate('Profile')}>
-          <Icon name="account-outline" size={20} color="#45464d" />
-        </TouchableOpacity>
-      </View>
-
       {/* ── Page Title & Filters ── */}
       <View style={styles.titleSection}>
         <Text style={styles.pageTitle}>My Routes</Text>
@@ -210,6 +223,121 @@ const MyRoutesScreen = ({ navigation }: any) => {
       >
         <Icon name="plus" size={28} color="#fff" />
       </TouchableOpacity>
+
+      {/* ── Options Modal ── */}
+      <Modal
+        visible={optionsModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setOptionsModalVisible(false)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setOptionsModalVisible(false)}>
+          <View style={styles.optionsModalContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.modalTitle}>Manage Route</Text>
+            
+            <TouchableOpacity 
+              style={styles.optionBtn}
+              onPress={() => {
+                setOptionsModalVisible(false);
+                navigation.navigate('Route Bookings', { routeId: selectedRoute?.id, routeItem: selectedRoute });
+              }}
+            >
+              <Icon name="account-group" size={24} color="#0b1c30" />
+              <Text style={styles.optionBtnText}>View Passengers</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.optionBtn}
+              onPress={() => {
+                setOptionsModalVisible(false);
+                setSelectedRouteForCancel(selectedRoute?.id);
+                setCancelDate(new Date());
+                setCancelModalVisible(true);
+              }}
+            >
+              <Icon name="calendar-remove" size={24} color="#ff4c4c" />
+              <Text style={[styles.optionBtnText, { color: '#ff4c4c' }]}>Cancel Specific Day</Text>
+            </TouchableOpacity>
+
+            {(!selectedRoute?.isRecurring && !selectedRoute?.IsRecurring) && (
+              <TouchableOpacity 
+                style={styles.optionBtn}
+                onPress={() => {
+                  setOptionsModalVisible(false);
+                  if (selectedRoute?.status === 'Published') {
+                    const rideStart = new Date(selectedRoute.startTime);
+                    const now = new Date();
+                    const diffHours = (rideStart.getTime() - now.getTime()) / (1000 * 60 * 60);
+                    
+                    if (diffHours > 3) {
+                      Alert.alert('Too Early', 'You cannot start a ride more than 3 hours before its scheduled start time.');
+                      return;
+                    }
+
+                    updateStatus(selectedRoute?.id, 'Started');
+                    navigation.navigate('Active Ride', { routeId: selectedRoute?.id, startLoc: selectedRoute?.startLocation, endLoc: selectedRoute?.endLocation });
+                  } else {
+                    updateStatus(selectedRoute?.id, 'Completed');
+                  }
+                }}
+              >
+                <Icon name="play-circle-outline" size={24} color="#006a61" />
+                <Text style={[styles.optionBtnText, { color: '#006a61' }]}>
+                  {selectedRoute?.status === 'Published' ? 'Start Ride' : 'Complete Ride'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setOptionsModalVisible(false)}>
+              <Text style={styles.modalBtnCancelText}>Dismiss</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Cancel Day Modal ── */}
+      <Modal
+        visible={cancelModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setCancelModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Cancel Specific Day</Text>
+            <Text style={styles.modalSubtitle}>Subscribers will be notified and suggested alternative rides.</Text>
+            
+            <TouchableOpacity 
+              style={styles.datePickerBtn}
+              onPress={() => setShowPicker(true)}
+            >
+              <Icon name="calendar" size={24} color="#006a61" />
+              <Text style={styles.datePickerText}>{cancelDate.toISOString().split('T')[0]}</Text>
+            </TouchableOpacity>
+
+            {showPicker && (
+              <DateTimePicker
+                value={cancelDate}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowPicker(Platform.OS === 'ios');
+                  if (selectedDate) setCancelDate(selectedDate);
+                }}
+              />
+            )}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setCancelModalVisible(false)}>
+                <Text style={styles.modalBtnCancelText}>Go Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalBtnConfirm} onPress={handleCancelDay}>
+                <Text style={styles.modalBtnConfirmText}>Confirm Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
     </SafeAreaView>
   );
@@ -417,6 +545,18 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#0b1c30',
   },
+  passengerBreakdown: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8f9ff',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  breakdownText: {
+    fontSize: 12,
+    color: '#45464d',
+  },
 
   // Bottom Row
   cardBottomRow: {
@@ -434,14 +574,110 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   paxText: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#45464d',
+    marginLeft: 4,
   },
   priceText: {
-    fontSize: 18,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#006a61',
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  optionsModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '90%',
+  },
+  optionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f3fa',
+  },
+  optionBtnText: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#000',
+    color: '#0b1c30',
+    marginLeft: 16,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0b1c30',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#45464d',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  datePickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9ff',
+    borderWidth: 1,
+    borderColor: '#e5e7f0',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 24,
+    width: '100%',
+  },
+  datePickerText: {
+    fontSize: 16,
+    color: '#0b1c30',
+    marginLeft: 12,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalBtnCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: '#f1f3fa',
+    marginRight: 8,
+    alignItems: 'center',
+  },
+  modalBtnCancelText: {
+    color: '#45464d',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  modalBtnConfirm: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: '#ff4c4c',
+    marginLeft: 8,
+    alignItems: 'center',
+  },
+  modalBtnConfirmText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
   },
 
   // FAB

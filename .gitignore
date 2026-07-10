@@ -38,3 +38,9 @@ Thumbs.db
 # Temp / Artifacts
 tmp/
 .gemini/
+
+# Secrets
+firebase-admin-sdk.json
+*.bundle
+*.db
+

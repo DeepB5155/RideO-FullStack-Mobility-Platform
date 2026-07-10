@@ -41,6 +41,13 @@ const SupportScreen = ({ navigation }: any) => {
           <View style={{ width: 50 }} />
         </View>
 
+        <TouchableOpacity 
+          style={styles.historyBtn} 
+          onPress={() => navigation.navigate('MyComplaints')}
+        >
+          <Text style={styles.historyBtnText}>View My Ticket History</Text>
+        </TouchableOpacity>
+
         <View style={styles.card}>
           <Text style={styles.title}>Submit a Complaint</Text>
           <Text style={styles.instruction}>
@@ -89,8 +96,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: theme.spacing.xl,
-    marginTop: theme.spacing.md,
+    marginTop: 16,
+    borderRadius: 8,
   },
+  historyBtn: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: theme.colors.surface,
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  historyBtnText: {
+    color: theme.colors.primary,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  btnText: { fontSize: 16, color: theme.colors.primary, fontWeight: '600' },
   backBtn: { fontSize: 16, color: theme.colors.primary, fontWeight: '600' },
   headerTitle: { fontSize: 20, fontWeight: '800', color: theme.colors.text.main },
   card: {

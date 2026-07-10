@@ -11,6 +11,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.AspNetCore.SignalR;
+using RideO.API.Hubs;
 
 namespace RideO.API.Controllers
 {
@@ -20,11 +22,13 @@ namespace RideO.API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
+        private readonly IHubContext<RideHub> _hubContext;
 
-        public AuthController(AppDbContext context, IConfiguration configuration)
+        public AuthController(AppDbContext context, IConfiguration configuration, IHubContext<RideHub> hubContext)
         {
             _context = context;
             _configuration = configuration;
+            _hubContext = hubContext;
         }
 
         private string GenerateJwtToken(User user)
@@ -38,6 +42,7 @@ namespace RideO.API.Controllers
             var claims = new[]
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
                 new Claim(ClaimTypes.Role, user.Role),
                 new Claim("FullName", user.FullName)
@@ -71,10 +76,10 @@ namespace RideO.API.Controllers
                 return BadRequest("Email and Password are required.");
             }
 
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email || u.PhoneNumber == request.Email);
             if (user == null)
             {
-                return Unauthorized("Invalid email or password.");
+                return Unauthorized("Account not found. Please register first.");
             }
 
             bool isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
@@ -293,6 +298,146 @@ namespace RideO.API.Controllers
             if (user == null) return NotFound();
 
             return Ok(user);
+        }
+
+        public class UpdateProfileRequest
+        {
+            public string FullName { get; set; } = string.Empty;
+            public string PhoneNumber { get; set; } = string.Empty;
+            public string Email { get; set; } = string.Empty;
+        }
+
+        [Authorize]
+        [HttpGet("driver-status")]
+        public async Task<IActionResult> GetDriverStatus()
+        {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized();
+
+            var driver = await _context.Drivers.FirstOrDefaultAsync(d => d.UserId == userId);
+            if (driver == null) return NotFound("Driver not found");
+
+            return Ok(new { isAvailable = driver.IsAvailable });
+        }
+
+        public class UpdateDriverStatusRequest
+        {
+            public bool IsAvailable { get; set; }
+        }
+
+        [Authorize]
+        [HttpPut("driver-status")]
+        public async Task<IActionResult> UpdateDriverStatus([FromBody] UpdateDriverStatusRequest request)
+        {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized();
+
+            var driver = await _context.Drivers.FirstOrDefaultAsync(d => d.UserId == userId);
+            if (driver == null) return NotFound("Driver not found");
+
+            driver.IsAvailable = request.IsAvailable;
+            await _context.SaveChangesAsync();
+            
+            await _hubContext.Clients.Group("AdminMonitors").SendAsync("DriverStatusChanged", driver.Id, request.IsAvailable);
+
+            return Ok(new { message = "Status updated", isAvailable = driver.IsAvailable });
+        }
+
+        [Authorize]
+        [HttpPut("me")]
+        public async Task<IActionResult> UpdateMe([FromBody] UpdateProfileRequest request)
+        {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized();
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return NotFound();
+
+            if (!string.IsNullOrWhiteSpace(request.Email) && request.Email != user.Email)
+            {
+                var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+                if (existingUser != null)
+                {
+                    return BadRequest(new { message = "This email address is already in use by another account." });
+                }
+                user.Email = request.Email;
+            }
+
+            user.FullName = request.FullName;
+            user.PhoneNumber = request.PhoneNumber;
+            await _context.SaveChangesAsync();
+
+            var token = GenerateJwtToken(user);
+
+            return Ok(new { message = "Profile updated successfully.", token, user });
+        }
+
+        public class VerifyPasswordRequest
+        {
+            public string CurrentPassword { get; set; } = string.Empty;
+        }
+
+        [Authorize]
+        [HttpPost("verify-password")]
+        public async Task<IActionResult> VerifyPassword([FromBody] VerifyPasswordRequest request)
+        {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized();
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return NotFound();
+
+            if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+                return BadRequest(new { message = "Incorrect current password." });
+
+            return Ok(new { message = "Password verified successfully." });
+        }
+
+        public class ChangePasswordRequest
+        {
+            public string CurrentPassword { get; set; } = string.Empty;
+            public string NewPassword { get; set; } = string.Empty;
+        }
+
+        [Authorize]
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+        {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized();
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return NotFound();
+
+            if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+                return BadRequest(new { message = "Incorrect current password." });
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Password changed successfully." });
+        }
+
+        [Authorize]
+        [HttpDelete("account")]
+        public async Task<IActionResult> DeleteAccount()
+        {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized();
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return NotFound();
+
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Account deleted successfully." });
         }
 
         [HttpGet("update-passwords")]

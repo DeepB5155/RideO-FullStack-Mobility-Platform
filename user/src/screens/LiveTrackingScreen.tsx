@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Share, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Share, Modal, FlatList } from 'react-native';
 import * as signalR from '@microsoft/signalr';
 import { SIGNALR_HUB_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,6 +13,15 @@ const LiveTrackingScreen = ({ route, navigation }: any) => {
   const [sosModalVisible, setSosModalVisible] = useState(false);
   const [sosCountdown, setSosCountdown] = useState(5);
   const [sosSent, setSosSent] = useState(false);
+
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [cancelReason, setCancelReason] = useState<string | null>(null);
+  const cancelReasons = [
+    'Driver is taking too long',
+    'Changed my mind',
+    'Driver asked me to cancel',
+    'Other'
+  ];
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -96,6 +105,23 @@ const LiveTrackingScreen = ({ route, navigation }: any) => {
     };
   }, [routeId]);
 
+  const handleCancelRide = async () => {
+    if (!cancelReason) {
+      Alert.alert('Select Reason', 'Please select a reason for cancellation.');
+      return;
+    }
+    try {
+      const res = await axiosInstance.put(`/booking/${bookingId}/cancel`, {
+        reason: cancelReason
+      });
+      setCancelModalVisible(false);
+      Alert.alert('Ride Cancelled', 'Your ride has been cancelled successfully.');
+      navigation.navigate('HomeTab');
+    } catch (err: any) {
+      Alert.alert('Cancel Failed', err.response?.data?.message || 'Failed to cancel the ride.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -126,6 +152,12 @@ const LiveTrackingScreen = ({ route, navigation }: any) => {
         }}>
           <Text style={styles.shareBtnText}>Share Live Ride</Text>
         </TouchableOpacity>
+
+        {bookingId && (
+          <TouchableOpacity style={styles.cancelRideBtn} onPress={() => setCancelModalVisible(true)}>
+            <Text style={styles.cancelRideBtnText}>Cancel Ride</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.mapContainer}>
@@ -182,6 +214,49 @@ const LiveTrackingScreen = ({ route, navigation }: any) => {
           </View>
         </View>
       </Modal>
+
+      {/* Cancel Modal */}
+      <Modal visible={cancelModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.cancelModalContent}>
+            <Text style={styles.modalTitle}>Cancel Ride</Text>
+            <Text style={styles.modalText}>Why do you want to cancel?</Text>
+            <FlatList
+              data={cancelReasons}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.reasonOption,
+                    cancelReason === item && styles.reasonOptionSelected
+                  ]}
+                  onPress={() => setCancelReason(item)}
+                >
+                  <Text style={[
+                    styles.reasonText,
+                    cancelReason === item && styles.reasonTextSelected
+                  ]}>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => {
+                setCancelModalVisible(false);
+                setCancelReason(null);
+              }}>
+                <Text style={styles.cancelBtnText}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.confirmCancelBtn, !cancelReason && { opacity: 0.5 }]} 
+                onPress={handleCancelRide}
+                disabled={!cancelReason}
+              >
+                <Text style={styles.sendNowBtnText}>Confirm Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -198,6 +273,8 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: 10, marginBottom: 15 },
   shareBtn: { flex: 1, backgroundColor: theme.colors.success, padding: 12, borderRadius: theme.radius.md, alignItems: 'center' },
   shareBtnText: { color: theme.colors.text.light, fontWeight: 'bold', fontSize: 16 },
+  cancelRideBtn: { flex: 1, backgroundColor: theme.colors.surface, padding: 12, borderRadius: theme.radius.md, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.danger },
+  cancelRideBtnText: { color: theme.colors.danger, fontWeight: 'bold', fontSize: 16 },
   sosBtn: { flex: 1, backgroundColor: theme.colors.danger, padding: 12, borderRadius: theme.radius.md, alignItems: 'center' },
   sosBtnText: { color: theme.colors.text.light, fontWeight: 'bold', fontSize: 16 },
   mapContainer: { flex: 1, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, overflow: 'hidden', ...theme.shadows.medium, borderWidth: 1, borderColor: theme.colors.border },
@@ -221,11 +298,17 @@ const styles = StyleSheet.create({
   modalContent: { backgroundColor: theme.colors.card, width: '85%', padding: 25, borderRadius: theme.radius.xl, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border },
   modalTitle: { fontSize: 22, fontWeight: 'bold', color: theme.colors.danger, marginBottom: 15 },
   modalText: { fontSize: 16, color: theme.colors.text.main, textAlign: 'center', marginBottom: 10 },
+  cancelModalContent: { backgroundColor: theme.colors.card, width: '90%', padding: 25, borderRadius: theme.radius.xl, maxHeight: '80%', borderWidth: 1, borderColor: theme.colors.border },
+  reasonOption: { padding: 15, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, marginBottom: 10 },
+  reasonOptionSelected: { borderColor: theme.colors.primary, backgroundColor: 'rgba(26, 115, 232, 0.1)' },
+  reasonText: { fontSize: 16, color: theme.colors.text.main },
+  reasonTextSelected: { fontWeight: 'bold', color: theme.colors.primary },
   countdownText: { fontSize: 18, fontWeight: 'bold', color: theme.colors.danger, marginBottom: 25 },
-  modalActions: { flexDirection: 'row', width: '100%', justifyContent: 'space-between' },
+  modalActions: { flexDirection: 'row', width: '100%', justifyContent: 'space-between', marginTop: 15 },
   cancelBtn: { flex: 1, padding: 15, backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, marginRight: 10, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border },
   cancelBtnText: { color: theme.colors.text.main, fontWeight: 'bold', fontSize: 16 },
   sendNowBtn: { flex: 1, padding: 15, backgroundColor: theme.colors.danger, borderRadius: theme.radius.md, marginLeft: 10, alignItems: 'center' },
+  confirmCancelBtn: { flex: 1, padding: 15, backgroundColor: theme.colors.danger, borderRadius: theme.radius.md, marginLeft: 10, alignItems: 'center' },
   sendNowBtnText: { color: theme.colors.text.light, fontWeight: 'bold', fontSize: 16 },
   sosSentContainer: { alignItems: 'center', paddingVertical: 20 },
   sosSentText: { fontSize: 28, fontWeight: 'bold', color: theme.colors.success, marginBottom: 10 },

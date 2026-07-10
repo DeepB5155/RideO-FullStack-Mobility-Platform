@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { 
   View, Text, TextInput, TouchableOpacity, StyleSheet, 
-  ScrollView, SafeAreaView, KeyboardAvoidingView, Platform, StatusBar, Image
+  ScrollView, SafeAreaView, KeyboardAvoidingView, Platform, StatusBar, Image, Alert
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import axiosInstance from '../api/axios';
+import { AuthContext } from '../context/AuthContext';
 
 const localColors = {
   background: '#f8f9ff',
@@ -22,6 +23,7 @@ const localColors = {
 
 const VehicleDetailsScreen = ({ navigation, route }: any) => {
   const fromProfile = route?.params?.fromProfile;
+  const { logout } = useContext(AuthContext);
 
   const [makeModel, setMakeModel] = useState('');
   const [year, setYear] = useState('');
@@ -37,8 +39,8 @@ const VehicleDetailsScreen = ({ navigation, route }: any) => {
         const res = await axiosInstance.get('/kyc/status');
         if (res.data.status === 'Approved' && !fromProfile) {
           navigation.replace('MainTabs');
-        } else if (res.data.status === 'Pending' && !fromProfile) {
-          navigation.replace('KYC'); // KYC screen handles pending state UI
+        } else if ((res.data.status === 'Pending' || res.data.status === 'Rejected') && !fromProfile) {
+          navigation.replace('KYC'); // KYC screen handles pending and rejected state UI
         }
       } catch (e) {
         console.log('Error checking KYC status', e);
@@ -80,24 +82,6 @@ const VehicleDetailsScreen = ({ navigation, route }: any) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#f8f9ff" />
-      
-      {/* Top Navigation */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <MaterialIcons name="arrow-back" size={24} color={localColors.primary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>RideO</Text>
-        </View>
-        <View style={styles.headerRight}>
-          <View style={styles.profileAvatar}>
-            <Image 
-              source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCeFCFpVQuQFkI4MWVZN8x4Y1uLbU6aEumR13GG3n2UpWk0R57jw65uybbWZ-sACYEVgzQl69TJULmi6tYwqJm_0QZbXL5zFPI-tQEx5Dm9GbBtbE8w6HFD3PP2mOBo6qLGOtvfPy-65-o1A9SA1C8biJq085XnRwE0sKRinsaANfJRyrdYkmdkDvpDe4OXBJEzYec9YS1W-7B42fuxP7BlJIbJoB5e0vKwJN0wGRtU8WoJIS9NxJ9Exg' }}
-              style={styles.avatarImage}
-            />
-          </View>
-        </View>
-      </View>
 
       <KeyboardAvoidingView style={styles.keyboardAvoid} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -203,20 +187,30 @@ const VehicleDetailsScreen = ({ navigation, route }: any) => {
                 <Text style={styles.tipsBody}>Your vehicle must be less than 15 years old and pass a basic safety inspection before your first ride.</Text>
               </View>
             </View>
+
+            {/* Bottom Action Bar (Moved inside ScrollView) */}
+            <View style={styles.bottomBar}>
+              <TouchableOpacity style={styles.primaryBtn} onPress={handleNext}>
+                <Text style={styles.primaryBtnText}>Next: Upload Documents</Text>
+                <MaterialIcons name="arrow-forward" size={20} color="#ffffff" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.secondaryBtn} onPress={() => {
+                if (navigation.canGoBack()) {
+                  navigation.goBack();
+                } else {
+                  Alert.alert('Log Out', 'Are you sure you want to log out? You can complete your vehicle details later.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Log Out', style: 'destructive', onPress: () => logout() }
+                  ]);
+                }
+              }}>
+                <Text style={styles.secondaryBtnText}>Back</Text>
+              </TouchableOpacity>
+            </View>
+
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Bottom Action Bar */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.primaryBtn} onPress={handleNext}>
-          <Text style={styles.primaryBtnText}>Next: Upload Documents</Text>
-          <MaterialIcons name="arrow-forward" size={20} color="#ffffff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.secondaryBtnText}>Back</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
@@ -419,16 +413,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(248, 249, 255, 0.95)',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 24,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(198, 198, 205, 0.2)',
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
+    marginTop: 16,
   },
   primaryBtn: {
     backgroundColor: localColors.primary,

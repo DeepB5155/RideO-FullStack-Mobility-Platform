@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, useRef } from 'react';
+import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -15,6 +16,7 @@ import {
 } from 'react-native';
 import Mapbox from '@rnmapbox/maps';
 import Geolocation from '@react-native-community/geolocation';
+import messaging from '@react-native-firebase/messaging';
 import * as signalR from '@microsoft/signalr';
 import { MAPBOX_ACCESS_TOKEN, SIGNALR_HUB_URL } from '@env';
 import { AuthContext } from '../context/AuthContext';
@@ -35,6 +37,32 @@ const HomeScreen = ({ navigation }: any) => {
   const locationWatchId = useRef<number | null>(null);
   const [incomingRide, setIncomingRide] = useState<any>(null);
   const [activeRide, setActiveRide] = useState<any>(null);
+  const [pendingSubs, setPendingSubs] = useState<any[]>([]);
+
+  const fetchPendingSubs = async () => {
+    try {
+      const res = await api.get('/booking/subscribe/pending');
+      setPendingSubs(res.data);
+    } catch (e) {
+      console.log('Error fetching pending subs', e);
+    }
+  };
+
+  const fetchDriverStatus = async () => {
+    try {
+      const res = await api.get('/auth/driver-status');
+      setIsOnline(res.data.isAvailable);
+    } catch (e) {
+      console.log('Error fetching driver status', e);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchPendingSubs();
+      fetchDriverStatus();
+    }, [])
+  );
 
   useEffect(() => {
     const requestLocationPermission = async () => {
@@ -76,29 +104,76 @@ const HomeScreen = ({ navigation }: any) => {
     newConnection.on('BookingRequested', (rideDetails) => setIncomingRide(rideDetails));
     setConnection(newConnection);
     requestLocationPermission();
+    fetchPendingSubs();
 
     // Listen to FCM Background/Foreground Data payload
     const pushListener = DeviceEventEmitter.addListener('onPushNotification', (data) => {
       if (data.type === 'RIDE_REQUEST') {
         setIncomingRide(data);
+      } else if (data.type === 'SUBSCRIPTION_REQUEST') {
+        fetchPendingSubs();
+        Alert.alert(
+          'New Subscription Request! 🔄',
+          'Someone requested to subscribe to your daily route. Do you want to review it now?',
+          [
+            { text: 'Later', style: 'cancel' },
+            { 
+              text: 'Review', 
+              onPress: () => {
+                navigation.navigate('Route Bookings', { 
+                  routeId: data.routeId, 
+                  routeItem: { isRecurring: true } 
+                });
+              }
+            }
+          ]
+        );
       }
     });
 
+    // Handle tapping on a notification while app is in background
+    const unsubscribeOnOpened = messaging().onNotificationOpenedApp(remoteMessage => {
+      if (remoteMessage.data?.type === 'SUBSCRIPTION_REQUEST') {
+        navigation.navigate('Route Bookings', { 
+          routeId: remoteMessage.data.routeId, 
+          routeItem: { isRecurring: true } 
+        });
+      }
+    });
+
+    // Handle app opened from a fully closed state via notification
+    messaging()
+      .getInitialNotification()
+      .then(remoteMessage => {
+        if (remoteMessage && remoteMessage.data?.type === 'SUBSCRIPTION_REQUEST') {
+          setTimeout(() => {
+            navigation.navigate('Route Bookings', { 
+              routeId: remoteMessage.data.routeId, 
+              routeItem: { isRecurring: true } 
+            });
+          }, 1000); // Small delay to ensure navigation is ready
+        }
+      });
+
     return () => {
       pushListener.remove();
+      unsubscribeOnOpened();
       if (locationWatchId.current !== null) Geolocation.clearWatch(locationWatchId.current);
       if (newConnection.state !== signalR.HubConnectionState.Disconnected) newConnection.stop();
     };
   }, []);
 
   const toggleOnlineStatus = async () => {
-    if (!isOnline) {
-      try {
+    try {
+      const newStatus = !isOnline;
+      await api.put('/auth/driver-status', { isAvailable: newStatus });
+      setIsOnline(newStatus);
+
+      if (newStatus) {
         if (connection && connection.state === signalR.HubConnectionState.Disconnected) {
           await connection.start();
           await connection.invoke('JoinDriverGroup');
         }
-        setIsOnline(true);
         locationWatchId.current = Geolocation.watchPosition(
           (position) => {
             const { latitude, longitude } = position.coords;
@@ -110,18 +185,17 @@ const HomeScreen = ({ navigation }: any) => {
           (error) => console.warn(error),
           { enableHighAccuracy: true, distanceFilter: 10 },
         );
-      } catch (error) {
-        Alert.alert('Connection Error', 'Could not connect to the server.');
+      } else {
+        if (locationWatchId.current !== null) {
+          Geolocation.clearWatch(locationWatchId.current);
+          locationWatchId.current = null;
+        }
+        if (connection && connection.state === signalR.HubConnectionState.Connected) {
+          await connection.stop();
+        }
       }
-    } else {
-      if (locationWatchId.current !== null) {
-        Geolocation.clearWatch(locationWatchId.current);
-        locationWatchId.current = null;
-      }
-      if (connection && connection.state === signalR.HubConnectionState.Connected) {
-        await connection.stop();
-      }
-      setIsOnline(false);
+    } catch (error) {
+      Alert.alert('Error', 'Could not update status. Please try again.');
     }
   };
 
@@ -139,7 +213,16 @@ const HomeScreen = ({ navigation }: any) => {
     }
   };
 
-  const rejectRide = () => setIncomingRide(null);
+  const rejectRide = async () => {
+    if (!incomingRide) return;
+    try {
+      await api.put(`/booking/${incomingRide.bookingId || incomingRide.id}/reject`);
+      setIncomingRide(null);
+    } catch {
+      Alert.alert('Error', 'Could not reject ride.');
+      setIncomingRide(null);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -162,20 +245,7 @@ const HomeScreen = ({ navigation }: any) => {
 
       {/* ── Top App Bar & Overlays ── */}
       <SafeAreaView style={styles.topSafeArea} pointerEvents="box-none">
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.headerIconBtn}>
-            <Icon name="menu" size={24} color="#0b1c30" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>RideO</Text>
-          <TouchableOpacity style={styles.headerProfileBtn} onPress={() => navigation.navigate('Profile')}>
-            <Image 
-              source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDggZdDotBzqRylK2ZrVqyedcMyZtSVzy7yiItrNwfHhYu_xlK6ZCwQ4qTywJf3Xs9_VUOOYSSNECTOwvoZNFpF2z45rwVXfIAfCZwLgJOy22glM5mrY29WP7AoicjSqOiDz18rM8WJSoaVQ0uMQNgXj5zDrhqLYdp91e1hi1-PiDLgKRTYLYaAKPE8WlC4mdCv5Y4euX2JMSb7WWG2l8GWKWpoidnxo1f-TwRrCHg6iBciDUOYnz6WITckO74jKN5RKglRpxTxHCtj' }} 
-              style={styles.profileImg} 
-            />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.floatingTopContainer} pointerEvents="box-none">
+        <View style={[styles.floatingTopContainer, { paddingTop: 64 }]} pointerEvents="box-none">
           {/* Status Pill */}
           <View style={styles.statusPill}>
             <View style={[styles.statusDot, { backgroundColor: isOnline ? '#89f5e7' : '#76777d' }]} />
@@ -184,19 +254,41 @@ const HomeScreen = ({ navigation }: any) => {
             </Text>
           </View>
 
+          {/* Pending Subscriptions Banner */}
+          {pendingSubs.length > 0 && (
+            <TouchableOpacity 
+              style={[styles.bannerCard, { backgroundColor: '#ffd4c7', borderColor: '#ba1a1a', borderWidth: 1 }]} 
+              onPress={() => navigation.navigate('Route Bookings', { routeId: pendingSubs[0].routeId, routeItem: { isRecurring: true } })}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.bannerIconWrapper, { backgroundColor: '#ba1a1a' }]}>
+                <Icon name="bell-ring" size={24} color="#ffffff" />
+              </View>
+              <View style={styles.bannerTextWrapper}>
+                <Text style={[styles.bannerTitle, { color: '#410002' }]}>{pendingSubs.length} New Subscription Request{pendingSubs.length > 1 ? 's' : ''}!</Text>
+                <Text style={[styles.bannerSubtext, { color: '#93000a' }]}>Tap here to review and accept or reject.</Text>
+              </View>
+              <Icon name="chevron-right" size={24} color="#93000a" />
+            </TouchableOpacity>
+          )}
+
           {/* Ready to earn banner */}
           {!incomingRide && !activeRide && (
-            <View style={styles.bannerCard}>
+            <TouchableOpacity 
+              style={styles.bannerCard} 
+              onPress={toggleOnlineStatus}
+              activeOpacity={0.8}
+            >
               <View style={styles.bannerIconWrapper}>
                 <Icon name="radar" size={24} color="#000" />
               </View>
               <View style={styles.bannerTextWrapper}>
                 <Text style={styles.bannerTitle}>{isOnline ? 'Finding Rides...' : 'Ready to earn?'}</Text>
                 <Text style={styles.bannerSubtext}>
-                  {isOnline ? 'Keep the app open to receive nearby requests.' : 'Go online to start receiving ride requests in your area.'}
+                  {isOnline ? 'Keep the app open to receive nearby requests. Tap to go offline.' : 'Tap here to Go Live and start receiving ride requests in your area.'}
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
           )}
         </View>
       </SafeAreaView>
@@ -258,7 +350,7 @@ const HomeScreen = ({ navigation }: any) => {
               activeOpacity={0.9}
             >
               <Icon name="power" size={24} color="#fff" style={styles.btnIcon} />
-              <Text style={styles.primaryButtonText}>{isOnline ? 'Go Offline' : 'Go Online'}</Text>
+              <Text style={styles.primaryButtonText}>{isOnline ? 'Go Offline' : 'Go Live'}</Text>
             </TouchableOpacity>
           </View>
         )}

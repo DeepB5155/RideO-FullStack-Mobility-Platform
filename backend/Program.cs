@@ -104,6 +104,8 @@ builder.Services.AddCors(options =>
     });
 });
 
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 var app = builder.Build();
 
 // Automatically apply EF Core creations/migrations for the Relational database.

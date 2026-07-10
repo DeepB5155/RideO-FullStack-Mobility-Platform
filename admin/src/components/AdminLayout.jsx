@@ -70,6 +70,7 @@ const AdminLayout = () => {
         { name: 'Live Map', icon: <Navigation size={20} />, path: '/live' },
         { name: 'Users', icon: <Users size={20} />, path: '/users' },
         { name: 'Drivers', icon: <Car size={20} />, path: '/drivers' },
+        { name: 'Payouts', icon: <LayoutDashboard size={20} />, path: '/payouts' },
         { name: 'KYC Auth', icon: <ShieldCheck size={20} />, path: '/kyc' },
         { name: 'Complaints', icon: <ShieldAlert size={20} />, path: '/complaints' },
         { name: 'Safety Alerts', icon: <AlertTriangle size={20} />, path: '/safety-alerts', badge: sosCount > 0 ? sosCount : null },

@@ -6,6 +6,7 @@ import { MAPBOX_ACCESS_TOKEN, SIGNALR_HUB_URL } from '@env';
 import * as signalR from '@microsoft/signalr';
 import { AuthContext } from '../context/AuthContext';
 import Icon from 'react-native-vector-icons/Ionicons';
+import messaging from '@react-native-firebase/messaging';
 
 // Split token to bypass GitHub secret scan
 const MAPBOX_TOKEN = MAPBOX_ACCESS_TOKEN;
@@ -19,6 +20,9 @@ const HomeScreen = ({ navigation }: any) => {
   const [rideStatus, setRideStatus] = useState<'idle' | 'searching' | 'accepted'>('idle');
   const [driverInfo, setDriverInfo] = useState<any>(null);
   const [routeCoordinates, setRouteCoordinates] = useState<any[]>([]);
+  const [driverLocation, setDriverLocation] = useState<[number, number] | null>(null);
+  const [isDriverReconnecting, setIsDriverReconnecting] = useState(false);
+  const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const cameraRef = useRef<Mapbox.Camera>(null);
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
@@ -37,7 +41,26 @@ const HomeScreen = ({ navigation }: any) => {
       newConnection.on("RideAccepted", (rideDetails: any) => {
         setRideStatus('accepted');
         setDriverInfo(rideDetails);
+        
+        // Initial Driver Location
+        if (rideDetails.driverLongitude && rideDetails.driverLatitude) {
+          setDriverLocation([rideDetails.driverLongitude, rideDetails.driverLatitude]);
+        }
+
         fetchRoute(rideDetails.pickupLongitude, rideDetails.pickupLatitude, rideDetails.driverLongitude, rideDetails.driverLatitude);
+      });
+
+      newConnection.on("DriverLocationUpdated", (driverId: string, lat: number, lng: number) => {
+        setDriverLocation([lng, lat]);
+        setIsDriverReconnecting(false);
+
+        if (reconnectTimeout.current) {
+          clearTimeout(reconnectTimeout.current);
+        }
+
+        reconnectTimeout.current = setTimeout(() => {
+          setIsDriverReconnecting(true);
+        }, 15000);
       });
 
       try {
@@ -51,6 +74,33 @@ const HomeScreen = ({ navigation }: any) => {
     if (user) {
       setupSignalR();
     }
+
+    // Push notification handler
+    const handleNotification = (remoteMessage: any) => {
+      if (remoteMessage && remoteMessage.data && remoteMessage.data.type === 'RIDE_CANCELLED_FIND_ALTERNATIVE') {
+        const { date, startLocation, endLocation } = remoteMessage.data;
+        Alert.alert(
+          'Ride Cancelled',
+          `Your ride on ${date} was cancelled. Would you like to find an alternative ride?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Find Alternative', 
+              onPress: () => {
+                navigation.navigate('SearchRide', {
+                  initialStartLocation: startLocation,
+                  initialEndLocation: endLocation,
+                  initialDate: date
+                });
+              }
+            }
+          ]
+        );
+      }
+    };
+
+    messaging().onNotificationOpenedApp(handleNotification);
+    messaging().getInitialNotification().then(handleNotification);
 
     return () => {
       connection?.stop();
@@ -73,8 +123,21 @@ const HomeScreen = ({ navigation }: any) => {
     }
   };
 
+  useEffect(() => {
+    navigation.setOptions({
+      title: rideStatus === 'accepted' ? 'En Route' : 'HomeTab'
+    });
+  }, [rideStatus, navigation]);
+
   return (
     <View style={styles.container}>
+      {isDriverReconnecting && rideStatus === 'accepted' && (
+        <View style={styles.reconnectBanner}>
+          <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 8 }} />
+          <Text style={styles.reconnectBannerText}>Driver lost connection. Reconnecting...</Text>
+        </View>
+      )}
+
       {/* Map Content */}
       <Mapbox.MapView 
         style={styles.map} 
@@ -107,32 +170,15 @@ const HomeScreen = ({ navigation }: any) => {
             />
           </Mapbox.ShapeSource>
         )}
-      </Mapbox.MapView>
 
-      {/* Top App Bar */}
-      <SafeAreaView style={styles.headerWrapper} pointerEvents="box-none">
-        <View style={styles.header}>
-          {rideStatus === 'accepted' ? (
-            <>
-              <TouchableOpacity style={styles.headerBtn} onPress={() => { /* Handle back if needed */ }}>
-                <Icon name="arrow-back" size={28} color="#000000" />
-              </TouchableOpacity>
-              <Text style={[styles.headerTitle, { fontSize: 24 }]}>En Route</Text>
-              <View style={{ width: 32 }} />
-            </>
-          ) : (
-            <>
-              <TouchableOpacity style={styles.headerBtn} onPress={() => {}}>
-                <Icon name="menu-outline" size={30} color="#000000" />
-              </TouchableOpacity>
-              <Text style={styles.headerTitle}>RideO</Text>
-              <TouchableOpacity style={styles.headerAvatar} onPress={() => navigation.navigate('Settings')}>
-                <Icon name="person" size={20} color="#ffffff" />
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </SafeAreaView>
+        {rideStatus === 'accepted' && driverLocation && (
+          <Mapbox.PointAnnotation id="driverMarker" coordinate={driverLocation}>
+            <View style={styles.carMarker}>
+              <Icon name="car" size={20} color="#ffffff" />
+            </View>
+          </Mapbox.PointAnnotation>
+        )}
+      </Mapbox.MapView>
 
       {/* Floating SOS Button */}
       {rideStatus === 'accepted' && (
@@ -269,46 +315,27 @@ const HomeScreen = ({ navigation }: any) => {
             </View>
 
             {/* Action Buttons */}
-            <View style={styles.actionButtonsRow}>
-              <TouchableOpacity style={styles.callButton}>
-                <Icon name="call" size={20} color="#000000" />
-                <Text style={styles.callButtonText}>Call</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.chatButton}>
-                <Icon name="chatbubble" size={20} color="#ffffff" />
-                <Text style={styles.chatButtonText}>Chat</Text>
-              </TouchableOpacity>
+            <View style={styles.actionRowWithOtp}>
+              {driverInfo?.otp && (
+                <View style={styles.otpCard}>
+                  <Text style={styles.otpLabel}>PIN</Text>
+                  <Text style={styles.otpValue}>{driverInfo.otp}</Text>
+                </View>
+              )}
+              <View style={styles.actionButtonsRow}>
+                <TouchableOpacity style={styles.callButton}>
+                  <Icon name="call" size={20} color="#000000" />
+                  <Text style={styles.callButtonText}>Call</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.chatButton}>
+                  <Icon name="chatbubble" size={20} color="#ffffff" />
+                  <Text style={styles.chatButtonText}>Chat</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
       </View>
-
-      {/* Bottom Tab Bar */}
-      {rideStatus !== 'accepted' && (
-        <View style={styles.tabBar}>
-          <TouchableOpacity style={styles.tabItem}>
-            <Icon name="home" size={24} color="#5B4FE9" />
-            <Text style={[styles.tabText, { color: '#5B4FE9' }]}>Home</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('My Rides')}>
-            <Icon name="car-outline" size={24} color="#45464d" />
-            <Text style={styles.tabText}>Rides</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('SubscriptionsScreen')}>
-            <Icon name="repeat-outline" size={24} color="#45464d" />
-            <Text style={styles.tabText}>Commutes</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Wallet')}>
-            <Icon name="wallet-outline" size={24} color="#45464d" />
-            <Text style={styles.tabText}>Wallet</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Notifications')}>
-            <Icon name="notifications-outline" size={24} color="#45464d" />
-            <Text style={styles.tabText}>Alerts</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
     </View>
   );
 };
@@ -562,6 +589,22 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   
+  carMarker: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#006a61',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+
   // SOS Button
   sosButton: {
     position: 'absolute',
@@ -725,10 +768,43 @@ const styles = StyleSheet.create({
     color: '#000000',
     letterSpacing: 2,
   },
-
+  actionRowWithOtp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  otpCard: {
+    backgroundColor: '#0b1c30',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  otpLabel: {
+    color: '#89f5e7',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  otpValue: {
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 4,
+  },
   actionButtonsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 12,
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   callButton: {
     flex: 1,
@@ -749,7 +825,7 @@ const styles = StyleSheet.create({
   chatButton: {
     flex: 1,
     height: 56,
-    backgroundColor: '#000000',
+    backgroundColor: '#006a61',
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -762,10 +838,33 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   chatButtonText: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
-    marginLeft: 8,
+    marginTop: 4,
+  },
+  reconnectBanner: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    backgroundColor: '#ba1a1a',
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  reconnectBannerText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
   }
 });
 

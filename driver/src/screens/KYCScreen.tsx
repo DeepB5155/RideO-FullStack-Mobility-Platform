@@ -31,7 +31,7 @@ const localColors = {
 
 const KYCScreen = ({ route, navigation }: any) => {
   const fromProfile = route?.params?.fromProfile;
-  const { user } = useContext(AuthContext);
+  const { user, updateUser } = useContext(AuthContext);
   const [status, setStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -39,12 +39,17 @@ const KYCScreen = ({ route, navigation }: any) => {
   const [licenseUrl, setLicenseUrl] = useState('');
   const [rcUrl, setRcUrl] = useState('');
   const [insuranceUrl, setInsuranceUrl] = useState('');
+  const [vehicleImageUrl, setVehicleImageUrl] = useState('');
+  const [driverFaceUrl, setDriverFaceUrl] = useState('');
 
   // Processing states for simulated upload
   const [isUploadingLicense, setIsUploadingLicense] = useState(false);
   const [isUploadingRc, setIsUploadingRc] = useState(false);
   const [isUploadingInsurance, setIsUploadingInsurance] = useState(false);
+  const [isUploadingVehicle, setIsUploadingVehicle] = useState(false);
+  const [isUploadingFace, setIsUploadingFace] = useState(false);
 
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -52,6 +57,9 @@ const KYCScreen = ({ route, navigation }: any) => {
     try {
       const res = await axiosInstance.get('/kyc/status');
       setStatus(res.data.status);
+      if (res.data.rejectionReason) {
+        setRejectionReason(res.data.rejectionReason);
+      }
     } catch (e) {
       console.log('Failed to check KYC status', e);
     } finally {
@@ -122,7 +130,9 @@ const KYCScreen = ({ route, navigation }: any) => {
         totalSeats: vDetails.totalSeats || 4,
         licenseFrontUrl: licenseUrl,
         licenseBackUrl: licenseUrl,
-        rcUrl: rcUrl || licenseUrl
+        rcUrl: rcUrl || licenseUrl,
+        vehicleImageUrl: vehicleImageUrl,
+        driverFaceUrl: driverFaceUrl
       });
       
       setShowSuccessModal(true);
@@ -143,12 +153,12 @@ const KYCScreen = ({ route, navigation }: any) => {
   useEffect(() => {
     if (status === 'Approved' && !fromProfile) {
       setTimeout(() => {
-        navigation.replace('MainTabs');
+        updateUser({ isVerified: true });
       }, 500);
     }
-  }, [status, navigation, fromProfile]);
+  }, [status, fromProfile, updateUser]);
 
-  const allRequiredApproved = licenseUrl && rcUrl && insuranceUrl;
+  const allRequiredApproved = licenseUrl && rcUrl && insuranceUrl && vehicleImageUrl && driverFaceUrl;
 
   const DocumentSlot = ({ title, desc, iconName, url, isUploading, onPress, fileName }: any) => {
     const isUploaded = !!url;
@@ -232,25 +242,19 @@ const KYCScreen = ({ route, navigation }: any) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="rgba(248, 249, 255, 0.8)" />
-      
-      {/* Top Navigation */}
-      <View style={styles.appBar}>
-        <View style={styles.appBarLeft}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <MaterialIcons name="arrow-back" size={24} color={localColors.primary} />
-          </TouchableOpacity>
-          <Text style={styles.appTitle}>RideO</Text>
-        </View>
-        <View style={styles.stepBadge}>
-          <Text style={styles.stepBadgeText}>Step 3 of 3</Text>
-        </View>
-      </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Progress Bar */}
         <View style={styles.progressBarBg}>
           <View style={styles.progressBarFill} />
         </View>
+
+        {status === 'Rejected' && (
+          <View style={{ backgroundColor: '#ffe5e5', padding: 16, borderRadius: 8, marginBottom: 24, borderWidth: 1, borderColor: '#ff4d4f' }}>
+            <Text style={{ color: '#ff4d4f', fontWeight: 'bold', fontSize: 16, marginBottom: 4 }}>KYC Rejected</Text>
+            <Text style={{ color: '#ff4d4f' }}>{rejectionReason || 'Your documents were rejected. Please check and upload valid documents again.'}</Text>
+          </View>
+        )}
 
         {/* Title Section */}
         <View style={styles.titleSection}>
@@ -287,6 +291,24 @@ const KYCScreen = ({ route, navigation }: any) => {
             onPress={() => simulateUpload(setInsuranceUrl, setIsUploadingInsurance)}
             fileName="insurance_policy.pdf"
           />
+          <DocumentSlot 
+            title="Vehicle Image"
+            desc="Clear photo of your vehicle"
+            iconName="directions-car"
+            url={vehicleImageUrl}
+            isUploading={isUploadingVehicle}
+            onPress={() => simulateUpload(setVehicleImageUrl, setIsUploadingVehicle)}
+            fileName="vehicle_photo.jpg"
+          />
+          <DocumentSlot 
+            title="Driver Photo"
+            desc="Clear selfie of your face"
+            iconName="face"
+            url={driverFaceUrl}
+            isUploading={isUploadingFace}
+            onPress={() => simulateUpload(setDriverFaceUrl, setIsUploadingFace)}
+            fileName="driver_selfie.jpg"
+          />
         </View>
 
         {/* Helper Text */}
@@ -296,28 +318,28 @@ const KYCScreen = ({ route, navigation }: any) => {
             Please ensure photos are clear and all text is readable. PDF, JPG, or PNG formats are accepted (Max 5MB per file).
           </Text>
         </View>
-      </ScrollView>
 
-      {/* Bottom Actions */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity 
-          style={[styles.submitBtn, !allRequiredApproved && styles.submitBtnDisabled]} 
-          onPress={submitKYC}
-          disabled={!allRequiredApproved || isSubmitting}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color={localColors.onPrimary} />
-          ) : (
-            <>
-              <Text style={styles.submitBtnText}>{allRequiredApproved ? 'Finish Registration' : 'Submit Application'}</Text>
-              <MaterialIcons name={allRequiredApproved ? "check-circle" : "rocket-launch"} size={20} color={localColors.onPrimary} style={{ marginLeft: 8 }} />
-            </>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.backActionBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backActionText}>Back</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Bottom Actions */}
+        <View style={styles.bottomBar}>
+          <TouchableOpacity 
+            style={[styles.submitBtn, !allRequiredApproved && styles.submitBtnDisabled]} 
+            onPress={submitKYC}
+            disabled={!allRequiredApproved || isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color={localColors.onPrimary} />
+            ) : (
+              <>
+                <Text style={styles.submitBtnText}>{allRequiredApproved ? 'Finish Registration' : 'Submit Application'}</Text>
+                <MaterialIcons name={allRequiredApproved ? "check-circle" : "rocket-launch"} size={20} color={localColors.onPrimary} style={{ marginLeft: 8 }} />
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.backActionBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.backActionText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       {/* Success Modal */}
       <Modal visible={showSuccessModal} transparent animationType="fade">
@@ -328,7 +350,7 @@ const KYCScreen = ({ route, navigation }: any) => {
             </View>
             <Text style={styles.modalTitle}>Application Sent!</Text>
             <Text style={styles.modalBody}>
-              Our team will review your documents within 24-48 hours. You'll be notified as soon as you're ready to hit the road.
+              Our team will review your documents. Please wait for 3 working days. You'll be notified as soon as you're ready to hit the road.
             </Text>
             <TouchableOpacity style={styles.modalBtn} onPress={handleModalClose}>
               <Text style={styles.modalBtnText}>Got it</Text>
@@ -418,7 +440,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 24,
     paddingTop: 24,
-    paddingBottom: 150, // Space for bottom bar
+    paddingBottom: 48,
   },
   progressBarBg: {
     width: '100%',
@@ -534,16 +556,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: localColors.surface,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(198, 198, 205, 0.2)',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 24,
+    paddingTop: 32,
+    paddingBottom: 24,
   },
   submitBtn: {
     flexDirection: 'row',

@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { theme } from '../theme/theme';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { CustomHeader } from '../components/CustomHeader';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -22,10 +23,13 @@ import SupportScreen from '../screens/SupportScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import WalletScreen from '../screens/WalletScreen';
 import InsightsScreen from '../screens/InsightsScreen';
+import MyComplaintsScreen from '../screens/MyComplaintsScreen';
+import LeaderboardScreen from '../screens/LeaderboardScreen';
 import DailyCommuteSetupScreen from '../screens/DailyCommuteSetupScreen';
 import EditVehicleScreen from '../screens/EditVehicleScreen';
 import VehicleDetailsScreen from '../screens/VehicleDetailsScreen';
 import WithdrawScreen from '../screens/WithdrawScreen';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 
 // Context
 import { AuthContext } from '../context/AuthContext';
@@ -68,7 +72,8 @@ const MainTabs = () => {
   return (
     <Tab.Navigator
       screenOptions={{
-        headerShown: false,
+        header: (props) => <CustomHeader {...props} />,
+        headerShown: true,
         tabBarShowLabel: false,
         tabBarStyle: {
           backgroundColor: '#ffffff',
@@ -88,40 +93,46 @@ const MainTabs = () => {
         },
       }}
     >
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
+      <Tab.Screen 
+        name="HomeTab" 
+        component={HomeScreen} 
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="dashboard" title="Dashboard" focused={focused} />,
-        }}
+          headerTransparent: true,
+          title: 'Home',
+          tabBarIcon: ({ focused }) => <TabIcon name="home" title="Home" focused={focused} />
+        }} 
       />
-      <Tab.Screen
-        name="My Routes"
-        component={MyRoutesScreen}
+      <Tab.Screen 
+        name="My Routes" 
+        component={MyRoutesScreen} 
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="directions-car" title="Routes" focused={focused} />,
-        }}
+          title: 'My Routes',
+          tabBarIcon: ({ focused }) => <TabIcon name="directions-car" title="My Routes" focused={focused} />
+        }} 
       />
-      <Tab.Screen
-        name="Earnings"
-        component={EarningsScreen}
+      <Tab.Screen 
+        name="Earnings" 
+        component={EarningsScreen} 
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="payment" title="Earnings" focused={focused} />,
-        }}
+          title: 'Earnings',
+          tabBarIcon: ({ focused }) => <TabIcon name="account-balance-wallet" title="Earnings" focused={focused} />
+        }} 
       />
-      <Tab.Screen
-        name="Notifications"
-        component={NotificationsScreen}
+      <Tab.Screen 
+        name="Notifications" 
+        component={NotificationsScreen} 
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="notifications" title="Alerts" focused={focused} />,
-        }}
+          title: 'Notifications',
+          tabBarIcon: ({ focused }) => <TabIcon name="notifications" title="Notifications" focused={focused} />
+        }} 
       />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileScreen} 
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="person" title="Profile" focused={focused} />,
-        }}
+          title: 'Profile',
+          tabBarIcon: ({ focused }) => <TabIcon name="person" title="Profile" focused={focused} />
+        }} 
       />
     </Tab.Navigator>
   );
@@ -132,29 +143,50 @@ const AuthStack = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
     </Stack.Navigator>
   );
 };
 
-// ─── Main Stack (wraps tabs + all secondary screens) ────────────────────
+// ─── Onboarding Stack (for unverified drivers) ────────────────────────────────────
+const OnboardingStack = () => {
+  return (
+    <Stack.Navigator 
+      screenOptions={{ 
+        header: (props) => <CustomHeader {...props} />,
+        headerShown: true
+      }}
+    >
+      <Stack.Screen name="VehicleDetails" component={VehicleDetailsScreen} options={{ title: 'Vehicle Details' }} />
+      <Stack.Screen name="KYC" component={KYCScreen} options={{ title: 'KYC Setup' }} />
+    </Stack.Navigator>
+  );
+};
+
+// ─── Main Stack (wraps tabs + all secondary screens) ────────────────────────
 const MainStack = () => {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="VehicleDetails" component={VehicleDetailsScreen} />
-      <Stack.Screen name="KYC" component={KYCScreen} />
-      <Stack.Screen name="MainTabs" component={MainTabs} />
+    <Stack.Navigator 
+      screenOptions={{ 
+        header: (props) => <CustomHeader {...props} />,
+        headerShown: true
+      }}
+    >
+      <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
       {/* Secondary screens reachable via navigation.navigate() */}
-      <Stack.Screen name="Withdraw" component={WithdrawScreen} />
-      <Stack.Screen name="Create Route" component={CreateRouteScreen} />
-      <Stack.Screen name="Route Bookings" component={RouteBookingsScreen} />
-      <Stack.Screen name="Active Ride" component={ActiveRideScreen} />
-      <Stack.Screen name="Rating" component={RatingScreen} />
-      <Stack.Screen name="Chat" component={ChatScreen} />
-      <Stack.Screen name="Support" component={SupportScreen} />
-      <Stack.Screen name="Wallet" component={WalletScreen} />
-      <Stack.Screen name="Insights" component={InsightsScreen} />
-      <Stack.Screen name="DailyCommuteSetup" component={DailyCommuteSetupScreen} />
-      <Stack.Screen name="EditVehicle" component={EditVehicleScreen} />
+      <Stack.Screen name="Withdraw" component={WithdrawScreen} options={{ title: 'Withdraw' }} />
+      <Stack.Screen name="Create Route" component={CreateRouteScreen} options={{ title: 'Create Route' }} />
+      <Stack.Screen name="Route Bookings" component={RouteBookingsScreen} options={{ title: 'Route Details' }} />
+      <Stack.Screen name="Active Ride" component={ActiveRideScreen} options={{ headerTransparent: true }} />
+      <Stack.Screen name="Rating" component={RatingScreen} options={{ title: 'Rating' }} />
+      <Stack.Screen name="Chat" component={ChatScreen} options={{ title: 'Chat' }} />
+      <Stack.Screen name="Support" component={SupportScreen} options={{ title: 'Support' }} />
+      <Stack.Screen name="Wallet" component={WalletScreen} options={{ title: 'Wallet' }} />
+      <Stack.Screen name="Insights" component={InsightsScreen} options={{ title: 'Insights' }} />
+      <Stack.Screen name="MyComplaints" component={MyComplaintsScreen} options={{ title: 'My Complaints' }} />
+      <Stack.Screen name="Leaderboard" component={LeaderboardScreen} options={{ title: 'Leaderboard' }} />
+      <Stack.Screen name="DailyCommuteSetup" component={DailyCommuteSetupScreen} options={{ title: 'Commute Setup' }} />
+      <Stack.Screen name="EditVehicle" component={EditVehicleScreen} options={{ title: 'Edit Vehicle' }} />
     </Stack.Navigator>
   );
 };
@@ -173,7 +205,7 @@ const AppNavigator = () => {
 
   return (
     <NavigationContainer>
-      {user ? <MainStack /> : <AuthStack />}
+      {user ? (user.isVerified ? <MainStack /> : <OnboardingStack />) : <AuthStack />}
     </NavigationContainer>
   );
 };

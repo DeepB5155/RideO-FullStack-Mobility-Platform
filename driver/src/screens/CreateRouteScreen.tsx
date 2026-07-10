@@ -250,8 +250,9 @@ const CreateRouteScreen = ({ navigation }: any) => {
               <View style={styles.locationInputContainer}>
                 <TextInput 
                   style={styles.locationInput} 
-                  placeholder="Enter pickup location (e.g. Mumbai Central)" 
+                  placeholder="Enter pickup location" 
                   placeholderTextColor="#c6c6cd"
+                  numberOfLines={1}
                   value={startLoc}
                   onChangeText={(t) => { 
                     setStartLoc(t); 
@@ -276,8 +277,9 @@ const CreateRouteScreen = ({ navigation }: any) => {
               <View style={[styles.locationInputContainer, { borderBottomWidth: 0, paddingBottom: 0 }]}>
                 <TextInput 
                   style={styles.locationInput} 
-                  placeholder="Enter drop-off location (e.g. Pune Airport)" 
+                  placeholder="Enter drop-off location" 
                   placeholderTextColor="#c6c6cd"
+                  numberOfLines={1}
                   value={endLoc}
                   onChangeText={(t) => { 
                     setEndLoc(t); 
@@ -340,7 +342,8 @@ const CreateRouteScreen = ({ navigation }: any) => {
                 value={date}
                 editable={false}
                 pointerEvents="none"
-                placeholder="DD/MM/YYYY"
+                placeholder="Date"
+                numberOfLines={1}
               />
               <Icon name="calendar-month" size={20} color="#000000" />
             </TouchableOpacity>
@@ -355,7 +358,8 @@ const CreateRouteScreen = ({ navigation }: any) => {
                 value={time}
                 editable={false}
                 pointerEvents="none"
-                placeholder="HH:MM"
+                placeholder="Time"
+                numberOfLines={1}
               />
             </TouchableOpacity>
           </View>
@@ -430,15 +434,13 @@ const CreateRouteScreen = ({ navigation }: any) => {
             </View>
           </View>
         </View>
-      </ScrollView>
 
-      {/* ── Floating Publish Button ── */}
-      <View style={styles.bottomFloatingArea}>
-        <TouchableOpacity style={styles.publishBtn} activeOpacity={0.9} onPress={handlePublish}>
+        {/* ── Publish Button ── */}
+        <TouchableOpacity style={[styles.publishBtn, { marginTop: 16 }]} activeOpacity={0.9} onPress={handlePublish}>
           <Text style={styles.publishBtnText}>Publish Route</Text>
           <MaterialIcon name="rocket-launch" size={20} color="#ffffff" style={{ marginLeft: 8 }} />
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
       {/* ── Native Date/Time Picker ── */}
       {showPicker && (
@@ -490,7 +492,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 24,
-    paddingBottom: 140, // Space for floating button
+    paddingBottom: 40,
     gap: 32,
   },
 

@@ -33,6 +33,10 @@ namespace RideO.API.Models
 
         [Required]
         [MaxLength(20)]
+        public string Status { get; set; } = "Pending";
+
+        [Required]
+        [MaxLength(20)]
         public string PaymentPlan { get; set; } = "Daily";
 
         public DateTime? PausedUntil { get; set; }

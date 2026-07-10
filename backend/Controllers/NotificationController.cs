@@ -79,5 +79,41 @@ namespace RideO.API.Controllers
 
             return Ok(new { message = "All notifications marked as read." });
         }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteNotification(Guid id)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var notification = await _context.Notifications
+                .FirstOrDefaultAsync(n => n.Id == id && n.UserId == userId);
+
+            if (notification == null) return NotFound();
+
+            _context.Notifications.Remove(notification);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Notification deleted successfully." });
+        }
+
+        [HttpDelete]
+        public async Task<IActionResult> DeleteAllNotifications()
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var notifications = await _context.Notifications
+                .Where(n => n.UserId == userId)
+                .ToListAsync();
+
+            if (notifications.Any())
+            {
+                _context.Notifications.RemoveRange(notifications);
+                await _context.SaveChangesAsync();
+            }
+
+            return Ok(new { message = "All notifications cleared successfully." });
+        }
     }
 }

@@ -2,10 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Image, SafeAreaView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import axios from 'axios';
-
-// Replace with your local machine's IP address
-const API_URL = 'http://10.0.2.2:5000/api';
+import api from '../api/axios';
 
 const localColors = {
   primary: '#000000',
@@ -38,10 +35,7 @@ export default function SubscriptionsScreen({ navigation }: any) {
 
   const fetchSubscriptions = async () => {
     try {
-      const token = await AsyncStorage.getItem('jwtToken');
-      const response = await axios.get(`${API_URL}/booking/my-subscriptions`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/booking/my-subscriptions');
       setSubscriptions(response.data);
     } catch (error) {
       console.error('Failed to fetch subscriptions', error);
@@ -60,10 +54,7 @@ export default function SubscriptionsScreen({ navigation }: any) {
       const pauseDate = new Date();
       pauseDate.setDate(pauseDate.getDate() + 7);
 
-      const token = await AsyncStorage.getItem('jwtToken');
-      await axios.put(`${API_URL}/booking/subscribe/${id}/pause`, { pauseUntilDate: pauseDate.toISOString() }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put(`/booking/subscribe/${id}/pause`, { pauseUntilDate: pauseDate.toISOString() });
       
       Alert.alert('Success', 'Subscription paused for 7 days.');
       fetchSubscriptions();
@@ -83,10 +74,7 @@ export default function SubscriptionsScreen({ navigation }: any) {
           style: 'destructive',
           onPress: async () => {
             try {
-              const token = await AsyncStorage.getItem('jwtToken');
-              await axios.delete(`${API_URL}/booking/subscribe/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-              });
+              await api.delete(`/booking/subscribe/${id}`);
               Alert.alert('Cancelled', 'Subscription has been cancelled.');
               fetchSubscriptions();
             } catch (error) {
@@ -119,14 +107,26 @@ export default function SubscriptionsScreen({ navigation }: any) {
   const renderSubscription = ({ item }: { item: any }) => {
     const isPaused = item.pausedUntil && new Date(item.pausedUntil) > new Date();
     const driverName = item.route?.driverName || 'Unassigned';
-    const weeklyEst = (item.totalFarePerRide || 0) * (item.route?.recurringDays?.split(',').length || 5);
-    const title = `${item.route?.startLocation?.split(',')[0] || 'Home'} to ${item.route?.endLocation?.split(',')[0] || 'Office'}`;
-    const time = item.route?.recurringTime?.substring(0, 5) || '08:00';
+    const weeklyEst = (item.totalFarePerRide || 0) * (item.route?.recurringDays?.split(',')?.length || 5);
+    const startLoc = item.route?.startLocation ? item.route.startLocation.split(',')[0] : 'Home';
+    const endLoc = item.route?.endLocation ? item.route.endLocation.split(',')[0] : 'Office';
+    const title = `${startLoc} to ${endLoc}`;
+    const timeParts = (item.route?.recurringTime || '08:00:00').split(':');
+    const d = new Date();
+    d.setHours(parseInt(timeParts[0], 10), parseInt(timeParts[1], 10));
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+
+    const isPending = item.status === 'Pending';
 
     return (
-      <View style={[styles.card, isPaused && styles.cardPaused]}>
+      <View style={[styles.card, (isPaused || isPending) && styles.cardPaused]}>
         {/* Status Badge */}
-        {isPaused ? (
+        {isPending ? (
+          <View style={[styles.activeBadge, { backgroundColor: '#fff3e0' }]}>
+            <MaterialIcons name="schedule" size={14} color="#e65100" style={{ marginRight: 4 }} />
+            <Text style={[styles.activeBadgeText, { color: '#e65100' }]}>Pending Approval</Text>
+          </View>
+        ) : isPaused ? (
           <View style={styles.pausedBadge}>
             <Text style={styles.pausedBadgeText}>Paused</Text>
           </View>
@@ -174,13 +174,31 @@ export default function SubscriptionsScreen({ navigation }: any) {
           
           <View style={[styles.detailBox, isPaused && styles.detailBoxPaused, { justifyContent: 'center' }]}>
             <Text style={styles.detailLabel}>WEEKLY EST.</Text>
-            <Text style={[styles.priceText, isPaused && styles.textMuted]}>${weeklyEst.toFixed(2)}</Text>
+            <Text style={[styles.priceText, isPaused && styles.textMuted]}>₹{weeklyEst.toFixed(2)}</Text>
           </View>
         </View>
 
+        {/* Vehicle Info */}
+        {driverName !== 'Unassigned' && (
+          <View style={[styles.detailBox, isPaused && styles.detailBoxPaused, { marginBottom: 20, flexDirection: 'row', alignItems: 'center' }]}>
+            <View style={styles.vehicleIconContainer}>
+              <MaterialIcons name="directions-car" size={20} color={localColors.secondary} />
+            </View>
+            <View>
+              <Text style={styles.detailLabel}>VEHICLE DETAILS</Text>
+              <Text style={styles.vehicleText}>{item.route?.vehicleMake || 'N/A'} {item.route?.vehicleModel || ''}</Text>
+              <Text style={styles.licenseText}>{item.route?.licensePlate || '---'}</Text>
+            </View>
+          </View>
+        )}
+
         {/* Action Controls */}
         <View style={styles.actionRow}>
-          {isPaused ? (
+          {isPending ? (
+            <View style={[styles.btnPause, { opacity: 0.5, backgroundColor: '#f0f0f0' }]}>
+              <Text style={[styles.btnPauseText, { color: '#888' }]}>Waiting...</Text>
+            </View>
+          ) : isPaused ? (
             <TouchableOpacity style={styles.btnResume}>
               <MaterialIcons name="play-arrow" size={18} color={localColors.onPrimary} />
               <Text style={styles.btnResumeText}>Resume</Text>
@@ -212,16 +230,6 @@ export default function SubscriptionsScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <SafeAreaView style={styles.headerSafe}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.headerIconBtn} onPress={() => navigation.goBack()}>
-            <MaterialIcons name="arrow-back" size={24} color={localColors.onSurface} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Subscriptions</Text>
-          <View style={{ width: 40 }} />
-        </View>
-      </SafeAreaView>
-
       {loading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={localColors.primary} />
@@ -318,7 +326,7 @@ const styles = StyleSheet.create({
     right: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 106, 97, 0.1)', // secondary/10
+    backgroundColor: 'rgba(0, 106, 97, 0.1)',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
@@ -351,7 +359,7 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     marginBottom: 20,
-    paddingRight: 80, // Space for badge
+    paddingRight: 80,
   },
   cardTitle: {
     fontSize: 18,
@@ -490,7 +498,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: localColors.surfaceBright,
     borderWidth: 1,
-    borderColor: 'rgba(186, 26, 26, 0.3)', // error/30
+    borderColor: 'rgba(186, 26, 26, 0.3)',
     paddingVertical: 10,
     borderRadius: 24,
     gap: 6,
@@ -585,5 +593,26 @@ const styles = StyleSheet.create({
     color: localColors.onSurfaceVariant,
     textAlign: 'center',
     maxWidth: '80%',
+  },
+  vehicleIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: localColors.surfaceContainerLow,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  vehicleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: localColors.onBackground,
+    marginBottom: 2,
+  },
+  licenseText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: localColors.outline,
+    letterSpacing: 1,
   },
 });

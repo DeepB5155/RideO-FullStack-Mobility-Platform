@@ -7,6 +7,8 @@ interface User {
   email: string;
   name: string;
   role: string;
+  phoneNumber?: string;
+  profilePicture?: string;
 }
 
 interface AuthContextType {
@@ -14,6 +16,7 @@ interface AuthContextType {
   token: string | null;
   login: (userData: any) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (data: Partial<User>, newToken?: string) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -22,6 +25,7 @@ export const AuthContext = createContext<AuthContextType>({
   token: null,
   login: async () => {},
   logout: async () => {},
+  updateUser: async () => {},
   isLoading: true,
 });
 
@@ -42,6 +46,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email: userData.email,
             name: userData.fullName || userData.name,
             role: userData.role,
+            phoneNumber: userData.phoneNumber,
+            profilePicture: userData.profilePicture,
           });
           setToken(storedToken);
           PushNotificationService.registerTokenWithBackend();
@@ -74,6 +80,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: userData.email,
         name: userData.fullName || userData.name,
         role: userData.role,
+        phoneNumber: userData.phoneNumber,
+        profilePicture: userData.profilePicture,
       });
       PushNotificationService.registerTokenWithBackend();
     } else {
@@ -88,8 +96,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(null);
   };
 
+  const updateUser = async (data: Partial<User>, newToken?: string) => {
+    if (!user) return;
+    const updatedUser = { ...user, ...data };
+    setUser(updatedUser);
+    
+    // Also update in AsyncStorage
+    try {
+      const stored = await AsyncStorage.getItem('userData');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        parsed.fullName = updatedUser.name;
+        parsed.phoneNumber = updatedUser.phoneNumber;
+        parsed.email = updatedUser.email;
+        parsed.profilePicture = updatedUser.profilePicture;
+        await AsyncStorage.setItem('userData', JSON.stringify(parsed));
+      }
+      
+      if (newToken) {
+        setToken(newToken);
+        await AsyncStorage.setItem('jwtToken', newToken);
+      }
+    } catch (e) {
+      console.error('Failed to update local storage', e);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, updateUser, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

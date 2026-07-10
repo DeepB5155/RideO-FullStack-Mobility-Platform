@@ -419,6 +419,7 @@ namespace RideO.API.Controllers
             if (driver == null) return NotFound();
 
             driver.IsVerified = false;
+            driver.KycRejectionReason = reason;
 
             var docs = await _context.DriverDocuments.Where(d => d.DriverId == driverId).ToListAsync();
             foreach (var doc in docs)
@@ -541,6 +542,31 @@ namespace RideO.API.Controllers
                 bookingStatus = booking.Status, 
                 messages 
             });
+        }
+        [HttpDelete("reset-database")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResetDatabase()
+        {
+            _context.ChatMessages.RemoveRange(await _context.ChatMessages.ToListAsync());
+            _context.EmergencySOSLogs.RemoveRange(await _context.EmergencySOSLogs.ToListAsync());
+            _context.Notifications.RemoveRange(await _context.Notifications.ToListAsync());
+            _context.Payments.RemoveRange(await _context.Payments.ToListAsync());
+            _context.PayoutRequests.RemoveRange(await _context.PayoutRequests.ToListAsync());
+            _context.Complaints.RemoveRange(await _context.Complaints.ToListAsync());
+            _context.DriverDocuments.RemoveRange(await _context.DriverDocuments.ToListAsync());
+            _context.RecurringBookings.RemoveRange(await _context.RecurringBookings.ToListAsync());
+            _context.Bookings.RemoveRange(await _context.Bookings.ToListAsync());
+            _context.Routes.RemoveRange(await _context.Routes.ToListAsync());
+            _context.Wallets.RemoveRange(await _context.Wallets.ToListAsync());
+            _context.Vehicles.RemoveRange(await _context.Vehicles.ToListAsync());
+            _context.Drivers.RemoveRange(await _context.Drivers.ToListAsync());
+
+            var nonAdmins = await _context.Users.Where(u => u.Role != "Admin").ToListAsync();
+            _context.Users.RemoveRange(nonAdmins);
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Database has been reset successfully. All non-admin data is cleared." });
         }
     }
 }

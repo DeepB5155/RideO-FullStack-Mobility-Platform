@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, ShieldAlert, ShieldCheck, Eye, Loader2, X, Car, DollarSign } from 'lucide-react';
+import * as signalR from '@microsoft/signalr';
 import api from '../api';
 import '../styles/Pages.css';
 
@@ -29,6 +30,49 @@ const Drivers = () => {
     useEffect(() => {
         fetchDrivers();
     }, [searchTerm, statusFilter]);
+
+    useEffect(() => {
+        let hubConnection;
+        const connectSignalR = async () => {
+            try {
+                const token = localStorage.getItem('adminToken');
+                hubConnection = new signalR.HubConnectionBuilder()
+                    .withUrl(import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5248/ridehub', {
+                        accessTokenFactory: () => token || ''
+                    })
+                    .withAutomaticReconnect()
+                    .build();
+
+                hubConnection.on('DriverStatusChanged', (driverId, isAvailable) => {
+                    setDrivers(prevDrivers => 
+                        prevDrivers.map(d => 
+                            d.id === driverId ? { ...d, isAvailable } : d
+                        )
+                    );
+                    setDriverDetails(prevDetails => {
+                        if (prevDetails && prevDetails.driver && prevDetails.driver.id === driverId) {
+                            return { ...prevDetails, driver: { ...prevDetails.driver, isAvailable } };
+                        }
+                        return prevDetails;
+                    });
+                });
+
+                await hubConnection.start();
+                await hubConnection.invoke('JoinAdminMonitors');
+                console.log('Drivers page connected to RideHub');
+            } catch (err) {
+                console.error('SignalR Drivers Connection Error: ', err);
+            }
+        };
+
+        connectSignalR();
+
+        return () => {
+            if (hubConnection) {
+                hubConnection.stop();
+            }
+        };
+    }, []);
 
     const handleToggleSuspend = async (driverId) => {
         if (!window.confirm("Are you sure you want to toggle the suspension status for this driver?")) return;
@@ -105,6 +149,7 @@ const Drivers = () => {
                                 <th>Name</th>
                                 <th>License Number</th>
                                 <th>Vehicle Type</th>
+                                <th>Live Status</th>
                                 <th>KYC Status</th>
                                 <th>Account Status</th>
                                 <th>Actions</th>
@@ -116,6 +161,11 @@ const Drivers = () => {
                                     <td><strong>{driver.user.fullName}</strong></td>
                                     <td>{driver.licenseNumber}</td>
                                     <td>{driver.vehicleType || 'Not set'}</td>
+                                    <td>
+                                        <span className={`status-badge ${driver.isAvailable ? 'approved' : ''}`} style={!driver.isAvailable ? { backgroundColor: '#e2e8f0', color: '#64748b' } : {}}>
+                                            {driver.isAvailable ? 'LIVE' : 'OFFLINE'}
+                                        </span>
+                                    </td>
                                     <td>
                                         <span className={`status-badge ${driver.isVerified ? 'approved' : 'pending'}`}>
                                             {driver.isVerified ? 'Verified' : 'Pending'}
@@ -139,7 +189,7 @@ const Drivers = () => {
                                 </tr>
                             ))}
                             {drivers.length === 0 && (
-                                <tr><td colSpan="6" style={{textAlign: 'center', padding: '20px', color: '#64748b'}}>No drivers found matching filters.</td></tr>
+                                <tr><td colSpan="7" style={{textAlign: 'center', padding: '20px', color: '#64748b'}}>No drivers found matching filters.</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -169,6 +219,9 @@ const Drivers = () => {
                                     </div>
                                     <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px' }}>
                                         <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f59e0b' }}>★ {driverDetails.driver.rating.toFixed(1)}</div>
+                                        <span className={`status-badge ${driverDetails.driver.isAvailable ? 'approved' : ''}`} style={!driverDetails.driver.isAvailable ? { backgroundColor: '#e2e8f0', color: '#64748b' } : {}}>
+                                            {driverDetails.driver.isAvailable ? 'LIVE' : 'OFFLINE'}
+                                        </span>
                                         <span className={`status-badge ${driverDetails.driver.isSuspended ? 'rejected' : 'approved'}`}>
                                             {driverDetails.driver.isSuspended ? 'SUSPENDED' : 'ACTIVE'}
                                         </span>

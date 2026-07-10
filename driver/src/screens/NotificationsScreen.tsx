@@ -52,6 +52,24 @@ const NotificationsScreen = ({ navigation }: any) => {
     }
   };
 
+  const deleteAllNotifications = async () => {
+    try {
+      await axiosInstance.delete('/notification');
+      setNotifications([]);
+    } catch (error) {
+      console.log('Error deleting all notifications:', error);
+    }
+  };
+
+  const deleteNotification = async (id: string) => {
+    try {
+      await axiosInstance.delete(`/notification/${id}`);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (error) {
+      console.log('Error deleting notification:', error);
+    }
+  };
+
   const getRelativeTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -89,24 +107,25 @@ const NotificationsScreen = ({ navigation }: any) => {
           <RefreshControl refreshing={isLoading} onRefresh={fetchNotifications} tintColor={localColors.secondary} />
         }
       >
-        {/* Header Section */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <MaterialIcons name="arrow-back" size={24} color={localColors.onSurfaceVariant} />
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.titleSection}>
-          <View style={styles.titleTextCol}>
-            <Text style={styles.pageTitle}>Alerts</Text>
-            <Text style={styles.pageSubtitle}>Stay updated with your latest notifications.</Text>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.pageTitle}>Notifications</Text>
+              <Text style={styles.pageSubtitle}>Stay updated with your latest notifications.</Text>
+            </View>
+            <View style={{ flexDirection: 'column', gap: 8 }}>
+              {hasUnread && (
+                <TouchableOpacity style={styles.markReadBtn} onPress={markAllAsRead}>
+                  <MaterialIcons name="done-all" size={16} color={localColors.secondary} />
+                  <Text style={styles.markReadText}>Mark read</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.clearAllBtn} onPress={deleteAllNotifications}>
+                <MaterialIcons name="delete-outline" size={16} color={localColors.error} />
+                <Text style={styles.clearAllText}>Clear all</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          {hasUnread && (
-            <TouchableOpacity style={styles.markReadBtn} onPress={markAllAsRead}>
-              <MaterialIcons name="done-all" size={16} color={localColors.secondary} />
-              <Text style={styles.markReadText}>Mark all as read</Text>
-            </TouchableOpacity>
-          )}
         </View>
 
         {/* Notifications List */}
@@ -145,7 +164,12 @@ const NotificationsScreen = ({ navigation }: any) => {
                     <View style={styles.textContainer}>
                       <View style={styles.cardHeaderRow}>
                         <Text style={styles.notifTitle}>{notif.title}</Text>
-                        <Text style={styles.notifTime}>{getRelativeTime(notif.createdAt)}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text style={styles.notifTime}>{getRelativeTime(notif.createdAt)}</Text>
+                          <TouchableOpacity onPress={() => deleteNotification(notif.id)} style={{ marginLeft: 8 }}>
+                            <MaterialIcons name="close" size={16} color={localColors.outlineVariant} />
+                          </TouchableOpacity>
+                        </View>
                       </View>
                       <Text style={styles.notifBody}>{notif.message}</Text>
                       
@@ -229,6 +253,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: localColors.secondary,
+    letterSpacing: 0.5,
+  },
+  clearAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: localColors.errorContainer,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  clearAllText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: localColors.error,
     letterSpacing: 0.5,
   },
   listContainer: {

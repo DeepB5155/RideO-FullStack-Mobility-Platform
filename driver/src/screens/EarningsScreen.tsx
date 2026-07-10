@@ -118,17 +118,6 @@ const EarningsScreen = ({ navigation }: any) => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#f8f9ff" />
       
-      {/* ── Top App Bar ── */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.headerIconBtn} onPress={() => navigation.openDrawer && navigation.openDrawer()}>
-          <Icon name="menu" size={24} color="#0b1c30" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>RideO</Text>
-        <TouchableOpacity style={styles.headerProfileBtn} onPress={() => navigation.navigate('Profile')}>
-          <Icon name="account-outline" size={20} color="#45464d" />
-        </TouchableOpacity>
-      </View>
-
       <ScrollView 
         style={styles.scrollView} 
         contentContainerStyle={styles.scrollContent}

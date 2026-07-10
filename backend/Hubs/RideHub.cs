@@ -5,6 +5,7 @@ using RideO.API.Data;
 using RideO.API.Models;
 using System;
 using System.Security.Claims;
+using System.Collections.Concurrent;
 
 namespace RideO.API.Hubs
 {
@@ -13,6 +14,9 @@ namespace RideO.API.Hubs
     {
         private readonly MongoDbContext _mongoDb;
         private readonly AppDbContext _appDb;
+
+        // Stores live driver locations for on-demand matchmaking
+        public static readonly ConcurrentDictionary<string, (double Lat, double Lng, DateTime LastUpdated)> OnlineDrivers = new();
 
         public RideHub(MongoDbContext mongoDb, AppDbContext appDb)
         {
@@ -66,6 +70,8 @@ namespace RideO.API.Hubs
         // Driver calls this from HomeScreen when online but not in a ride
         public async Task BroadcastDriverLocation(string driverUserId, double lat, double lng)
         {
+            OnlineDrivers[driverUserId] = (lat, lng, DateTime.UtcNow);
+
             // Broadcast to Admin Monitors (null for routeId since they are idle)
             await Clients.Group("AdminMonitors").SendAsync("ReceiveDriverLocation", driverUserId, null, lat, lng);
 

@@ -54,6 +54,24 @@ const NotificationsScreen = ({ navigation }: any) => {
     }
   };
 
+  const deleteAllNotifications = async () => {
+    try {
+      await axiosInstance.delete('/notification');
+      setNotifications([]);
+    } catch (error) {
+      console.log('Error deleting all notifications:', error);
+    }
+  };
+
+  const deleteNotification = async (id: string) => {
+    try {
+      await axiosInstance.delete(`/notification/${id}`);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (error) {
+      console.log('Error deleting notification:', error);
+    }
+  };
+
   const getRelativeTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -143,10 +161,15 @@ const NotificationsScreen = ({ navigation }: any) => {
           <View style={styles.textContainer}>
             <View style={styles.cardHeaderRow}>
               <Text style={styles.cardTitle} numberOfLines={1}>{notif.title}</Text>
-              <Text style={[styles.cardTime, isArrival && styles.cardTimeArrival]}>
-                {getRelativeTime(notif.createdAt)}
-              </Text>
-              {isArrival && <View style={styles.unreadDot} />}
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={[styles.cardTime, isArrival && styles.cardTimeArrival]}>
+                  {getRelativeTime(notif.createdAt)}
+                </Text>
+                {isArrival && <View style={styles.unreadDot} />}
+                <TouchableOpacity onPress={() => deleteNotification(notif.id || notif._id)} style={{ marginLeft: 8 }}>
+                  <MaterialIcons name="close" size={16} color={localColors.outlineVariant} />
+                </TouchableOpacity>
+              </View>
             </View>
             
             <Text style={styles.cardBody} numberOfLines={2}>{notif.message}</Text>
@@ -169,24 +192,6 @@ const NotificationsScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <SafeAreaView style={styles.headerSafe}>
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-              <MaterialIcons name="arrow-back" size={24} color={localColors.primary} />
-            </TouchableOpacity>
-            <Text style={styles.logoText}>RideO</Text>
-          </View>
-          <TouchableOpacity style={styles.profileBtn}>
-            <Image 
-              source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCLSlCyyb_hKQmSgt0BhHrIl5arAQrQtzEesGxgmZPqoqHfBCeeSkkl1uNQD6C-xdVXeLL27x7jAeolArIGIq7zWiT0Yttyil9jrxb8H0x130JVx3s7-5Zl8I9MnfrMryCPnUJGwQjDmIg2zyBcR8POihH_G8Xn2PebW0-ByJDU-Ib8mQq2mNlM9Ok5uSkqiv9NEXSCUzHv51RN97168dmqfZn6jF7WdrVlEnwb_kwzJtDank8CK21dxl3YxzPAntWuAcV80_3XIraU' }} 
-              style={styles.avatar} 
-            />
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         
         {/* Page Title Area */}
@@ -196,10 +201,17 @@ const NotificationsScreen = ({ navigation }: any) => {
             <Text style={styles.pageSubtitle}>Stay updated on your rides and offers.</Text>
           </View>
           
-          <TouchableOpacity style={styles.markReadBtn} onPress={markAllAsRead}>
-            <MaterialIcons name="done-all" size={16} color={localColors.primary} />
-            <Text style={styles.markReadText}>Mark all read</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'column', gap: 8 }}>
+            <TouchableOpacity style={styles.markReadBtn} onPress={markAllAsRead}>
+              <MaterialIcons name="done-all" size={16} color={localColors.primary} />
+              <Text style={styles.markReadText}>Mark read</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.clearAllBtn} onPress={deleteAllNotifications}>
+              <MaterialIcons name="delete-outline" size={16} color={localColors.error} />
+              <Text style={styles.clearAllText}>Clear all</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {isLoading ? (

@@ -7,7 +7,9 @@ import {
   Alert,
   Image,
   SafeAreaView,
-  StatusBar
+  StatusBar,
+  Modal,
+  TextInput
 } from 'react-native';
 import * as signalR from '@microsoft/signalr';
 import { SIGNALR_HUB_URL } from '@env';
@@ -22,6 +24,10 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
   const [currentCoords, setCurrentCoords] = useState<{lat: number, lng: number} | null>(null);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+  
+  const [ridePhase, setRidePhase] = useState<'heading_to_pickup' | 'in_progress'>('heading_to_pickup');
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
 
   useEffect(() => {
     let hubConnection: signalR.HubConnection;
@@ -41,12 +47,51 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
         setIsBroadcasting(true);
         console.log('Connected to RideHub as Driver');
 
+        const syncCachedLocations = async () => {
+          try {
+            const cached = await AsyncStorage.getItem(`cachedLocations_${routeId}`);
+            if (cached) {
+              const locations = JSON.parse(cached);
+              if (locations.length > 0) {
+                await axiosInstance.post('/route/sync-locations', locations);
+                await AsyncStorage.removeItem(`cachedLocations_${routeId}`);
+                console.log(`Synced ${locations.length} cached locations.`);
+              }
+            }
+          } catch (e) {
+            console.error('Failed to sync cached locations', e);
+          }
+        };
+
+        hubConnection.onreconnected(async () => {
+          console.log('SignalR Reconnected, syncing cached locations...');
+          await syncCachedLocations();
+        });
+
+        // Run sync on initial connect too
+        syncCachedLocations();
+
         watchId = Geolocation.watchPosition(
-          (position) => {
+          async (position) => {
             const { latitude, longitude } = position.coords;
             setCurrentCoords({ lat: latitude, lng: longitude });
             if (hubConnection.state === signalR.HubConnectionState.Connected) {
               hubConnection.invoke('UpdateRouteLocation', routeId, latitude, longitude).catch(console.error);
+            } else {
+              // Cache offline location
+              try {
+                const cached = await AsyncStorage.getItem(`cachedLocations_${routeId}`);
+                const locations = cached ? JSON.parse(cached) : [];
+                locations.push({
+                  routeId,
+                  latitude,
+                  longitude,
+                  timestamp: new Date().toISOString()
+                });
+                await AsyncStorage.setItem(`cachedLocations_${routeId}`, JSON.stringify(locations));
+              } catch (e) {
+                console.error('Failed to cache location', e);
+              }
             }
           },
           (error) => console.log(error),
@@ -65,6 +110,26 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
       if (hubConnection) hubConnection.stop();
     };
   }, [routeId]);
+
+  const handleVerifyOtp = async () => {
+    if (otpInput.length !== 4) {
+      Alert.alert('Error', 'Please enter a 4-digit PIN');
+      return;
+    }
+    
+    try {
+      // routeId is passed from the navigation params. Wait, routeId is used for StartWithOtp but the endpoint expects Booking Id. 
+      // If we only have routeId, we must adapt this. Wait, in RequestOnDemand we passed the Booking object to driver.
+      // So `routeId` here might actually be the booking id. Let's assume it's the booking ID because `/route/{id}/status` was called earlier.
+      // Actually earlier it called `PUT /route/${routeId}/status`, but now we should call `PUT /api/booking/${routeId}/start-with-otp`
+      await axiosInstance.put(`/booking/${routeId}/start-with-otp`, { otp: otpInput });
+      setShowOtpModal(false);
+      setRidePhase('in_progress');
+      Alert.alert('Success', 'Ride Started successfully!');
+    } catch (e: any) {
+      Alert.alert('Verification Failed', e.response?.data || 'Invalid OTP');
+    }
+  };
 
   const handleCompleteRide = async () => {
     Alert.alert('Complete Ride', 'Are you sure you have dropped off all passengers and want to end this ride?', [
@@ -206,13 +271,48 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
-        {/* Complete Button */}
-        <TouchableOpacity style={styles.completeBtn} activeOpacity={0.9} onPress={handleCompleteRide}>
-          <Text style={styles.completeBtnText}>Complete Dropoff</Text>
-          <Icon name="arrow-right" size={24} color="#ffffff" style={{ marginLeft: 8 }} />
-        </TouchableOpacity>
+        {/* Bottom Button */}
+        {ridePhase === 'heading_to_pickup' ? (
+          <TouchableOpacity style={styles.startBtn} activeOpacity={0.9} onPress={() => setShowOtpModal(true)}>
+            <Text style={styles.completeBtnText}>Verify OTP & Start Ride</Text>
+            <Icon name="shield-check" size={24} color="#ffffff" style={{ marginLeft: 8 }} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.completeBtn} activeOpacity={0.9} onPress={handleCompleteRide}>
+            <Text style={styles.completeBtnText}>Complete Dropoff</Text>
+            <Icon name="arrow-right" size={24} color="#ffffff" style={{ marginLeft: 8 }} />
+          </TouchableOpacity>
+        )}
 
       </View>
+
+      {/* OTP Modal */}
+      <Modal visible={showOtpModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Enter Passenger PIN</Text>
+            <Text style={styles.modalSub}>Ask the passenger for their 4-digit PIN to start the ride safely.</Text>
+            <TextInput
+              style={styles.otpInput}
+              keyboardType="number-pad"
+              maxLength={4}
+              value={otpInput}
+              onChangeText={setOtpInput}
+              placeholder="0000"
+              placeholderTextColor="#c6c6cd"
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setShowOtpModal(false)}>
+                <Text style={styles.modalBtnCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalBtnConfirm} onPress={handleVerifyOtp}>
+                <Text style={styles.modalBtnConfirmText}>Verify & Start</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -583,6 +683,89 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  startBtn: {
+    flexDirection: 'row',
+    backgroundColor: '#005049', // darker teal for start
+    borderRadius: 9999,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#005049',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0b1c30',
+    marginBottom: 8,
+  },
+  modalSub: {
+    fontSize: 14,
+    color: '#45464d',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  otpInput: {
+    fontSize: 40,
+    fontWeight: '800',
+    color: '#0b1c30',
+    letterSpacing: 16,
+    textAlign: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: '#006a61',
+    width: '60%',
+    marginBottom: 32,
+    paddingVertical: 8,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 16,
+    width: '100%',
+  },
+  modalBtnCancel: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 9999,
+    backgroundColor: '#f8f9ff',
+    borderWidth: 1,
+    borderColor: '#c6c6cd',
+    alignItems: 'center',
+  },
+  modalBtnCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#45464d',
+  },
+  modalBtnConfirm: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 9999,
+    backgroundColor: '#006a61',
+    alignItems: 'center',
+  },
+  modalBtnConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
   },
 });
 

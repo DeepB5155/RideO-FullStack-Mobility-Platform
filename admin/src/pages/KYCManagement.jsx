@@ -7,6 +7,7 @@ const KYCManagement = () => {
   const [pendingDrivers, setPendingDrivers] = useState([]);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   const fetchPendingKYC = async () => {
     try {
@@ -33,6 +34,7 @@ const KYCManagement = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSelectedDriver(res.data);
+      setRejectionReason(''); // Reset reason on select
     } catch (err) {
       console.error('Failed to fetch driver details', err);
     }
@@ -52,9 +54,13 @@ const KYCManagement = () => {
   };
 
   const handleReject = async () => {
+    if (!rejectionReason.trim()) {
+      alert('Please provide a reason for rejecting the KYC.');
+      return;
+    }
     try {
       const token = localStorage.getItem('adminToken');
-      await axios.post(`${import.meta.env.VITE_API_BASE_URL}/admin/kyc/${selectedDriver?.driver?.id || selectedDriver?.id}/reject`, "Invalid documents", {
+      await axios.post(`${import.meta.env.VITE_API_BASE_URL}/admin/kyc/${selectedDriver?.driver?.id || selectedDriver?.id}/reject`, JSON.stringify(rejectionReason), {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -162,19 +168,30 @@ const KYCManagement = () => {
             </div>
           </div>
 
-          <div style={{ marginTop: '30px', display: 'flex', gap: '15px', justifyContent: 'flex-end', borderTop: '1px solid var(--surface-border)', paddingTop: '20px' }}>
-            <button 
-              onClick={handleReject}
-              className="danger-btn"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <XCircle size={18} /> Reject Application
-            </button>
-            <button 
-              onClick={handleApprove}
-              className="primary-btn"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--success)' }}>
-              <CheckCircle size={18} /> Approve Driver
-            </button>
+          <div style={{ marginTop: '30px', borderTop: '1px solid var(--surface-border)', paddingTop: '20px' }}>
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Rejection Reason (Required for Rejecting)</label>
+              <textarea 
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Type the reason why the KYC documents are being rejected..."
+                style={{ width: '100%', minHeight: '80px', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--outline)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '15px', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={handleReject}
+                className="danger-btn"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <XCircle size={18} /> Reject Application
+              </button>
+              <button 
+                onClick={handleApprove}
+                className="primary-btn"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--success)' }}>
+                <CheckCircle size={18} /> Approve Driver
+              </button>
+            </div>
           </div>
         </div>
       )}

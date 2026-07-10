@@ -387,7 +387,107 @@ namespace RideO.API.Controllers
                 .OrderByDescending(r => r.StartTime)
                 .ToListAsync();
 
+            foreach (var r in routes)
+            {
+                r.OneTimeBookingsCount = await _context.Bookings
+                    .Where(b => b.RouteId == r.Id && (b.Status == "Approved" || b.Status == "Started"))
+                    .SumAsync(b => (int?)b.SeatsBooked) ?? 0;
+                
+                r.SubscribersCount = await _context.RecurringBookings
+                    .Where(sb => sb.OriginalRouteId == r.Id && sb.IsActive)
+                    .SumAsync(sb => (int?)sb.SeatsBooked) ?? 0;
+            }
+
             return Ok(routes);
+        }
+
+        public class CancelDayRequest
+        {
+            public string Date { get; set; } = string.Empty;
+        }
+
+        [HttpPost("{routeId}/cancel-day")]
+        public async Task<IActionResult> CancelDay(Guid routeId, [FromBody] CancelDayRequest req)
+        {
+            var driver = await GetCurrentDriver();
+            if (driver == null) return Unauthorized();
+
+            var templateRoute = await _context.Routes.FirstOrDefaultAsync(r => r.Id == routeId && r.DriverId == driver.Id);
+            if (templateRoute == null) return BadRequest("Route not found.");
+
+            if (!templateRoute.IsRecurring)
+            {
+                // User clicked an instance. Find the parent template.
+                var actualTemplate = await _context.Routes.FirstOrDefaultAsync(r => 
+                    r.DriverId == driver.Id && 
+                    r.IsRecurring && 
+                    r.StartLocation == templateRoute.StartLocation && 
+                    r.EndLocation == templateRoute.EndLocation);
+                
+                if (actualTemplate == null) return BadRequest("Could not find recurring template for this ride.");
+                
+                templateRoute = actualTemplate;
+            }
+
+            // Add to CancelledDates
+            var cancelledDates = templateRoute.CancelledDates?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList() ?? new List<string>();
+            if (!cancelledDates.Contains(req.Date))
+            {
+                cancelledDates.Add(req.Date);
+                templateRoute.CancelledDates = string.Join(",", cancelledDates);
+            }
+
+            // Cancel any generated instance for this day
+            if (DateTime.TryParse(req.Date, out var parsedDate))
+            {
+                var instanceRoute = await _context.Routes.FirstOrDefaultAsync(r => 
+                    r.DriverId == driver.Id && 
+                    r.StartTime.Date == parsedDate.Date && 
+                    !r.IsRecurring && 
+                    r.StartLocation == templateRoute.StartLocation && 
+                    r.EndLocation == templateRoute.EndLocation && 
+                    r.Status != "Cancelled");
+                
+                if (instanceRoute != null)
+                {
+                    instanceRoute.Status = "Cancelled";
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Notify subscribers
+            var subscribers = await _context.RecurringBookings
+                .Include(sb => sb.User)
+                .Where(sb => sb.OriginalRouteId == routeId && sb.IsActive)
+                .ToListAsync();
+
+            foreach (var sub in subscribers)
+            {
+                if (sub.User?.FcmDeviceToken != null)
+                {
+                    var notification = new Notification
+                    {
+                        UserId = sub.UserId,
+                        Title = "Ride Cancelled ⚠️",
+                        Message = $"Your driver cancelled the ride on {req.Date}. Tap to find an alternative.",
+                        Type = "RIDE_CANCELLED_FIND_ALTERNATIVE",
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.Notifications.Add(notification);
+                    
+                    await _fcmService.SendNotificationAsync(sub.User.FcmDeviceToken, notification.Title, notification.Message, new Dictionary<string, string>
+                    {
+                        { "type", "RIDE_CANCELLED_FIND_ALTERNATIVE" },
+                        { "date", req.Date },
+                        { "startLocation", templateRoute.StartLocation },
+                        { "endLocation", templateRoute.EndLocation }
+                    });
+                }
+            }
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = $"Ride on {req.Date} has been cancelled." });
         }
 
         // --- HA VERSINE DISTANCE HELPER ---
@@ -410,41 +510,69 @@ namespace RideO.API.Controllers
 
         [HttpGet("search")]
         [AllowAnonymous] // Anyone can search for rides
-        public async Task<IActionResult> SearchRoutes([FromQuery] double pickupLat, [FromQuery] double pickupLng, [FromQuery] double dropLat, [FromQuery] double dropLng, [FromQuery] DateTime date, [FromQuery] int seats = 1)
+        public async Task<IActionResult> SearchRoutes([FromQuery] double pickupLat, [FromQuery] double pickupLng, [FromQuery] double dropLat, [FromQuery] double dropLng, [FromQuery] DateTime date, [FromQuery] int seats = 1, [FromQuery] bool isRecurring = false, [FromQuery] string? recurringDays = null)
         {
-            // 1. Initial filter: Only Published routes, verified drivers, sufficient seats, on the specific date
+            var allRoutes = new List<RideO.API.Models.Route>();
+            
             // Ensure the date is UTC for PostgreSQL timestamp with time zone compatibility
             var startOfDay = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
             var endOfDay = startOfDay.AddDays(1);
 
-            var availableRoutes = await _context.Routes
-                .Include(r => r.Driver).ThenInclude(d => d.User)
-                .Include(r => r.Vehicle)
-                .Include(r => r.Stops)
-                .Where(r => r.Status == "Published" 
-                         && r.Driver != null 
-                         && r.Driver.IsVerified 
-                         && r.AvailableSeats >= seats
-                         && r.StartTime >= startOfDay 
-                         && r.StartTime < endOfDay)
-                .ToListAsync();
+            if (isRecurring && !string.IsNullOrEmpty(recurringDays))
+            {
+                var requestedDays = recurringDays.Split(',').Select(d => d.Trim()).ToList();
+                
+                var recurringRoutes = await _context.Routes
+                    .Include(r => r.Driver).ThenInclude(d => d.User)
+                    .Include(r => r.Vehicle)
+                    .Include(r => r.Stops)
+                    .Where(r => r.Status == "Published"
+                             && r.IsRecurring
+                             && r.RecurringDays != null
+                             && r.Driver != null
+                             && r.Driver.IsVerified
+                             && r.AvailableSeats >= seats)
+                    .ToListAsync();
+                
+                // Filter in memory: route's RecurringDays must contain at least one of the requestedDays
+                recurringRoutes = recurringRoutes.Where(r => 
+                    requestedDays.Any(day => r.RecurringDays!.Contains(day))
+                ).ToList();
 
-            // Fetch recurring routes that match the day of the week
-            var dayOfWeekStr = startOfDay.ToString("ddd"); // "Mon", "Tue", etc.
-            var recurringRoutes = await _context.Routes
-                .Include(r => r.Driver).ThenInclude(d => d.User)
-                .Include(r => r.Vehicle)
-                .Include(r => r.Stops)
-                .Where(r => r.Status == "Published"
-                         && r.IsRecurring
-                         && r.RecurringDays != null
-                         && r.RecurringDays.Contains(dayOfWeekStr)
-                         && r.Driver != null
-                         && r.Driver.IsVerified
-                         && r.AvailableSeats >= seats)
-                .ToListAsync();
+                allRoutes = recurringRoutes;
+            }
+            else
+            {
+                // 1. Initial filter: Only Published routes, verified drivers, sufficient seats, on the specific date
+                var availableRoutes = await _context.Routes
+                    .Include(r => r.Driver).ThenInclude(d => d.User)
+                    .Include(r => r.Vehicle)
+                    .Include(r => r.Stops)
+                    .Where(r => r.Status == "Published" 
+                             && r.Driver != null 
+                             && r.Driver.IsVerified 
+                             && r.AvailableSeats >= seats
+                             && r.StartTime >= startOfDay 
+                             && r.StartTime < endOfDay)
+                    .ToListAsync();
 
-            var allRoutes = availableRoutes.UnionBy(recurringRoutes, r => r.Id).ToList();
+                // Fetch recurring routes that match the day of the week
+                var dayOfWeekStr = startOfDay.ToString("ddd"); // "Mon", "Tue", etc.
+                var recurringRoutes = await _context.Routes
+                    .Include(r => r.Driver).ThenInclude(d => d.User)
+                    .Include(r => r.Vehicle)
+                    .Include(r => r.Stops)
+                    .Where(r => r.Status == "Published"
+                             && r.IsRecurring
+                             && r.RecurringDays != null
+                             && r.RecurringDays.Contains(dayOfWeekStr)
+                             && r.Driver != null
+                             && r.Driver.IsVerified
+                             && r.AvailableSeats >= seats)
+                    .ToListAsync();
+
+                allRoutes = availableRoutes.UnionBy(recurringRoutes, r => r.Id).ToList();
+            }
 
             var matchedRoutes = new List<object>();
             var radiusKm = 5.0; // Max distance to walk/travel to pickup point
@@ -520,6 +648,41 @@ namespace RideO.API.Controllers
             }
 
             return Ok(matchedRoutes.OrderBy(r => ((dynamic)r).startTime));
+        }
+
+        public class SyncLocationDto
+        {
+            public Guid RouteId { get; set; }
+            public double Latitude { get; set; }
+            public double Longitude { get; set; }
+            public DateTime Timestamp { get; set; }
+        }
+
+        [HttpPost("sync-locations")]
+        public async Task<IActionResult> SyncLocations([FromBody] List<SyncLocationDto> locations)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var driver = await _context.Drivers.FirstOrDefaultAsync(d => d.UserId == Guid.Parse(userId));
+            if (driver == null) return Forbid();
+
+            if (locations == null || !locations.Any()) return BadRequest("No locations provided.");
+
+            var caches = locations.Select(l => new LocationCache
+            {
+                Id = Guid.NewGuid(),
+                DriverId = driver.Id,
+                RouteId = l.RouteId,
+                Latitude = l.Latitude,
+                Longitude = l.Longitude,
+                Timestamp = l.Timestamp
+            }).ToList();
+
+            _context.LocationCaches.AddRange(caches);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = $"{caches.Count} locations synced." });
         }
     }
 }

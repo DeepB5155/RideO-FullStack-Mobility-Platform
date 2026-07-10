@@ -40,7 +40,20 @@ const LoginScreen = () => {
         Alert.alert('Error', 'Please fill in all fields');
         return;
       }
-      const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{4,}$/;
+      
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        Alert.alert('Error', 'Please enter a valid email address.');
+        return;
+      }
+
+      const phoneRegex = /^[0-9]{10}$/;
+      if (!phoneRegex.test(phone.replace(/\D/g, ''))) {
+        Alert.alert('Error', 'Please enter a valid 10-digit phone number.');
+        return;
+      }
+
+      const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
       if (!strongPasswordRegex.test(password)) {
         Alert.alert('Weak Password', 'Password must be at least 8 characters and contain 1 uppercase, 1 lowercase, 1 number, and 1 special character.');
         return;
@@ -97,7 +110,7 @@ const LoginScreen = () => {
       const { token, user } = response.data;
       
       if (user.role !== 'Driver') {
-        Alert.alert('Error', 'Invalid User Role. Please login with a Driver account.');
+        Alert.alert('Error', 'Account not found. Please register as a Driver first.');
         return;
       }
       
@@ -105,6 +118,33 @@ const LoginScreen = () => {
     } catch (error: any) {
       const message = error.response?.data || error.message || 'Login failed';
       Alert.alert('Login Error', message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const identifier = loginMethod === 'phone' ? phone : email;
+    if (!identifier) {
+      Alert.alert('Error', 'Please enter your email or phone to reset password.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await api.post('/auth/forgot-password', { email: identifier });
+      
+      if (response.data.debug_token) {
+        Alert.alert(
+          'Reset Link Sent', 
+          `Your debug token is: ${response.data.debug_token}\n\nUse this to test the reset password flow.`,
+          [{ text: 'OK', onPress: () => navigation.navigate('ResetPassword') }]
+        );
+      } else {
+        Alert.alert('Reset Link Sent', response.data.message);
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data || 'Failed to send reset link.');
     } finally {
       setLoading(false);
     }
@@ -163,11 +203,12 @@ const LoginScreen = () => {
                   <Icon name="phone-iphone" size={20} color={localColors.outline} style={styles.icon} />
                   <TextInput
                     style={styles.regInput}
-                    placeholder="+1 (555) 000-0000"
+                    placeholder="9876543210"
                     placeholderTextColor={localColors.outline}
-                    keyboardType="phone-pad"
+                    keyboardType="numeric"
+                    maxLength={10}
                     value={phone}
-                    onChangeText={setPhone}
+                    onChangeText={(text) => setPhone(text.replace(/[^0-9]/g, ''))}
                   />
                 </View>
               </View>
@@ -304,7 +345,7 @@ const LoginScreen = () => {
               <View style={styles.inputGroup}>
                 <View style={styles.labelRow}>
                   <Text style={styles.label}>PASSWORD</Text>
-                  <TouchableOpacity onPress={() => Alert.alert('Reset Password', 'Contact support to reset your password.')}>
+                  <TouchableOpacity onPress={handleForgotPassword}>
                     <Text style={styles.forgotText}>Forgot?</Text>
                   </TouchableOpacity>
                 </View>

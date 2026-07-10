@@ -31,12 +31,22 @@ namespace RideO.API.Migrations
                     b.Property<DateTime>("BookedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal>("CancellationFee")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("CancellationReason")
+                        .HasColumnType("text");
+
                     b.Property<string>("DropoffLocationName")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
                     b.Property<Guid?>("DropoffStopId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Otp")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
@@ -181,6 +191,10 @@ namespace RideO.API.Migrations
                     b.Property<bool>("IsVerified")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("KycRejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<string>("LicenseNumber")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -311,6 +325,32 @@ namespace RideO.API.Migrations
                     b.ToTable("EmergencySOSLogs");
                 });
 
+            modelBuilder.Entity("RideO.API.Models.LocationCache", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DriverId")
+                        .HasColumnType("uuid");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<Guid>("RouteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("LocationCaches");
+                });
+
             modelBuilder.Entity("RideO.API.Models.Notification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -389,6 +429,33 @@ namespace RideO.API.Migrations
                     b.ToTable("Payments");
                 });
 
+            modelBuilder.Entity("RideO.API.Models.PayoutRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("DriverId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PayoutRequests");
+                });
+
             modelBuilder.Entity("RideO.API.Models.Rating", b =>
                 {
                     b.Property<Guid>("Id")
@@ -452,6 +519,11 @@ namespace RideO.API.Migrations
                     b.Property<int>("SeatsBooked")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<DateTime>("SubscribedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -485,6 +557,9 @@ namespace RideO.API.Migrations
                     b.Property<int>("AvailableSeats")
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
+
+                    b.Property<string>("CancelledDates")
+                        .HasColumnType("text");
 
                     b.Property<Guid>("DriverId")
                         .HasColumnType("uuid");

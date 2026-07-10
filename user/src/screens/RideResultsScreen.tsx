@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, ImageBackground, Image, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, Image, SafeAreaView, ScrollView, Platform, Animated, PanResponder, Dimensions } from 'react-native';
+import { useRef } from 'react';
 import axiosInstance from '../api/axios';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import Mapbox from '@rnmapbox/maps';
+import { MAPBOX_ACCESS_TOKEN } from '@env';
+
+const MAPBOX_TOKEN = MAPBOX_ACCESS_TOKEN;
+Mapbox.setAccessToken(MAPBOX_TOKEN);
 
 const localColors = {
   background: '#f8f9ff',
@@ -21,10 +27,10 @@ const localColors = {
   onBackground: '#0b1c30',
 };
 
-const mapBgUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuAwEihdVVURAqIQe9V9OV7lDhsqNiIY3jRdQGMWSGhVjh0_WBXQg3eTMi1bYIP5U6AaEzEcBWR4q02lft_PxDEvJQvl-Yp6mQFA2dJQzjO_BpcIPC7Az09spSX-pKNasyI3qVRxU789iMZF6bsPkN2hUX8UIgy6xrIWTbvTqPALHxZ8Huv0vwwCfPT7R04xPKNW-wzeYTguugGOZVBttUa9204AyJVg1Nebbh4_hll2YPV8_bYTKfrXQ6EVklgauOkOhIXQpgw71Cmo";
+// Using dynamic map view instead of static bg
 
 const RideResultsScreen = ({ route, navigation }: any) => {
-  const { pickupText, dropoffText, pickupLat, pickupLng, dropLat, dropLng, date, seats } = route.params;
+  const { pickupText, dropoffText, pickupLat, pickupLng, dropLat, dropLng, date, seats, isRecurring, recurringDays } = route.params;
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'UPI' | 'Wallet'>('Wallet');
@@ -33,10 +39,43 @@ const RideResultsScreen = ({ route, navigation }: any) => {
   const [selectedRoute, setSelectedRoute] = useState<any>(null);
   const [subscriptionPlan, setSubscriptionPlan] = useState<'Daily' | 'Weekly'>('Daily');
 
+  const [routeCoordinates, setRouteCoordinates] = useState<any[]>([]);
+  const [mockDrivers, setMockDrivers] = useState<{id: number, lng: number, lat: number}[]>([]);
+
+  const windowHeight = Dimensions.get('window').height;
+  const SHEET_PEEK_HEIGHT = 200; // Increased to fit the filter chips cleanly
+  const SHEET_FULL_HEIGHT = windowHeight * 0.78;
+  const COLLAPSED_Y = SHEET_FULL_HEIGHT - SHEET_PEEK_HEIGHT;
+  const EXPANDED_Y = 0;
+
+  const animation = useRef(new Animated.Value(0)).current; // 0 = collapsed, 1 = expanded
+  const isExpanded = useRef(false);
+
+  const translateY = animation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [COLLAPSED_Y, EXPANDED_Y],
+    extrapolate: 'clamp',
+  });
+
+  const snapTo = (expanded: boolean) => {
+    isExpanded.current = expanded;
+    Animated.spring(animation, {
+      toValue: expanded ? 1 : 0,
+      useNativeDriver: true, // We can safely use true again for better performance since there is no drag interference
+      bounciness: 0,
+      speed: 14,
+    }).start();
+  };
+
+  const toggleSheet = () => snapTo(!isExpanded.current);
+
   useEffect(() => {
     const fetchResults = async () => {
       try {
-        const url = `/route/search?pickupLat=${pickupLat}&pickupLng=${pickupLng}&dropLat=${dropLat}&dropLng=${dropLng}&date=${date}&seats=${seats}`;
+        let url = `/route/search?pickupLat=${pickupLat}&pickupLng=${pickupLng}&dropLat=${dropLat}&dropLng=${dropLng}&date=${date}&seats=${seats}`;
+        if (isRecurring) {
+          url += `&isRecurring=true&recurringDays=${recurringDays || ''}`;
+        }
         const res = await axiosInstance.get(url);
         setResults(res.data);
       } catch (err) {
@@ -47,6 +86,25 @@ const RideResultsScreen = ({ route, navigation }: any) => {
       }
     };
     fetchResults();
+
+    const fetchRoute = async () => {
+      try {
+        const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${pickupLng},${pickupLat};${dropLng},${dropLat}?geometries=geojson&access_token=${MAPBOX_TOKEN}`);
+        const data = await res.json();
+        if (data.routes && data.routes.length > 0) {
+          setRouteCoordinates(data.routes[0].geometry.coordinates);
+        }
+      } catch (e) {
+        console.error('Route fetch error:', e);
+      }
+    };
+    fetchRoute();
+
+    setMockDrivers([
+      { id: 1, lng: pickupLng + 0.002, lat: pickupLat + 0.002 },
+      { id: 2, lng: pickupLng - 0.003, lat: pickupLat + 0.001 },
+      { id: 3, lng: pickupLng + 0.001, lat: pickupLat - 0.002 },
+    ]);
   }, []);
 
   const handleRequestSeat = async (item: any) => {
@@ -62,6 +120,28 @@ const RideResultsScreen = ({ route, navigation }: any) => {
       navigation.navigate('My Rides'); 
     } catch (err: any) {
       Alert.alert('Error', err.response?.data || 'Failed to request seat.');
+    }
+  };
+
+  const [onDemandLoading, setOnDemandLoading] = useState(false);
+  const handleRequestOnDemand = async () => {
+    try {
+      setOnDemandLoading(true);
+      const estimatedFare = 150 * seats; // basic mock pricing
+      await axiosInstance.post('/booking/ondemand', {
+        pickupLat, pickupLng, dropLat, dropLng,
+        pickupLocationName: pickupText,
+        dropoffLocationName: dropoffText,
+        seatsBooked: seats,
+        paymentMethod,
+        estimatedFare
+      });
+      Alert.alert('Success', 'Searching for a nearby taxi... Driver notified!');
+      navigation.navigate('My Rides'); 
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.message || err.response?.data || 'No nearby drivers available right now.');
+    } finally {
+      setOnDemandLoading(false);
     }
   };
 
@@ -141,10 +221,43 @@ const RideResultsScreen = ({ route, navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      {/* Map Background Layer */}
-      <ImageBackground source={{ uri: mapBgUrl }} style={styles.mapBg} resizeMode="cover" />
+      {/* Map View */}
+      <View style={styles.mapBg}>
+        <Mapbox.MapView style={{ flex: 1 }} styleURL={Mapbox.StyleURL.Street} compassEnabled={false}>
+          <Mapbox.Camera
+            defaultSettings={{
+              centerCoordinate: [pickupLng, pickupLat],
+              zoomLevel: 12,
+            }}
+          />
+          {routeCoordinates.length > 0 && (
+            <Mapbox.ShapeSource id="routeSource" shape={{ type: 'LineString', coordinates: routeCoordinates }}>
+              <Mapbox.LineLayer
+                id="routeFill"
+                style={{ lineColor: '#006a61', lineWidth: 5, lineCap: 'round', lineJoin: 'round' }}
+              />
+            </Mapbox.ShapeSource>
+          )}
+          
+          <Mapbox.PointAnnotation id="pickup" coordinate={[pickupLng, pickupLat]}>
+            <View style={styles.markerPickup}><View style={styles.markerPickupInner}/></View>
+          </Mapbox.PointAnnotation>
+          
+          <Mapbox.PointAnnotation id="dropoff" coordinate={[dropLng, dropLat]}>
+            <View style={styles.markerDropoff}><View style={styles.markerDropoffInner}/></View>
+          </Mapbox.PointAnnotation>
+          
+          {mockDrivers.map((driver) => (
+            <Mapbox.PointAnnotation key={driver.id.toString()} id={`driver-${driver.id}`} coordinate={[driver.lng, driver.lat]}>
+              <View style={styles.carMarker}>
+                <MaterialIcons name="local-taxi" size={16} color="#ffffff" />
+              </View>
+            </Mapbox.PointAnnotation>
+          ))}
+        </Mapbox.MapView>
+      </View>
       
-      <View style={styles.innerContainer}>
+      <View style={styles.topContainer}>
         {/* Top Header */}
         <View style={styles.headerContainer}>
           <View style={styles.header}>
@@ -178,32 +291,41 @@ const RideResultsScreen = ({ route, navigation }: any) => {
                 <MaterialIcons name="tune" size={20} color={localColors.primary} />
               </TouchableOpacity>
             </View>
-            
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll}>
-              <TouchableOpacity style={styles.filterChipActive}>
-                <Text style={styles.filterChipActiveText}>Recommended</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.filterChip}>
-                <Text style={styles.filterChipText}>Fastest</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.filterChip}>
-                <Text style={styles.filterChipText}>Lowest Price</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.filterChip}>
-                <Text style={styles.filterChipText}>Eco-Friendly</Text>
-              </TouchableOpacity>
-            </ScrollView>
           </View>
         </View>
 
-        {/* Bottom Sheet UI */}
-        <View style={styles.bottomSheet}>
-          <View style={styles.handleBar} />
-          
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Available Rides</Text>
-            <Text style={styles.sheetSubtitle}>{results.length} options for {date}</Text>
-          </View>
+      </View>
+
+        {/* Animated Bottom Sheet */}
+        <Animated.View 
+          style={[styles.bottomSheet, { height: SHEET_FULL_HEIGHT, transform: [{ translateY }] }]}
+        >
+          <TouchableOpacity 
+            activeOpacity={0.8}
+            onPress={toggleSheet}
+            style={styles.dragZone}
+          >
+            <View style={styles.handleBar} />
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Available Rides</Text>
+              <Text style={styles.sheetSubtitle}>{results.length} options for {date}</Text>
+            </View>
+          </TouchableOpacity>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScrollSheet}>
+            <TouchableOpacity style={styles.filterChipActive}>
+              <Text style={styles.filterChipActiveText}>Recommended</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.filterChip}>
+              <Text style={styles.filterChipText}>Fastest</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.filterChip}>
+              <Text style={styles.filterChipText}>Lowest Price</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.filterChip}>
+              <Text style={styles.filterChipText}>Eco-Friendly</Text>
+            </TouchableOpacity>
+          </ScrollView>
 
           {/* Payment Selector injected cleanly */}
           <View style={styles.paymentSelector}>
@@ -220,6 +342,45 @@ const RideResultsScreen = ({ route, navigation }: any) => {
             ))}
           </View>
 
+          {/* On-Demand Taxi Card */}
+          <TouchableOpacity 
+            style={[styles.rideCard, { backgroundColor: '#fcf6e3', borderColor: '#e4cd8b' }]} 
+            onPress={handleRequestOnDemand}
+            disabled={onDemandLoading}
+          >
+            <View style={styles.cardTopRow}>
+              <View style={styles.carInfoLeft}>
+                <Image source={{ uri: getVehicleImage('Sedan') }} style={styles.carImg} resizeMode="contain" />
+                <View>
+                  <Text style={styles.carTitle}>🚕 Request Taxi Now</Text>
+                  <Text style={styles.carSubtitle}>Instant pickup • Nearest Driver</Text>
+                </View>
+              </View>
+              <View style={styles.priceContainer}>
+                <Text style={styles.priceText}>₹{150 * seats}</Text>
+              </View>
+            </View>
+            <View style={styles.cardBottomRow}>
+              <View style={styles.driverInfo}>
+                <MaterialIcons name="bolt" size={16} color="#d97706" />
+                <Text style={[styles.driverText, { color: '#b45309' }]}>Fastest Match</Text>
+              </View>
+              <View style={[styles.actionBtn, { backgroundColor: '#000' }]}>
+                {onDemandLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={[styles.actionBtnText, { color: '#fff' }]}>Book Taxi</Text>
+                )}
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.dividerBox}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR SCHEDULED CARPOOLS</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
           {loading ? (
             <ActivityIndicator size="large" color={localColors.primary} style={{ marginTop: 40 }} />
           ) : (
@@ -234,8 +395,7 @@ const RideResultsScreen = ({ route, navigation }: any) => {
               showsVerticalScrollIndicator={false}
             />
           )}
-        </View>
-      </View>
+        </Animated.View>
 
       {/* Subscription Modal */}
       <Modal visible={isSubscribeModalVisible} animationType="slide" transparent={true}>
@@ -291,16 +451,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: localColors.background,
   },
-  innerContainer: {
-    flex: 1,
-    justifyContent: 'space-between',
+  topContainer: {
+    paddingBottom: 20,
+    pointerEvents: 'box-none',
   },
   mapBg: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '60%', 
+    ...StyleSheet.absoluteFill as any,
   },
   headerContainer: {
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
@@ -406,6 +562,11 @@ const styles = StyleSheet.create({
   filtersScroll: {
     flexDirection: 'row',
   },
+  filtersScrollSheet: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
   filterChipActive: {
     backgroundColor: localColors.primary + '15',
     paddingHorizontal: 16,
@@ -433,17 +594,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   bottomSheet: {
-    flex: 1,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0, // anchored to bottom; positive translateY shifts it DOWN, leaving only PEEK visible
     backgroundColor: localColors.surface,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    marginTop: 20,
     paddingTop: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 24,
     elevation: 20,
+    zIndex: 100, // Guarantee it renders above all other floating overlays
+  },
+  dragZone: {
+    paddingBottom: 8,
+    backgroundColor: 'transparent',
   },
   handleBar: {
     width: 48,
@@ -680,7 +848,40 @@ const styles = StyleSheet.create({
     color: localColors.onPrimary,
     fontSize: 16,
     fontWeight: '700',
-  }
+  },
+  dividerBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+    paddingHorizontal: 20
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e0e0e0'
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    color: '#76777d',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5
+  },
+  markerPickup: {
+    width: 16, height: 16, borderRadius: 8, backgroundColor: '#ffffff',
+    borderWidth: 3, borderColor: '#000000', alignItems: 'center', justifyContent: 'center'
+  },
+  markerPickupInner: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#000000' },
+  markerDropoff: {
+    width: 16, height: 16, backgroundColor: '#ffffff',
+    borderWidth: 3, borderColor: '#006a61', alignItems: 'center', justifyContent: 'center'
+  },
+  markerDropoffInner: { width: 4, height: 4, backgroundColor: '#006a61' },
+  carMarker: {
+    width: 28, height: 28, borderRadius: 14, backgroundColor: '#000000',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 5
+  },
 });
 
 export default RideResultsScreen;

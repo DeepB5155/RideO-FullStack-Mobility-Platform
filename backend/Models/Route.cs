@@ -76,6 +76,14 @@ namespace RideO.API.Models
         [MaxLength(50)]
         public string? RecurringDays { get; set; } // e.g. "Mon,Tue,Wed,Thu,Fri"
 
-        public TimeSpan? RecurringTime { get; set; } 
+        public TimeSpan? RecurringTime { get; set; }
+
+        public string? CancelledDates { get; set; } // Comma-separated list of YYYY-MM-DD dates
+
+        [NotMapped]
+        public int OneTimeBookingsCount { get; set; } = 0;
+
+        [NotMapped]
+        public int SubscribersCount { get; set; } = 0;
     }
 }

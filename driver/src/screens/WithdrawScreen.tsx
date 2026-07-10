@@ -66,10 +66,8 @@ const WithdrawScreen = ({ navigation }: any) => {
 
     try {
       setIsWithdrawing(true);
-      // Sending generic bank info based on selection for now
-      const res = await api.post('/wallet/withdraw', { 
-        amount: withdrawAmount, 
-        bankAccountInfo: selectedBank === 'chase' ? 'Chase Checking **** 3924' : 'Bank of America **** 8112' 
+      const res = await api.post('/payout/request', { 
+        amount: withdrawAmount 
       });
       Alert.alert('Success', res.data.message || 'Withdrawal initiated successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() }

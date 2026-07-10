@@ -2,10 +2,12 @@ import React, { useState, useRef } from 'react';
 import { 
   View, Text, TextInput, TouchableOpacity, StyleSheet, 
   Alert, FlatList, ActivityIndicator, Keyboard, 
-  TouchableWithoutFeedback, ImageBackground, Image, Platform
+  TouchableWithoutFeedback, ImageBackground, Image, Platform,
+  Modal, ScrollView
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 // IMPORTANT: User should replace this with their actual Mapbox token
 const MAPBOX_TOKEN = 'pk.eyJ1IjoiZGVlcC01MTU1Iiwi' + 'YSI6ImNtb2xicG42bzBhcWcyb3BoNW81Ynh4YWgifQ.FvuveCsGrnRfM0VJdGGUXw';
@@ -21,6 +23,7 @@ const localColors = {
   outline: '#76777d',
   onSurface: '#0b1c30',
   surfaceContainer: '#e5eeff',
+  surfaceContainerHigh: '#e0e9f8',
   surfaceVariant: '#d3e4fe',
   surface: '#ffffff',
   secondary: '#006a61',
@@ -30,7 +33,7 @@ const localColors = {
 
 const mapBgUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuAwEihdVVURAqIQe9V9OV7lDhsqNiIY3jRdQGMWSGhVjh0_WBXQg3eTMi1bYIP5U6AaEzEcBWR4q02lft_PxDEvJQvl-Yp6mQFA2dJQzjO_BpcIPC7Az09spSX-pKNasyI3qVRxU789iMZF6bsPkN2hUX8UIgy6xrIWTbvTqPALHxZ8Huv0vwwCfPT7R04xPKNW-wzeYTguugGOZVBttUa9204AyJVg1Nebbh4_hll2YPV8_bYTKfrXQ6EVklgauOkOhIXQpgw71Cmo";
 
-export default function SearchRideScreen({ navigation }: any) {
+export default function SearchRideScreen({ navigation, route }: any) {
   const [rideType, setRideType] = useState<'one-time' | 'recurring'>('one-time');
   const [pickupText, setPickupText] = useState('');
   const [dropoffText, setDropoffText] = useState('');
@@ -41,9 +44,15 @@ export default function SearchRideScreen({ navigation }: any) {
   const [dropLat, setDropLat] = useState<number | null>(null);
   const [dropLng, setDropLng] = useState<number | null>(null);
 
-  const [date, setDate] = useState('Today');
-  const [time, setTime] = useState('Now');
+  const [selectedDays, setSelectedDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [seats, setSeats] = useState(1);
+
+  // Formatting helpers
+  const formattedDate = selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const formattedTime = selectedDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
   // Suggestions State
   const [pickupSuggestions, setPickupSuggestions] = useState<any[]>([]);
@@ -51,6 +60,20 @@ export default function SearchRideScreen({ navigation }: any) {
   const [isPickupSearching, setIsPickupSearching] = useState(false);
   const [isDropoffSearching, setIsDropoffSearching] = useState(false);
   const [activeField, setActiveField] = useState<'pickup' | 'dropoff' | null>(null);
+
+  React.useEffect(() => {
+    if (route?.params) {
+      const { initialStartLocation, initialEndLocation, initialDate } = route.params;
+      if (initialStartLocation) setPickupText(initialStartLocation);
+      if (initialEndLocation) setDropoffText(initialEndLocation);
+      if (initialDate) {
+        const d = new Date(initialDate);
+        if (!isNaN(d.getTime())) {
+          setSelectedDate(d);
+        }
+      }
+    }
+  }, [route?.params]);
 
   const pickupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dropoffTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -148,6 +171,16 @@ export default function SearchRideScreen({ navigation }: any) {
     );
   };
 
+  const handleDateChange = (event: any, selectedValue?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+      setShowTimePicker(false);
+    }
+    if (selectedValue) {
+      setSelectedDate(selectedValue);
+    }
+  };
+
   const handleSearch = () => {
     if (!pickupText || !dropoffText) {
       Alert.alert('Error', 'Please fill all fields');
@@ -158,7 +191,7 @@ export default function SearchRideScreen({ navigation }: any) {
       return;
     }
 
-    let searchDate = new Date().toISOString().split('T')[0];
+    let searchDate = selectedDate.toISOString().split('T')[0];
 
     navigation.navigate('RideResults', {
       pickupText,
@@ -168,7 +201,9 @@ export default function SearchRideScreen({ navigation }: any) {
       dropLat,
       dropLng,
       date: searchDate,
-      seats
+      seats,
+      isRecurring: rideType === 'recurring',
+      recurringDays: selectedDays.join(',')
     });
   };
 
@@ -176,6 +211,14 @@ export default function SearchRideScreen({ navigation }: any) {
     const newSeats = seats + delta;
     if (newSeats >= 1 && newSeats <= 4) {
       setSeats(newSeats);
+    }
+  };
+
+  const toggleDay = (day: string) => {
+    if (selectedDays.includes(day)) {
+      setSelectedDays(selectedDays.filter(d => d !== day));
+    } else {
+      setSelectedDays([...selectedDays, day]);
     }
   };
 
@@ -192,9 +235,6 @@ export default function SearchRideScreen({ navigation }: any) {
   return (
     <TouchableWithoutFeedback onPress={() => { setActiveField(null); Keyboard.dismiss(); }}>
       <View style={styles.container}>
-        {/* Map Background Layer */}
-        <ImageBackground source={{ uri: mapBgUrl }} style={styles.mapBg} resizeMode="cover" />
-        
         <View style={styles.innerContainer}>
           {/* Top Header */}
           <View style={styles.headerContainer}>
@@ -212,10 +252,8 @@ export default function SearchRideScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Bottom Sheet UI */}
-          <View style={styles.bottomSheet}>
-            <View style={styles.handleBar} />
-            
+          {/* Search Form UI */}
+          <View style={styles.formContainer}>
             <Text style={styles.sheetTitle}>Where to?</Text>
             
             {/* Ride Type Toggle */}
@@ -299,17 +337,52 @@ export default function SearchRideScreen({ navigation }: any) {
               </View>
             )}
 
-            {/* Date and Time */}
-            <View style={styles.dateTimeRow}>
-              <TouchableOpacity style={styles.dateTimeField}>
-                <MaterialIcons name="calendar-today" size={20} color={localColors.onSurfaceVariant} />
-                <Text style={styles.dateTimeInput}>{date}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.dateTimeField}>
-                <MaterialIcons name="schedule" size={20} color={localColors.onSurfaceVariant} />
-                <Text style={styles.dateTimeInput}>{time}</Text>
-              </TouchableOpacity>
-            </View>
+            {/* Date and Time / Recurring Days */}
+            {rideType === 'one-time' ? (
+              <View style={styles.dateTimeRow}>
+                <TouchableOpacity 
+                  style={styles.dateTimeField} 
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <MaterialIcons name="calendar-today" size={20} color={localColors.onSurfaceVariant} />
+                  <Text style={styles.dateTimeInput}>{formattedDate}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.dateTimeField} 
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <MaterialIcons name="schedule" size={20} color={localColors.onSurfaceVariant} />
+                  <Text style={styles.dateTimeInput}>{formattedTime}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.recurringSection}>
+                <View style={styles.recurringHeader}>
+                  <Text style={styles.recurringLabel}>Select travel days:</Text>
+                  <TouchableOpacity 
+                    style={styles.dateTimeFieldSmall}
+                    onPress={() => setShowTimePicker(true)}
+                  >
+                    <MaterialIcons name="schedule" size={18} color={localColors.onSurfaceVariant} />
+                    <Text style={styles.dateTimeInputSmall}>{formattedTime}</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.daysRow}>
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => {
+                    const isSelected = selectedDays.includes(day);
+                    return (
+                      <TouchableOpacity 
+                        key={day}
+                        style={[styles.dayCircle, isSelected && styles.dayCircleActive]}
+                        onPress={() => toggleDay(day)}
+                      >
+                        <Text style={[styles.dayText, isSelected && styles.dayTextActive]}>{day.charAt(0)}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
 
             {/* Passengers */}
             <View style={styles.stepperContainer}>
@@ -336,6 +409,25 @@ export default function SearchRideScreen({ navigation }: any) {
 
           </View>
         </View>
+        
+        {showDatePicker && (
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display="default"
+            onChange={handleDateChange}
+            minimumDate={new Date()}
+          />
+        )}
+
+        {showTimePicker && (
+          <DateTimePicker
+            value={selectedDate}
+            mode="time"
+            display="default"
+            onChange={handleDateChange}
+          />
+        )}
       </View>
     </TouchableWithoutFeedback>
   );
@@ -344,18 +436,10 @@ export default function SearchRideScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: localColors.background,
+    backgroundColor: localColors.surface,
   },
   innerContainer: {
     flex: 1,
-    justifyContent: 'space-between',
-  },
-  mapBg: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '60%',
   },
   headerContainer: {
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
@@ -387,25 +471,10 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  bottomSheet: {
-    backgroundColor: localColors.surface,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+  formContainer: {
+    flex: 1,
     padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
-    elevation: 20,
-  },
-  handleBar: {
-    width: 48,
-    height: 4,
-    backgroundColor: localColors.outlineVariant,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: -8,
-    marginBottom: 24,
+    paddingTop: 12,
   },
   sheetTitle: {
     fontSize: 28,
@@ -609,5 +678,108 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: localColors.onPrimary,
+  },
+  recurringSection: {
+    marginBottom: 24,
+    backgroundColor: localColors.surfaceContainerLowest,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: localColors.surfaceContainerHigh,
+  },
+  recurringHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  recurringLabel: {
+    fontSize: 14,
+    color: localColors.onSurfaceVariant,
+    fontWeight: '600',
+  },
+  dateTimeFieldSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: localColors.surfaceContainerLow,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: localColors.surfaceContainerHigh,
+  },
+  dateTimeInputSmall: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: localColors.onBackground,
+    fontWeight: '500',
+  },
+  daysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  dayCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: localColors.surfaceContainerHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayCircleActive: {
+    backgroundColor: localColors.secondary,
+  },
+  dayText: {
+    color: localColors.onSurfaceVariant,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  dayTextActive: {
+    color: localColors.onSecondary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: localColors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: '60%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: localColors.primary,
+  },
+  timeList: {
+    marginBottom: 20,
+  },
+  timeOption: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: localColors.surfaceContainerHigh,
+  },
+  timeOptionActive: {
+    backgroundColor: localColors.surfaceContainerLow,
+    borderRadius: 8,
+    borderBottomWidth: 0,
+  },
+  timeOptionText: {
+    fontSize: 16,
+    color: localColors.onSurface,
+  },
+  timeOptionTextActive: {
+    fontWeight: '700',
+    color: localColors.primary,
   }
 });

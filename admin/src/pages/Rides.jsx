@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Eye, Loader2, X, AlertOctagon, Map, Users, Car, MapPin } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Filter, Eye, Loader2, X, AlertOctagon, Map, Users, Car, MapPin, PlayCircle } from 'lucide-react';
 import api from '../api';
 import '../styles/Pages.css';
 
 const Rides = () => {
+    const navigate = useNavigate();
     const [rides, setRides] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -175,6 +177,15 @@ const Rides = () => {
                                                 style={{ marginTop: '10px', backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}
                                             >
                                                 <AlertOctagon size={16} /> Force Cancel Route
+                                            </button>
+                                        )}
+
+                                        {rideDetails.route.status === 'Completed' && (
+                                            <button 
+                                                onClick={() => navigate(`/ride-playback/${rideDetails.route.id}`)}
+                                                style={{ marginTop: '10px', backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}
+                                            >
+                                                <PlayCircle size={16} /> View Ride Playback
                                             </button>
                                         )}
                                     </div>

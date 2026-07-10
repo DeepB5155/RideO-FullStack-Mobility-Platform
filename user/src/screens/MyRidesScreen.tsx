@@ -42,7 +42,7 @@ const MyRidesScreen = ({ navigation }: any) => {
 
   const fetchSubscriptions = async () => {
     try {
-      const res = await axiosInstance.get('/booking/subscriptions');
+      const res = await axiosInstance.get('/booking/my-subscriptions');
       setSubscriptions(res.data);
     } catch (e) {
       console.log('Failed to fetch subscriptions', e);
@@ -84,7 +84,7 @@ const MyRidesScreen = ({ navigation }: any) => {
         style: 'destructive',
         onPress: async () => {
           try {
-            await axiosInstance.put(`/booking/unsubscribe/${id}`);
+            await axiosInstance.delete(`/booking/subscribe/${id}`);
             fetchSubscriptions();
             Alert.alert('Success', 'Subscription cancelled.');
           } catch (e: any) {
@@ -111,7 +111,14 @@ const MyRidesScreen = ({ navigation }: any) => {
               color={isLive ? localColors.secondary : isCompleted ? localColors.primary : localColors.onSurfaceVariant} 
             />
             <Text style={styles.cardTitle}>
-              {isLive ? 'In Progress' : isCompleted ? item.status : `Scheduled, ${new Date(item.route.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+              {isLive 
+                ? 'In Progress' 
+                : isCompleted 
+                  ? item.status 
+                  : item.status === 'Pending' 
+                    ? 'Pending Approval' 
+                    : `Scheduled, ${new Date(item.route.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}`
+              }
             </Text>
           </View>
           
@@ -215,7 +222,8 @@ const MyRidesScreen = ({ navigation }: any) => {
   };
 
   const renderSubscriptionItem = ({ item }: { item: any }) => {
-    const isActive = item.routeDetails.isTemplateActive;
+    const isActive = item.status === 'Active' || item.status === 'Approved' || item.status === 'Pending';
+    const route = item.route || {};
     
     return (
       <View style={[styles.card, !isActive && styles.cardCompleted]}>
@@ -248,11 +256,11 @@ const MyRidesScreen = ({ navigation }: any) => {
           <View style={styles.routeDetails}>
             <View style={styles.routeRow}>
               <Text style={styles.routeLabel}>Route</Text>
-              <Text style={styles.routeLocationText} numberOfLines={1}>{item.routeDetails.startLocation} → {item.routeDetails.endLocation}</Text>
+              <Text style={styles.routeLocationText} numberOfLines={1}>{route.startLocation || 'Unknown'} → {route.endLocation || 'Unknown'}</Text>
             </View>
             <View style={[styles.routeRow, { marginTop: 8 }]}>
               <Text style={styles.routeLabel}>Schedule</Text>
-              <Text style={styles.routeLocationText}>{item.routeDetails.days} at {item.routeDetails.time}</Text>
+              <Text style={styles.routeLocationText}>{route.recurringDays || 'Everyday'} at {route.recurringTime || 'TBD'}</Text>
             </View>
           </View>
           
@@ -281,28 +289,16 @@ const MyRidesScreen = ({ navigation }: any) => {
       <ImageBackground source={{ uri: mapBgUrl }} style={styles.mapBg} resizeMode="cover" />
       
       <View style={styles.innerContainer}>
-        {/* Top Header */}
-        <View style={styles.headerContainer}>
-          <View style={styles.header}>
-            <TouchableOpacity style={styles.headerIconBtn} onPress={() => navigation.openDrawer && navigation.openDrawer()}>
-              <MaterialIcons name="menu" size={24} color={localColors.primary} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>RideO</Text>
-            <TouchableOpacity style={styles.avatarBtn} onPress={() => navigation.navigate('Profile')}>
-              <Image 
-                source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBzQYOgy32PCBFjjgRPqJmiCIJ-mN6yONRzw0FQg6IfNDsqKBJv_IhRLNdhltqFS9KlVk5RfZ-a9RW4CDdZgdWBTdpJC5EJT_8ufU2i3qR9xPKoZB9e597I1lx-O5opoyQ5CYgNqjuSWfGv0EQH-RUIn-gDcYgqQrhSArRpRPbMjpjduvCbn1DuI7XZwDfs905EMq5EGPGx0Rv6KIdIpYR7AePciyJGWzqo6Cnl5p5b-WJoVFkwrLwVOZlm1QUNv5RM28ZvTGkO6une' }} 
-                style={styles.avatarImg} 
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Bottom Sheet UI */}
         <View style={styles.bottomSheet}>
           <View style={styles.handleBar} />
           
           <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>My Rides</Text>
+            <View style={styles.sheetHeaderRow}>
+              <Text style={styles.sheetTitle}>My Rides</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('RideHistory')} style={styles.historyBtn}>
+                <MaterialIcons name="history" size={24} color={localColors.primary} />
+              </TouchableOpacity>
+            </View>
             
             <View style={styles.tabContainer}>
               <TouchableOpacity 
@@ -422,11 +418,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(198,198,205,0.3)',
   },
+  sheetHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sheetTitle: {
     fontSize: 24,
     fontWeight: '600',
     color: localColors.onBackground,
-    marginBottom: 16,
+  },
+  historyBtn: {
+    padding: 8,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 20,
   },
   tabContainer: {
     flexDirection: 'row',

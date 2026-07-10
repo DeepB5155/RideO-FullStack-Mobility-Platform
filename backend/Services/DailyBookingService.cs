@@ -78,6 +78,13 @@ namespace RideO.API.Services
             {
                 try
                 {
+                    // Check if today is cancelled by driver
+                    var todayDateString = todayIst.ToString("yyyy-MM-dd");
+                    if (sub.OriginalRoute?.CancelledDates != null && sub.OriginalRoute.CancelledDates.Contains(todayDateString))
+                    {
+                        continue; // Skip this day, driver cancelled it
+                    }
+
                     // Check if a booking already exists for today to avoid duplicates
                     var existingBooking = await context.Bookings
                         .AnyAsync(b => b.UserId == sub.UserId && 

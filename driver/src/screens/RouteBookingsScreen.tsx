@@ -4,8 +4,10 @@ import axiosInstance from '../api/axios';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 const RouteBookingsScreen = ({ route, navigation }: any) => {
-  const { routeId } = route.params;
+  const { routeId, routeItem } = route.params;
   const [bookings, setBookings] = useState<any[]>([]);
+  const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [isRecurring, setIsRecurring] = useState(routeItem?.isRecurring || false);
 
   const fetchBookings = async () => {
     try {
@@ -16,8 +18,20 @@ const RouteBookingsScreen = ({ route, navigation }: any) => {
     }
   };
 
+  const fetchSubscribers = async () => {
+    try {
+      const res = await axiosInstance.get(`/booking/subscribe/route/${routeId}`);
+      setSubscribers(res.data);
+    } catch (e) {
+      console.log('Failed to fetch route subscribers', e);
+    }
+  };
+
   useEffect(() => {
     fetchBookings();
+    if (isRecurring) {
+      fetchSubscribers();
+    }
   }, []);
 
   const updateBookingStatus = async (id: string, action: string) => {
@@ -35,9 +49,33 @@ const RouteBookingsScreen = ({ route, navigation }: any) => {
     }
   };
 
+  const updateSubscriberStatus = async (id: string, action: string) => {
+    try {
+      await axiosInstance.put(`/booking/subscribe/${id}/${action.toLowerCase()}`);
+      fetchSubscribers();
+    } catch (e: any) {
+      Alert.alert('Error', e.response?.data?.message || `Failed to ${action} subscription`);
+    }
+  };
+
+  const handleStopRecurring = async () => {
+    Alert.alert('Stop Auto-Renew', 'This route will no longer automatically renew each day. Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Yes, Stop', style: 'destructive', onPress: async () => {
+        try {
+          await axiosInstance.put(`/route/${routeId}/stop-recurring`);
+          setIsRecurring(false);
+          Alert.alert('Success', 'Auto-renew stopped.');
+        } catch (e: any) {
+          Alert.alert('Error', e.response?.data || 'Failed to stop auto-renew');
+        }
+      }}
+    ]);
+  };
+
   // Status mapping
   const renderStatusChip = (status: string) => {
-    if (status === 'Approved' || status === 'Started') {
+    if (status === 'Approved' || status === 'Started' || status === 'Active') {
       return (
         <View style={[styles.chip, { backgroundColor: 'rgba(134, 242, 228, 0.3)' }]}>
           <Icon name="checkmark-circle" size={14} color="#006f66" style={{ marginRight: 4 }} />
@@ -50,6 +88,14 @@ const RouteBookingsScreen = ({ route, navigation }: any) => {
         <View style={[styles.chip, { backgroundColor: '#dce9ff' }]}>
           <Icon name="time-outline" size={14} color="#45464d" style={{ marginRight: 4 }} />
           <Text style={[styles.chipText, { color: '#45464d' }]}>Pending</Text>
+        </View>
+      );
+    }
+    if (status === 'Cancelled') {
+      return (
+        <View style={[styles.chip, { backgroundColor: '#ffdad6' }]}>
+          <Icon name="close-circle-outline" size={14} color="#ba1a1a" style={{ marginRight: 4 }} />
+          <Text style={[styles.chipText, { color: '#ba1a1a' }]}>Cancelled</Text>
         </View>
       );
     }
@@ -71,6 +117,8 @@ const RouteBookingsScreen = ({ route, navigation }: any) => {
           </View>
           <View>
             <Text style={styles.passengerName}>{item.userName}</Text>
+            {item.userPhone && <Text style={{ fontSize: 13, color: '#45464d', marginTop: 2 }}>{item.userPhone}</Text>}
+            <Text style={{ fontSize: 13, color: '#45464d', marginTop: 2 }}>📍 {item.pickupLocationName || 'Unknown'} → {item.dropoffLocationName || 'Unknown'}</Text>
             <View style={styles.passengerBadges}>
               <View style={styles.seatsChip}>
                 <Text style={styles.seatsChipText}>{item.seatsBooked || 1} Seat{item.seatsBooked > 1 ? 's' : ''}</Text>
@@ -125,6 +173,52 @@ const RouteBookingsScreen = ({ route, navigation }: any) => {
     </View>
   );
 
+  const renderSubscriberItem = (item: any) => (
+    <View style={styles.passengerCard} key={`sub-${item.id}`}>
+      <View style={styles.passengerHeader}>
+        <View style={styles.passengerInfo}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{item.userName ? item.userName.substring(0, 2).toUpperCase() : '?'}</Text>
+          </View>
+          <View>
+            <Text style={styles.passengerName}>{item.userName} (Subscriber)</Text>
+            {item.userPhone && <Text style={{ fontSize: 13, color: '#45464d', marginTop: 2 }}>{item.userPhone}</Text>}
+            <Text style={{ fontSize: 13, color: '#45464d', marginTop: 2 }}>Plan: {item.paymentPlan} • ₹{item.totalFarePerRide}/ride</Text>
+            <View style={styles.passengerBadges}>
+              <View style={styles.seatsChip}>
+                <Text style={styles.seatsChipText}>{item.seatsBooked || 1} Seat{item.seatsBooked > 1 ? 's' : ''}</Text>
+              </View>
+              {renderStatusChip(item.status)}
+              
+              {item.pausedUntil && new Date(item.pausedUntil) > new Date() && (
+                <View style={[styles.chip, { backgroundColor: '#ffe082', marginLeft: 6 }]}>
+                  <Icon name="pause-circle-outline" size={14} color="#ff8f00" style={{ marginRight: 4 }} />
+                  <Text style={[styles.chipText, { color: '#ff8f00' }]}>Paused until {new Date(item.pausedUntil).toLocaleDateString()}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+        <View style={styles.actionIcons}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Chat', { bookingId: item.id, targetName: item.userName })}>
+            <Icon name="chatbubble-outline" size={20} color="#000000" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {item.status === 'Pending' && (
+        <View style={styles.functionalActionRow}>
+          <TouchableOpacity style={[styles.actionBtn, {backgroundColor: '#006a61'}]} onPress={() => updateSubscriberStatus(item.id, 'Approve')}>
+            <Text style={styles.actionBtnText}>Approve</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, {backgroundColor: '#ba1a1a'}]} onPress={() => updateSubscriberStatus(item.id, 'Reject')}>
+            <Text style={styles.actionBtnText}>Reject</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -151,8 +245,16 @@ const RouteBookingsScreen = ({ route, navigation }: any) => {
                   <Text style={styles.routeTitle}>Route Bookings</Text>
                   <Text style={styles.routeTime}>Active Route Details</Text>
                 </View>
-                <View style={styles.seatsBookedBadge}>
-                  <Text style={styles.seatsBookedText}>{totalSeatsBooked} Seats Booked</Text>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <View style={styles.seatsBookedBadge}>
+                    <Text style={styles.seatsBookedText}>{totalSeatsBooked} Seats Booked</Text>
+                  </View>
+                  {isRecurring && (
+                    <TouchableOpacity onPress={handleStopRecurring} style={styles.stopRecurringBtn}>
+                      <Icon name="close-circle" size={12} color="#fff" style={{ marginRight: 4 }} />
+                      <Text style={styles.stopRecurringText}>Stop Auto-Renew</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
 
@@ -175,7 +277,19 @@ const RouteBookingsScreen = ({ route, navigation }: any) => {
               </View>
             </View>
 
-            <Text style={styles.manifestTitle}>Passenger Manifest</Text>
+            {isRecurring && (
+              <>
+                <Text style={styles.manifestTitle}>Route Subscribers</Text>
+                {subscribers.length === 0 ? (
+                  <Text style={styles.empty}>No subscribers yet.</Text>
+                ) : (
+                  subscribers.map(renderSubscriberItem)
+                )}
+                <View style={{ height: 16 }} />
+              </>
+            )}
+
+            <Text style={styles.manifestTitle}>Passenger Manifest (Today)</Text>
           </>
         }
         renderItem={renderItem}
@@ -388,13 +502,27 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 8,
   },
   chipText: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  stopRecurringBtn: {
+    backgroundColor: '#dc3545',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  stopRecurringText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
   },
   actionIcons: {
     flexDirection: 'row',

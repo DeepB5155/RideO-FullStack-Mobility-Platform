@@ -27,6 +27,8 @@ namespace RideO.API.Data
         public DbSet<SystemSetting> SystemSettings { get; set; }
         public DbSet<EmergencyContact> EmergencyContacts { get; set; }
         public DbSet<EmergencySOS> EmergencySOSLogs { get; set; }
+        public DbSet<LocationCache> LocationCaches { get; set; }
+        public DbSet<PayoutRequest> PayoutRequests { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
