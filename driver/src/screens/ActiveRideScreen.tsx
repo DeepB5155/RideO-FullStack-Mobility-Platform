@@ -12,12 +12,15 @@ import {
   TextInput
 } from 'react-native';
 import * as signalR from '@microsoft/signalr';
-import { SIGNALR_HUB_URL } from '@env';
+import { SIGNALR_HUB_URL, MAPBOX_ACCESS_TOKEN } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
 import axiosInstance from '../api/axios';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
+import Mapbox from '@rnmapbox/maps';
+
+Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
 
 const ActiveRideScreen = ({ route, navigation }: any) => {
   const { routeId, startLoc, endLoc } = route.params;
@@ -158,17 +161,29 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       
-      {/* ── Map Background Mock ── */}
+      {/* ── Dynamic Map Layer ── */}
       <View style={styles.mapLayer}>
-        <Image 
-          source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDuAqyECcXACqi9U3Ev5XtiyveowXkpkg23YIDCkBDUYo1l06sIGyKf4Q22RXXfq74N_WeLIOsAOZcw9ZXulVx38kJtsGVPO4qoIVl-b_di9OQaKKTv2f_CdDerR707AHSJgCS7YXj0H1e4csj7T4BOL5OP2lwaVMPvkCHKSHEmAeNyRNysKHSnJ41kLx_urdC7ymUOKx67JlixirY5NreNRnWOOPphpxzKwWm0pH20OM2jwGfUiI_0a4F_MnfllKmTBu5NXkDlHN5D' }} 
-          style={styles.mapImage}
-          resizeMode="cover"
-        />
-        {/* Simple vehicle marker */}
-        <View style={styles.vehicleMarker}>
-          <Icon name="car" size={24} color="#ffffff" />
-        </View>
+        {currentCoords ? (
+          <Mapbox.MapView 
+            style={styles.mapImage} 
+            logoEnabled={false} 
+            attributionEnabled={false} 
+            styleURL={Mapbox.StyleURL.Dark}
+          >
+            <Mapbox.Camera
+              zoomLevel={15}
+              centerCoordinate={[currentCoords.lng, currentCoords.lat]}
+              animationMode="flyTo"
+              animationDuration={2000}
+            />
+            <Mapbox.UserLocation visible showsUserHeadingIndicator />
+          </Mapbox.MapView>
+        ) : (
+          <View style={[styles.mapImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#dce9ff' }]}>
+            <ActivityIndicator size="large" color="#000000" />
+            <Text style={{ marginTop: 10, color: '#000000', fontWeight: 'bold' }}>Acquiring GPS Signal...</Text>
+          </View>
+        )}
       </View>
 
       {/* ── Top Overlays ── */}

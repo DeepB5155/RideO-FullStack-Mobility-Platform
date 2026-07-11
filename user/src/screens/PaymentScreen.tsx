@@ -33,10 +33,9 @@ const PaymentScreen = ({ route, navigation }: any) => {
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | null, message: string }>({ type: null, message: '' });
 
-  // Calculate mock breakdown based on total amount
-  const baseFare = (amount * 0.55).toFixed(2);
-  const distanceFare = (amount * 0.35).toFixed(2);
-  const taxes = (amount * 0.10).toFixed(2);
+  // Calculate real breakdown
+  const driverPayout = (amount * 0.90).toFixed(2);
+  const taxesAndFees = (amount * 0.10).toFixed(2);
 
   const handlePayment = async () => {
     setFeedback({ type: null, message: '' });
@@ -107,21 +106,17 @@ const PaymentScreen = ({ route, navigation }: any) => {
         {/* Fare Summary Card */}
         <View style={styles.fareCard}>
           <View style={styles.fareRow}>
-            <Text style={styles.fareLabel}>Base Fare</Text>
-            <Text style={styles.fareValue}>${baseFare}</Text>
+            <Text style={styles.fareLabel}>Ride Fare</Text>
+            <Text style={styles.fareValue}>₹{driverPayout}</Text>
           </View>
           <View style={styles.fareRow}>
-            <Text style={styles.fareLabel}>Distance</Text>
-            <Text style={styles.fareValue}>${distanceFare}</Text>
-          </View>
-          <View style={styles.fareRow}>
-            <Text style={styles.fareLabel}>Taxes & Fees</Text>
-            <Text style={styles.fareValue}>${taxes}</Text>
+            <Text style={styles.fareLabel}>Platform Fee & Taxes</Text>
+            <Text style={styles.fareValue}>₹{taxesAndFees}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.fareRowTotal}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>${amount.toFixed(2)}</Text>
+            <Text style={styles.totalValue}>₹{amount.toFixed(2)}</Text>
           </View>
         </View>
 

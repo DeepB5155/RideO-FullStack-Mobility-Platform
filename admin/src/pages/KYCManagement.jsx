@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { CheckCircle, XCircle, FileSearch } from 'lucide-react';
+import { HubConnectionBuilder } from '@microsoft/signalr';
 import '../styles/Pages.css';
 
 const KYCManagement = () => {
@@ -25,6 +26,39 @@ const KYCManagement = () => {
 
   useEffect(() => {
     fetchPendingKYC();
+
+    let connection;
+    const setupSignalR = async () => {
+      try {
+        const token = localStorage.getItem('adminToken');
+        if (!token) return;
+
+        const hubUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '/rideHub') || 'http://localhost:5248/rideHub';
+        
+        connection = new HubConnectionBuilder()
+          .withUrl(hubUrl, { accessTokenFactory: () => token })
+          .withAutomaticReconnect()
+          .build();
+
+        connection.on("KYCSubmitted", () => {
+          console.log("New KYC submitted, refreshing list...");
+          fetchPendingKYC();
+        });
+
+        await connection.start();
+        await connection.invoke("JoinAdminMonitors");
+      } catch (err) {
+        console.error("SignalR KYC Connection Error", err);
+      }
+    };
+
+    setupSignalR();
+
+    return () => {
+      if (connection) {
+        connection.stop();
+      }
+    };
   }, []);
 
   const viewDetails = async (driverId) => {

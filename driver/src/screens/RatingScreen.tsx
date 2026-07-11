@@ -67,16 +67,6 @@ const RatingScreen = ({ route, navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.appBar}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={24} color="#45464d" />
-        </TouchableOpacity>
-        <Text style={styles.appTitle}>Trip Rating</Text>
-        <TouchableOpacity style={styles.skipButton} onPress={() => navigation.navigate('Home')}>
-          <Text style={styles.skipText}>SKIP</Text>
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.mainContainer}>
         {/* Passenger Avatar & Info */}
         <View style={styles.profileSection}>
@@ -152,6 +142,12 @@ const RatingScreen = ({ route, navigation }: any) => {
               </>
             )}
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.skipBottomBtn} 
+            onPress={() => navigation.navigate('Home')}
+          >
+            <Text style={styles.skipBottomBtnText}>Skip Rating</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>
@@ -163,12 +159,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9ff',
   },
-  appBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  skipBottomBtn: {
+    marginTop: 16,
     alignItems: 'center',
-    paddingHorizontal: 16,
-    height: 64,
+    paddingVertical: 12,
+  },
+  skipBottomBtnText: {
+    color: '#45464d',
+    fontSize: 16,
+    fontWeight: '600',
   },
   backButton: {
     padding: 8,

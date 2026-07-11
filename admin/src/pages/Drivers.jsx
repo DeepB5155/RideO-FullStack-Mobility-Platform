@@ -157,7 +157,7 @@ const Drivers = () => {
                         </thead>
                         <tbody>
                             {drivers.map(driver => (
-                                <tr key={driver.id} style={{ backgroundColor: driver.isSuspended ? '#fef2f2' : 'transparent' }}>
+                                <tr key={driver.id} style={{ backgroundColor: driver.isSuspended ? 'rgba(239, 68, 68, 0.15)' : 'transparent' }}>
                                     <td><strong>{driver.user.fullName}</strong></td>
                                     <td>{driver.licenseNumber}</td>
                                     <td>{driver.vehicleType || 'Not set'}</td>

@@ -1,6 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Map, Navigation, ArrowLeft, MapPin, Clock } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet's default icon path issues with Webpack/Vite
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Custom Car Icon
+const carIcon = new L.Icon({
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/744/744426.png', // Fallback simple car icon
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  popupAnchor: [0, -16]
+});
 
 const RidePlayback = () => {
   const { id } = useParams();
@@ -85,9 +104,8 @@ const RidePlayback = () => {
 
       {/* Main Content */}
       <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
-        {/* Map Area (Mock) */}
-        <div style={{ flex: 1, backgroundColor: '#e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
-           <div style={{ position: 'absolute', top: 20, left: 20, backgroundColor: 'white', padding: '10px 15px', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+        <div style={{ flex: 1, backgroundColor: '#e2e8f0', position: 'relative', zIndex: 0 }}>
+           <div style={{ position: 'absolute', top: 20, left: 20, backgroundColor: 'white', padding: '10px 15px', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', zIndex: 1000 }}>
              <h3 style={{ margin: '0 0 10px 0', fontSize: '1rem' }}>Controls</h3>
              <div style={{ display: 'flex', gap: '10px' }}>
                <button 
@@ -108,19 +126,20 @@ const RidePlayback = () => {
            </div>
 
            {logs.length > 0 && currentLog ? (
-             <div style={{ textAlign: 'center' }}>
-               <MapPin size={64} color="#8b5cf6" />
-               <div style={{ marginTop: '10px', backgroundColor: '#1e293b', color: 'white', padding: '5px 10px', borderRadius: '4px', fontSize: '14px' }}>
-                 Lat: {currentLog.latitude?.toFixed(5)}<br/>
-                 Lng: {currentLog.longitude?.toFixed(5)}
-               </div>
-               <div style={{ marginTop: '10px', fontWeight: 'bold', color: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                 <Clock size={16} />
-                 {new Date(currentLog.timestamp).toLocaleTimeString()}
-               </div>
-             </div>
+             <MapContainer center={[currentLog.latitude || 0, currentLog.longitude || 0]} zoom={15} style={{ height: '100%', width: '100%' }}>
+               <TileLayer
+                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+               />
+               <Polyline positions={logs.map(log => [log.latitude || 0, log.longitude || 0])} color="#3b82f6" weight={4} opacity={0.6} />
+               <Marker position={[currentLog.latitude || 0, currentLog.longitude || 0]} icon={carIcon}>
+                 <Popup>
+                   <div style={{ fontWeight: 'bold' }}>{new Date(currentLog.timestamp).toLocaleTimeString()}</div>
+                 </Popup>
+               </Marker>
+             </MapContainer>
            ) : (
-             <div style={{ textAlign: 'center', color: '#64748b' }}>
+             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#64748b' }}>
                 <Navigation size={48} color="#94a3b8" />
                 <p>No location logs found for this ride.</p>
              </div>

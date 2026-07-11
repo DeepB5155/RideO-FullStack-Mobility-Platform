@@ -9,6 +9,8 @@ using System.IO;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
+using RideO.API.Hubs;
 
 namespace RideO.API.Controllers
 {
@@ -20,10 +22,12 @@ namespace RideO.API.Controllers
     public class KYCController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IHubContext<RideHub> _hubContext;
 
-        public KYCController(AppDbContext context)
+        public KYCController(AppDbContext context, IHubContext<RideHub> hubContext)
         {
             _context = context;
+            _hubContext = hubContext;
         }
 
         [HttpPost("upload")]
@@ -55,6 +59,7 @@ namespace RideO.API.Controllers
             public string RCUrl { get; set; } = string.Empty;
             public string VehicleImageUrl { get; set; } = string.Empty;
             public string DriverFaceUrl { get; set; } = string.Empty;
+            public string InsuranceUrl { get; set; } = string.Empty;
             public string LicenseNumber { get; set; } = string.Empty;
             public string PhoneNumber { get; set; } = string.Empty;
             
@@ -123,18 +128,24 @@ namespace RideO.API.Controllers
             }
             else
             {
-                vehicle.Make = request.Make;
-                vehicle.Model = request.Model;
-                vehicle.Year = request.Year;
-                vehicle.Color = request.Color;
-                vehicle.LicensePlate = request.LicensePlate;
-                vehicle.VehicleType = request.VehicleType;
-                vehicle.TotalSeats = request.TotalSeats;
+                if (!string.IsNullOrWhiteSpace(request.Make))
+                {
+                    vehicle.Make = request.Make;
+                    vehicle.Model = request.Model;
+                    vehicle.Year = request.Year;
+                    vehicle.Color = request.Color;
+                    vehicle.LicensePlate = request.LicensePlate;
+                    vehicle.VehicleType = request.VehicleType;
+                    vehicle.TotalSeats = request.TotalSeats;
+                }
             }
 
             // Remove old pending/rejected documents
             var oldDocs = await _context.DriverDocuments.Where(d => d.DriverId == driver.Id).ToListAsync();
             _context.DriverDocuments.RemoveRange(oldDocs);
+
+            // Reset verification status so admin must re-approve the new documents
+            driver.IsVerified = false;
 
             // Add new documents
             _context.DriverDocuments.AddRange(
@@ -142,10 +153,15 @@ namespace RideO.API.Controllers
                 new DriverDocument { DriverId = driver.Id, DocumentType = "LicenseBack", DocumentUrl = request.LicenseBackUrl },
                 new DriverDocument { DriverId = driver.Id, DocumentType = "RC", DocumentUrl = request.RCUrl },
                 new DriverDocument { DriverId = driver.Id, DocumentType = "VehicleImage", DocumentUrl = request.VehicleImageUrl },
-                new DriverDocument { DriverId = driver.Id, DocumentType = "DriverFace", DocumentUrl = request.DriverFaceUrl }
+                new DriverDocument { DriverId = driver.Id, DocumentType = "DriverFace", DocumentUrl = request.DriverFaceUrl },
+                new DriverDocument { DriverId = driver.Id, DocumentType = "VehicleInsurance", DocumentUrl = request.InsuranceUrl }
             );
 
             await _context.SaveChangesAsync();
+
+            // Notify Admin Panel that a new KYC was submitted
+            await _hubContext.Clients.Group("AdminMonitors").SendAsync("KYCSubmitted");
+
             return Ok(new { message = "KYC and Vehicle details submitted successfully. Pending Admin review." });
         }
 
@@ -164,16 +180,37 @@ namespace RideO.API.Controllers
             var vehicleId = vehicle?.Id;
 
             var documents = await _context.DriverDocuments.Where(d => d.DriverId == driver.Id).ToListAsync();
+            
+            var docUrls = new
+            {
+                licenseFrontUrl = documents.FirstOrDefault(d => d.DocumentType == "LicenseFront")?.DocumentUrl ?? "",
+                rcUrl = documents.FirstOrDefault(d => d.DocumentType == "RC")?.DocumentUrl ?? "",
+                insuranceUrl = documents.FirstOrDefault(d => d.DocumentType == "VehicleInsurance")?.DocumentUrl ?? "",
+                vehicleImageUrl = documents.FirstOrDefault(d => d.DocumentType == "VehicleImage")?.DocumentUrl ?? "",
+                driverFaceUrl = documents.FirstOrDefault(d => d.DocumentType == "DriverFace")?.DocumentUrl ?? ""
+            };
+
             if (documents.Count == 0)
                 return Ok(new { status = "NotSubmitted", isVerified = false });
 
+            var vehicleDetails = vehicle != null ? new
+            {
+                make = vehicle.Make,
+                model = vehicle.Model,
+                year = vehicle.Year,
+                color = vehicle.Color,
+                licensePlate = vehicle.LicensePlate,
+                vehicleType = vehicle.VehicleType,
+                totalSeats = vehicle.TotalSeats
+            } : null;
+
             if (driver.IsVerified)
-                return Ok(new { status = "Approved", isVerified = true, vehicleId, licenseNumber = driver.LicenseNumber });
+                return Ok(new { status = "Approved", isVerified = true, vehicleId, licenseNumber = driver.LicenseNumber, documents = docUrls, vehicleDetails });
 
             if (documents.Any(d => d.Status == "Rejected"))
-                return Ok(new { status = "Rejected", isVerified = false, vehicleId, licenseNumber = driver.LicenseNumber, rejectionReason = driver.KycRejectionReason });
+                return Ok(new { status = "Rejected", isVerified = false, vehicleId, licenseNumber = driver.LicenseNumber, rejectionReason = driver.KycRejectionReason, documents = docUrls, vehicleDetails });
 
-            return Ok(new { status = "Pending", isVerified = false, vehicleId, licenseNumber = driver.LicenseNumber });
+            return Ok(new { status = "Pending", isVerified = false, vehicleId, licenseNumber = driver.LicenseNumber, documents = docUrls, vehicleDetails });
         }
     }
 }

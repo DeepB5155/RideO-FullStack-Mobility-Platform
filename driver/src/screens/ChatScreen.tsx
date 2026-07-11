@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { 
   View, 
   Text, 
@@ -19,9 +19,11 @@ import { SIGNALR_HUB_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import api from '../api/axios';
+import { AuthContext } from '../context/AuthContext';
 
 const ChatScreen = ({ route, navigation }: any) => {
-  const { bookingId, targetName } = route.params || { bookingId: 'mock-1', targetName: 'Sarah Jenkins' };
+  const { bookingId, targetName } = route.params || { bookingId: 'mock-1', targetName: 'Chat' };
+  const { user } = useContext(AuthContext);
   
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -62,32 +64,9 @@ const ChatScreen = ({ route, navigation }: any) => {
     const fetchHistory = async () => {
       try {
         const res = await api.get(`/chat/${bookingId}`);
-        setMessages(res.data);
+        setMessages(res.data.messages || []);
       } catch (err) {
         console.log('No chat history found or error fetching');
-        // Mock messages for design visualization if empty
-        if (messages.length === 0) {
-          setMessages([
-            {
-              id: 'm1',
-              content: "Hi, I'm standing right outside the coffee shop on the corner. Wearing a yellow jacket!",
-              isFromDriver: false,
-              sentAt: new Date(Date.now() - 300000).toISOString()
-            },
-            {
-              id: 'm2',
-              content: "Got it! I see the coffee shop. Pulling up in about 2 minutes.",
-              isFromDriver: true,
-              sentAt: new Date(Date.now() - 240000).toISOString()
-            },
-            {
-              id: 'm3',
-              content: "Perfect, thank you! No rush.",
-              isFromDriver: false,
-              sentAt: new Date(Date.now() - 180000).toISOString()
-            }
-          ]);
-        }
       }
     };
 
@@ -105,14 +84,6 @@ const ChatScreen = ({ route, navigation }: any) => {
   const sendTextMessage = async (text: string) => {
     if (!text.trim()) return;
 
-    // Optimistic UI update for mockup
-    const optimisticMsg = {
-      id: Math.random().toString(),
-      content: text,
-      isFromDriver: true,
-      sentAt: new Date().toISOString()
-    };
-    setMessages(prev => [...prev, optimisticMsg]);
     setNewMessage('');
 
     if (!connection) return;
@@ -125,7 +96,7 @@ const ChatScreen = ({ route, navigation }: any) => {
   };
 
   const renderItem = ({ item }: any) => {
-    const isMine = item.isFromDriver;
+    const isMine = item.senderId === user?.id;
     const time = new Date(item.sentAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
     if (isMine) {

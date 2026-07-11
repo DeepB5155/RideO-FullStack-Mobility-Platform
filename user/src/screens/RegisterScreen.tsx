@@ -46,6 +46,20 @@ const RegisterScreen = ({ navigation }: any) => {
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Validation Error', 'Please enter a valid email address.');
+      return;
+    }
+
+    if (phone) {
+      const phoneRegex = /^\d{10,15}$/;
+      if (!phoneRegex.test(phone)) {
+        Alert.alert('Validation Error', 'Please enter a valid phone number (10-15 digits).');
+        return;
+      }
+    }
+
     if (password.length < 6) {
       Alert.alert('Validation Error', 'Password must be at least 6 characters.');
       return;
@@ -56,7 +70,8 @@ const RegisterScreen = ({ navigation }: any) => {
       await api.post('/auth/register', { 
         fullName, 
         email, 
-        password, 
+        password,
+        phoneNumber: phone,
         role: 'User'
       });
       

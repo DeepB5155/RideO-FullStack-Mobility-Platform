@@ -60,10 +60,6 @@ const WalletScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Driver Earnings & Wallet</Text>
-      </View>
-
       <View style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Available Balance</Text>
         <Text style={styles.balanceAmount}>₹{balance.toFixed(2)}</Text>

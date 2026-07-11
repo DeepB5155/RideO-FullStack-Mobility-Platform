@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, StatusBar, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, StatusBar, Modal, TextInput, Alert } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axiosInstance from '../api/axios';
@@ -35,6 +35,8 @@ const KYCScreen = ({ route, navigation }: any) => {
   const [status, setStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [licenseNumber, setLicenseNumber] = useState('');
+
   // Document states
   const [licenseUrl, setLicenseUrl] = useState('');
   const [rcUrl, setRcUrl] = useState('');
@@ -52,6 +54,7 @@ const KYCScreen = ({ route, navigation }: any) => {
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fetchedVehicleDetails, setFetchedVehicleDetails] = useState<any>(null);
 
   const checkStatus = async () => {
     try {
@@ -59,6 +62,21 @@ const KYCScreen = ({ route, navigation }: any) => {
       setStatus(res.data.status);
       if (res.data.rejectionReason) {
         setRejectionReason(res.data.rejectionReason);
+      }
+      
+      // Populate existing data if available
+      if (res.data.licenseNumber) {
+        setLicenseNumber(res.data.licenseNumber);
+      }
+      if (res.data.documents) {
+        setLicenseUrl(res.data.documents.licenseFrontUrl || '');
+        setRcUrl(res.data.documents.rcUrl || '');
+        setInsuranceUrl(res.data.documents.insuranceUrl || '');
+        setVehicleImageUrl(res.data.documents.vehicleImageUrl || '');
+        setDriverFaceUrl(res.data.documents.driverFaceUrl || '');
+      }
+      if (res.data.vehicleDetails) {
+        setFetchedVehicleDetails(res.data.vehicleDetails);
       }
     } catch (e) {
       console.log('Failed to check KYC status', e);
@@ -71,39 +89,6 @@ const KYCScreen = ({ route, navigation }: any) => {
     checkStatus();
   }, []);
 
-  useEffect(() => {
-    let connection: signalR.HubConnection | null = null;
-    
-    const setupSignalR = async () => {
-      try {
-        const token = await AsyncStorage.getItem('userToken');
-        if (!token || status !== 'Pending') return;
-        
-        const hubUrl = axiosInstance.defaults.baseURL?.replace('/api', '/rideHub') || 'http://localhost:5000/rideHub';
-        
-        connection = new signalR.HubConnectionBuilder()
-          .withUrl(hubUrl, { accessTokenFactory: () => token })
-          .withAutomaticReconnect()
-          .build();
-
-        connection.on("KYCStatusUpdated", (newStatus: string) => {
-          setStatus(newStatus);
-        });
-
-        await connection.start();
-      } catch (err) {
-        console.log("SignalR Connection Error:", err);
-      }
-    };
-
-    setupSignalR();
-
-    return () => {
-      if (connection) {
-        connection.stop();
-      }
-    };
-  }, [status]);
 
   const simulateUpload = (setter: any, loadingSetter: any) => {
     loadingSetter(true);
@@ -117,22 +102,28 @@ const KYCScreen = ({ route, navigation }: any) => {
     try {
       setIsSubmitting(true);
       
-      const vDetails = route?.params?.vehicleDetails || {};
+      const vDetails = route?.params?.vehicleDetails || fetchedVehicleDetails;
+      if (!vDetails || !vDetails.make || !vDetails.color || !vDetails.totalSeats) {
+        Alert.alert('Missing Details', 'It looks like your vehicle details are missing. Please go back and complete the vehicle setup step.');
+        setIsSubmitting(false);
+        return;
+      }
       
       await axiosInstance.post('/kyc/submit', {
-        licenseNumber: 'DL-DEFAULT',
-        make: vDetails.make || 'Mock Make',
-        model: vDetails.model || 'Mock Model',
-        year: vDetails.year || 2023,
-        color: vDetails.color || 'White',
-        licensePlate: vDetails.licensePlate || 'ABC-1234',
-        vehicleType: vDetails.vehicleType || 'Sedan',
-        totalSeats: vDetails.totalSeats || 4,
+        licenseNumber: licenseNumber,
+        make: vDetails.make,
+        model: vDetails.model,
+        year: vDetails.year,
+        color: vDetails.color,
+        licensePlate: vDetails.licensePlate,
+        vehicleType: vDetails.vehicleType,
+        totalSeats: vDetails.totalSeats,
         licenseFrontUrl: licenseUrl,
         licenseBackUrl: licenseUrl,
         rcUrl: rcUrl || licenseUrl,
         vehicleImageUrl: vehicleImageUrl,
-        driverFaceUrl: driverFaceUrl
+        driverFaceUrl: driverFaceUrl,
+        insuranceUrl: insuranceUrl
       });
       
       setShowSuccessModal(true);
@@ -158,7 +149,7 @@ const KYCScreen = ({ route, navigation }: any) => {
     }
   }, [status, fromProfile, updateUser]);
 
-  const allRequiredApproved = licenseUrl && rcUrl && insuranceUrl && vehicleImageUrl && driverFaceUrl;
+  const allRequiredApproved = licenseUrl && rcUrl && insuranceUrl && vehicleImageUrl && driverFaceUrl && licenseNumber.trim() !== '';
 
   const DocumentSlot = ({ title, desc, iconName, url, isUploading, onPress, fileName }: any) => {
     const isUploaded = !!url;
@@ -171,7 +162,7 @@ const KYCScreen = ({ route, navigation }: any) => {
           isUploading ? { opacity: 0.5 } : null
         ]} 
         onPress={onPress}
-        disabled={isUploaded || isUploading}
+        disabled={isUploading || isApprovedAndViewing}
         activeOpacity={0.9}
       >
         <View style={styles.slotContent}>
@@ -187,13 +178,21 @@ const KYCScreen = ({ route, navigation }: any) => {
                 <Text style={styles.tapToUploadText}>{isUploading ? 'Uploading...' : 'Tap to upload'}</Text>
               </View>
             )}
+            {isUploaded && !isApprovedAndViewing && (
+              <View style={styles.tapToUploadWrap}>
+                <MaterialIcons name="edit" size={20} color={localColors.onPrimary} />
+                <Text style={[styles.tapToUploadText, { color: localColors.onPrimary }]}>Tap to change</Text>
+              </View>
+            )}
           </View>
         </View>
 
         {isUploaded && (
           <View style={styles.uploadedPreviewBox}>
-            <MaterialIcons name="check-circle" size={20} color={localColors.onSecondaryContainer} />
-            <Text style={styles.uploadedFileName} numberOfLines={1}>{fileName}</Text>
+            <MaterialIcons name="check-circle" size={20} color={isApprovedAndViewing ? "#4caf50" : localColors.onSecondaryContainer} />
+            <Text style={[styles.uploadedFileName, isApprovedAndViewing && { color: "#4caf50" }]} numberOfLines={1}>
+              {isApprovedAndViewing ? "Verified & Approved" : fileName}
+            </Text>
           </View>
         )}
       </TouchableOpacity>
@@ -208,21 +207,18 @@ const KYCScreen = ({ route, navigation }: any) => {
     );
   }
 
-  if (status === 'Approved') {
+  const isApprovedAndViewing = status === 'Approved' && fromProfile;
+
+  if (status === 'Approved' && !fromProfile) {
     return (
       <View style={styles.center}>
-        {!fromProfile && <ActivityIndicator size="large" color={localColors.secondary} />}
+        <ActivityIndicator size="large" color={localColors.secondary} />
         <Text style={[styles.statusTitle, { marginTop: 15, color: localColors.secondary }]}>
           Verified!
         </Text>
         <Text style={styles.statusSubtitle}>
-          {fromProfile ? 'Your documents and account are fully approved.' : 'Loading Dashboard...'}
+          Loading Dashboard...
         </Text>
-        {fromProfile && (
-          <TouchableOpacity style={styles.buttonOutline} onPress={() => navigation.goBack()}>
-            <Text style={styles.buttonOutlineText}>Go Back</Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   }
@@ -245,9 +241,11 @@ const KYCScreen = ({ route, navigation }: any) => {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Progress Bar */}
-        <View style={styles.progressBarBg}>
-          <View style={styles.progressBarFill} />
-        </View>
+        {!isApprovedAndViewing && (
+          <View style={styles.progressBarBg}>
+            <View style={styles.progressBarFill} />
+          </View>
+        )}
 
         {status === 'Rejected' && (
           <View style={{ backgroundColor: '#ffe5e5', padding: 16, borderRadius: 8, marginBottom: 24, borderWidth: 1, borderColor: '#ff4d4f' }}>
@@ -258,8 +256,32 @@ const KYCScreen = ({ route, navigation }: any) => {
 
         {/* Title Section */}
         <View style={styles.titleSection}>
-          <Text style={styles.mainHeading}>Upload Documents</Text>
-          <Text style={styles.headerDesc}>We need a few legal documents to verify your profile and vehicle eligibility.</Text>
+          <Text style={styles.mainHeading}>{isApprovedAndViewing ? 'Approved Documents' : 'Upload Documents'}</Text>
+          <Text style={styles.headerDesc}>{isApprovedAndViewing ? 'These are the documents you submitted for your profile.' : 'We need your license number and a few legal documents to verify your profile.'}</Text>
+        </View>
+
+        {/* Text Inputs */}
+        <View style={styles.slotsContainer}>
+          <View style={{ marginBottom: 15 }}>
+            <Text style={{ fontSize: 14, fontWeight: 'bold', color: localColors.onSurface, marginBottom: 8, marginLeft: 4 }}>License Number</Text>
+            <TextInput
+              style={{
+                backgroundColor: isApprovedAndViewing ? '#f0f0f0' : localColors.surfaceContainerLowest,
+                borderWidth: 1,
+                borderColor: isApprovedAndViewing ? '#e0e0e0' : localColors.outlineVariant,
+                borderRadius: 12,
+                padding: 16,
+                fontSize: 16,
+                color: isApprovedAndViewing ? '#888' : localColors.onSurface
+              }}
+              placeholder="Enter your Driving License Number"
+              placeholderTextColor={localColors.outline}
+              value={licenseNumber}
+              onChangeText={setLicenseNumber}
+              autoCapitalize="characters"
+              editable={!isApprovedAndViewing}
+            />
+          </View>
         </View>
 
         {/* Document Slots */}
@@ -312,32 +334,44 @@ const KYCScreen = ({ route, navigation }: any) => {
         </View>
 
         {/* Helper Text */}
-        <View style={styles.helperCard}>
-          <MaterialIcons name="info" size={20} color={localColors.secondary} style={{ marginTop: 2 }} />
-          <Text style={styles.helperText}>
-            Please ensure photos are clear and all text is readable. PDF, JPG, or PNG formats are accepted (Max 5MB per file).
-          </Text>
-        </View>
+        {!isApprovedAndViewing && (
+          <View style={styles.helperCard}>
+            <MaterialIcons name="info" size={20} color={localColors.secondary} style={{ marginTop: 2 }} />
+            <Text style={styles.helperText}>
+              Please ensure photos are clear and all text is readable. PDF, JPG, or PNG formats are accepted (Max 5MB per file).
+            </Text>
+          </View>
+        )}
 
         {/* Bottom Actions */}
         <View style={styles.bottomBar}>
-          <TouchableOpacity 
-            style={[styles.submitBtn, !allRequiredApproved && styles.submitBtnDisabled]} 
-            onPress={submitKYC}
-            disabled={!allRequiredApproved || isSubmitting}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color={localColors.onPrimary} />
-            ) : (
-              <>
-                <Text style={styles.submitBtnText}>{allRequiredApproved ? 'Finish Registration' : 'Submit Application'}</Text>
-                <MaterialIcons name={allRequiredApproved ? "check-circle" : "rocket-launch"} size={20} color={localColors.onPrimary} style={{ marginLeft: 8 }} />
-              </>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.backActionBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backActionText}>Back</Text>
-          </TouchableOpacity>
+          {isApprovedAndViewing ? (
+            <TouchableOpacity style={[styles.submitBtn, { backgroundColor: localColors.secondary }]} onPress={() => navigation.goBack()}>
+              <Text style={styles.submitBtnText}>Back to Profile</Text>
+              <MaterialIcons name="arrow-back" size={20} color={localColors.onPrimary} style={{ marginLeft: 8 }} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity 
+              style={[styles.submitBtn, !allRequiredApproved && styles.submitBtnDisabled]} 
+              onPress={submitKYC}
+              disabled={!allRequiredApproved || isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color={localColors.onPrimary} />
+              ) : (
+                <>
+                  <Text style={styles.submitBtnText}>{allRequiredApproved ? 'Finish Registration' : 'Submit Application'}</Text>
+                  <MaterialIcons name={allRequiredApproved ? "check-circle" : "rocket-launch"} size={20} color={localColors.onPrimary} style={{ marginLeft: 8 }} />
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+          
+          {!isApprovedAndViewing && (
+            <TouchableOpacity style={styles.backActionBtn} onPress={() => navigation.goBack()}>
+              <Text style={styles.backActionText}>Back</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 

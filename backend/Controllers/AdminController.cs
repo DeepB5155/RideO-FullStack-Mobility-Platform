@@ -194,6 +194,14 @@ namespace RideO.API.Controllers
             if (driver == null) return NotFound();
 
             driver.IsSuspended = !driver.IsSuspended;
+            
+            if (driver.IsSuspended)
+            {
+                driver.IsAvailable = false;
+                await _hubContext.Clients.User(driver.UserId.ToString()).SendAsync("AccountSuspended");
+                await _hubContext.Clients.All.SendAsync("DriverLocationUpdated", driver.Id, null, null, false);
+            }
+            
             await _context.SaveChangesAsync();
             return Ok(new { message = driver.IsSuspended ? "Driver suspended successfully" : "Driver unsuspended successfully", isSuspended = driver.IsSuspended });
         }
@@ -431,7 +439,7 @@ namespace RideO.API.Controllers
             await _context.SaveChangesAsync();
             
             // Realtime Update via SignalR
-            await _hubContext.Clients.User(driver.UserId.ToString()).SendAsync("KYCStatusUpdated", "Rejected");
+            await _hubContext.Clients.User(driver.UserId.ToString()).SendAsync("KYCStatusUpdated", "Rejected", reason);
             
             if (!string.IsNullOrEmpty(driver.User?.FcmDeviceToken))
             {

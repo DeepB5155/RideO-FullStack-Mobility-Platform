@@ -15,21 +15,8 @@ export const CustomHeader = ({ navigation, route, options, back }: any) => {
     <SafeAreaView style={[styles.headerSafe, isHome && styles.headerSafeTransparent]} pointerEvents={isHome ? "box-none" : "auto"}>
       <View style={[styles.header, isHome && styles.headerTransparent]} pointerEvents={isHome ? "box-none" : "auto"}>
         {/* Left Side: Back Arrow or App Logo */}
-        {!isHome ? (
-          <TouchableOpacity style={styles.headerBtn} onPress={() => {
-            if (back) {
-              navigation.goBack();
-            } else {
-              if (user && !user.isVerified) {
-                Alert.alert('Log Out', 'Are you sure you want to log out? You can complete your vehicle details later.', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Log Out', style: 'destructive', onPress: () => logout() }
-                ]);
-              } else {
-                navigation.navigate('MainTabs');
-              }
-            }
-          }}>
+        {back ? (
+          <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
             <Icon name="arrow-left" size={28} color="#000000" />
           </TouchableOpacity>
         ) : (
@@ -45,12 +32,10 @@ export const CustomHeader = ({ navigation, route, options, back }: any) => {
            </Text>
         ) : (
            <View />
-        )}
-
-        {/* Right Side: Profile Avatar or Empty space for flex alignment */}
-        <TouchableOpacity style={styles.headerAvatar} onPress={() => navigation.navigate('Profile')}>
-          <Icon name="account" size={20} color="#ffffff" />
-        </TouchableOpacity>
+          )}
+  
+          {/* Right Side: Empty space for flex alignment */}
+          <View style={styles.rightSpacer} />
       </View>
     </SafeAreaView>
   );
@@ -99,17 +84,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#000000',
   },
-  headerAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#0b1c30',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  rightSpacer: {
+    width: 44,
   },
 });

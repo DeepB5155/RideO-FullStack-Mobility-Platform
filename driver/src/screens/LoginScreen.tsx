@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, SafeAreaView, KeyboardAvoidingView, Platform, StatusBar, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, SafeAreaView, KeyboardAvoidingView, Platform, StatusBar, ScrollView, Modal } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api/axios';
@@ -32,30 +32,61 @@ const LoginScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   
+  // Custom Error Modal State
+  const [errorVisible, setErrorVisible] = useState(false);
+  const [errorTitle, setErrorTitle] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  
   const { login } = useContext(AuthContext);
+
+  const showError = (title: string, msg: string) => {
+    setErrorTitle(title);
+    setErrorMessage(msg);
+    setErrorVisible(true);
+  };
+
+  const renderErrorModal = () => (
+    <Modal
+      transparent={true}
+      visible={errorVisible}
+      animationType="fade"
+      onRequestClose={() => setErrorVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <Icon name="error-outline" size={48} color="#ef4444" style={{ marginBottom: 16 }} />
+          <Text style={styles.modalTitle}>{errorTitle}</Text>
+          <Text style={styles.modalMessage}>{errorMessage}</Text>
+          <TouchableOpacity style={styles.modalBtn} onPress={() => setErrorVisible(false)}>
+            <Text style={styles.modalBtnText}>OK</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   const handleAuth = async () => {
     if (isRegistering) {
       if (!fullName || !email || !phone || !password) {
-        Alert.alert('Error', 'Please fill in all fields');
+        showError('Error', 'Please fill in all fields');
         return;
       }
       
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
-        Alert.alert('Error', 'Please enter a valid email address.');
+        showError('Error', 'Please enter a valid email address.');
         return;
       }
 
       const phoneRegex = /^[0-9]{10}$/;
       if (!phoneRegex.test(phone.replace(/\D/g, ''))) {
-        Alert.alert('Error', 'Please enter a valid 10-digit phone number.');
+        showError('Error', 'Please enter a valid 10-digit phone number.');
         return;
       }
 
       const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
       if (!strongPasswordRegex.test(password)) {
-        Alert.alert('Weak Password', 'Password must be at least 8 characters and contain 1 uppercase, 1 lowercase, 1 number, and 1 special character.');
+        showError('Error', 'Password must be at least 8 characters long and contain uppercase, lowercase, number, and special character.');
         return;
       }
 
@@ -64,7 +95,7 @@ const LoginScreen = () => {
         await api.post('/Auth/register', {
           fullName,
           email,
-          phone,
+          phoneNumber: phone,
           password,
           role: 'Driver'
         });
@@ -73,8 +104,9 @@ const LoginScreen = () => {
         const { token, user } = response.data;
         await login(token, user);
       } catch (error: any) {
-        const message = error.response?.data || error.message || 'Registration failed';
-        Alert.alert('Registration Error', message);
+        const data = error.response?.data;
+        const message = data?.message || (typeof data === 'string' ? data : error.message) || 'Registration failed';
+        showError('Registration Error', message);
       } finally {
         setLoading(false);
       }
@@ -85,19 +117,19 @@ const LoginScreen = () => {
     const identifier = loginMethod === 'phone' ? phone : email;
 
     if (!identifier || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      showError('Error', 'Please fill in all fields');
       return;
     }
 
     if (loginMethod === 'phone') {
       if (phone.length !== 10) {
-        Alert.alert('Error', 'Phone number must be exactly 10 digits.');
+        showError('Error', 'Phone number must be exactly 10 digits.');
         return;
       }
     } else {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
-        Alert.alert('Error', 'Please enter a valid email address.');
+        showError('Error', 'Please enter a valid email address.');
         return;
       }
     }
@@ -110,14 +142,16 @@ const LoginScreen = () => {
       const { token, user } = response.data;
       
       if (user.role !== 'Driver') {
-        Alert.alert('Error', 'Account not found. Please register as a Driver first.');
+        showError('Error', 'Account not found. Please register as a Driver first.');
         return;
       }
       
       await login(token, user);
     } catch (error: any) {
-      const message = error.response?.data || error.message || 'Login failed';
-      Alert.alert('Login Error', message);
+      const data = error.response?.data;
+      const message = data?.message || (typeof data === 'string' ? data : error.message) || 'Login failed';
+      const title = message.toLowerCase().includes('suspended') ? 'Account Suspended 🚫' : 'Login Error';
+      showError(title, message);
     } finally {
       setLoading(false);
     }
@@ -126,7 +160,7 @@ const LoginScreen = () => {
   const handleForgotPassword = async () => {
     const identifier = loginMethod === 'phone' ? phone : email;
     if (!identifier) {
-      Alert.alert('Error', 'Please enter your email or phone to reset password.');
+      showError('Error', 'Please enter your email or phone to reset password.');
       return;
     }
 
@@ -135,16 +169,17 @@ const LoginScreen = () => {
       const response = await api.post('/auth/forgot-password', { email: identifier });
       
       if (response.data.debug_token) {
-        Alert.alert(
+        showError(
           'Reset Link Sent', 
-          `Your debug token is: ${response.data.debug_token}\n\nUse this to test the reset password flow.`,
-          [{ text: 'OK', onPress: () => navigation.navigate('ResetPassword') }]
+          `Your debug token is: ${response.data.debug_token}\n\nUse this to test the reset password flow.`
         );
       } else {
-        Alert.alert('Reset Link Sent', response.data.message);
+        showError('Reset Link Sent', response.data.message);
       }
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data || 'Failed to send reset link.');
+      const data = error.response?.data;
+      const message = data?.message || (typeof data === 'string' ? data : error.message) || 'Failed to send reset link.';
+      showError('Error', message);
     } finally {
       setLoading(false);
     }
@@ -155,6 +190,7 @@ const LoginScreen = () => {
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" backgroundColor="#f8f9ff" />
+        {renderErrorModal()}
         <KeyboardAvoidingView style={styles.keyboardAvoid} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={styles.regScrollInner} showsVerticalScrollIndicator={false}>
             
@@ -275,6 +311,7 @@ const LoginScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#f8f9ff" />
+      {renderErrorModal()}
       <KeyboardAvoidingView 
         style={styles.keyboardAvoid} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -660,6 +697,50 @@ const styles = StyleSheet.create({
   regTermsLink: {
     textDecorationLine: 'underline',
     color: localColors.onSurface,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '85%',
+    backgroundColor: localColors.surfaceContainerLowest,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: localColors.onSurface,
+    marginBottom: 12,
+  },
+  modalMessage: {
+    fontSize: 15,
+    color: localColors.outline,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  modalBtn: {
+    backgroundColor: localColors.secondary,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalBtnText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
   }
 });
 

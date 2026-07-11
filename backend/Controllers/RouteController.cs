@@ -643,7 +643,9 @@ namespace RideO.API.Controllers
                     pricingMode = route.PricingMode,
                     autoApprove = route.AutoApprove,
                     isRecurring = route.IsRecurring,
-                    isProDriver = topDriverIds.Contains(route.DriverId)
+                    isProDriver = topDriverIds.Contains(route.DriverId),
+                    driverLat = route.StartLat,
+                    driverLng = route.StartLng
                 });
             }
 

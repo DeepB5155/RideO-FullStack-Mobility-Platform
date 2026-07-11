@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axiosInstance from '../api/axiosInstance';
+import api from '../api';
 import './PayoutRequests.css'; // Optional, but let's just use inline or simple styles for now. I'll stick to basic JSX with standard classes if they exist, or just inline. Actually, let's use inline for simplicity.
 
 const PayoutRequests = () => {
@@ -14,7 +14,7 @@ const PayoutRequests = () => {
   const fetchPayouts = async () => {
     try {
       setLoading(true);
-      const res = await axiosInstance.get('/payout/pending');
+      const res = await api.get('/payout/pending');
       setPayouts(res.data);
       setError(null);
     } catch (err) {
@@ -29,7 +29,7 @@ const PayoutRequests = () => {
     if (!window.confirm(`Are you sure you want to ${status.toLowerCase()} this payout?`)) return;
     
     try {
-      await axiosInstance.put(`/payout/${id}/status`, { status });
+      await api.put(`/payout/${id}/status`, { status });
       // Remove from list after successful action
       setPayouts((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {

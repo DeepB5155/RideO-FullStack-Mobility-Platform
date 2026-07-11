@@ -93,9 +93,30 @@ namespace RideO.API.Controllers
                 return StatusCode(403, new { message = "Your account has been suspended by an administrator." });
             }
 
-            var token = GenerateJwtToken(user);
+            if (user.Role == "Driver")
+            {
+                var driver = await _context.Drivers.FirstOrDefaultAsync(d => d.UserId == user.Id);
+                if (driver != null && driver.IsSuspended)
+                {
+                    return StatusCode(403, new { message = "Your driver account is suspended. Contact support." });
+                }
 
-            return Ok(new { token, user });
+                var token = GenerateJwtToken(user);
+                return Ok(new { 
+                    token, 
+                    user = new { 
+                        id = user.Id, 
+                        fullName = user.FullName, 
+                        email = user.Email, 
+                        phoneNumber = user.PhoneNumber,
+                        role = user.Role, 
+                        isVerified = driver?.IsVerified ?? false
+                    } 
+                });
+            }
+
+            var defaultToken = GenerateJwtToken(user);
+            return Ok(new { token = defaultToken, user });
         }
 
         [HttpPost("admin-login")]

@@ -1,6 +1,9 @@
-import React, { useContext } from 'react';
-import { ActivityIndicator, View, Text } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useContext, useEffect } from 'react';
+import { ActivityIndicator, View, Text, Alert } from 'react-native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as signalR from '@microsoft/signalr';
+import axiosInstance from '../api/axios';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { theme } from '../theme/theme';
@@ -33,6 +36,8 @@ import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 
 // Context
 import { AuthContext } from '../context/AuthContext';
+
+export const navigationRef = createNavigationContainerRef<any>();
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -179,7 +184,7 @@ const MainStack = () => {
       <Stack.Screen name="Route Bookings" component={RouteBookingsScreen} options={{ title: 'Route Details' }} />
       <Stack.Screen name="Active Ride" component={ActiveRideScreen} options={{ headerTransparent: true }} />
       <Stack.Screen name="Rating" component={RatingScreen} options={{ title: 'Rating' }} />
-      <Stack.Screen name="Chat" component={ChatScreen} options={{ title: 'Chat' }} />
+      <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Support" component={SupportScreen} options={{ title: 'Support' }} />
       <Stack.Screen name="Wallet" component={WalletScreen} options={{ title: 'Wallet' }} />
       <Stack.Screen name="Insights" component={InsightsScreen} options={{ title: 'Insights' }} />
@@ -187,13 +192,83 @@ const MainStack = () => {
       <Stack.Screen name="Leaderboard" component={LeaderboardScreen} options={{ title: 'Leaderboard' }} />
       <Stack.Screen name="DailyCommuteSetup" component={DailyCommuteSetupScreen} options={{ title: 'Commute Setup' }} />
       <Stack.Screen name="EditVehicle" component={EditVehicleScreen} options={{ title: 'Edit Vehicle' }} />
+      <Stack.Screen name="KYC" component={KYCScreen} options={{ title: 'KYC Details' }} />
     </Stack.Navigator>
   );
 };
 
 // ─── Root ────────────────────────────────────────────────────────────────
 const AppNavigator = () => {
-  const { user, isLoading } = useContext(AuthContext);
+  const { user, isLoading, updateUser, logout } = useContext(AuthContext);
+
+  useEffect(() => {
+    let connection: signalR.HubConnection | null = null;
+    
+    const setupGlobalSignalR = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (!token || !user) return;
+        
+        const hubUrl = axiosInstance.defaults.baseURL?.replace('/api', '/rideHub') || 'http://localhost:5000/rideHub';
+        
+        connection = new signalR.HubConnectionBuilder()
+          .withUrl(hubUrl, { accessTokenFactory: () => token })
+          .withAutomaticReconnect()
+          .build();
+
+        connection.on("KYCStatusUpdated", (newStatus: string, reason?: string) => {
+          if (newStatus === 'Rejected') {
+            Alert.alert(
+              "KYC Rejected ⚠️",
+              `Your documents were rejected.\n\nReason: ${reason || 'Invalid documents'}\n\nPlease update your details.`,
+              [
+                { 
+                  text: "OK", 
+                  onPress: () => {
+                    updateUser({ isVerified: false });
+                    if (navigationRef.isReady()) {
+                      navigationRef.navigate('KYCScreen');
+                    }
+                  } 
+                }
+              ]
+            );
+          } else if (newStatus === 'Approved') {
+             updateUser({ isVerified: true });
+          }
+        });
+
+        connection.on("AccountSuspended", () => {
+          console.log("RECEIVED AccountSuspended EVENT FROM SIGNALR!");
+          Alert.alert(
+            "Account Suspended 🚫",
+            "Your driver account has been suspended by an administrator. You will be logged out. Contact support for assistance.",
+            [
+              { 
+                text: "OK", 
+                onPress: () => {
+                  logout();
+                } 
+              }
+            ]
+          );
+        });
+
+        await connection.start();
+        console.log("Global SignalR Connected Successfully in AppNavigator!");
+      } catch (err) {
+        console.log("Global SignalR Connection Error:", err);
+      }
+    };
+
+    setupGlobalSignalR();
+
+    return () => {
+      if (connection) {
+        connection.stop();
+      }
+    };
+  }, [user?.id]);
 
   if (isLoading) {
     return (
@@ -204,7 +279,7 @@ const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       {user ? (user.isVerified ? <MainStack /> : <OnboardingStack />) : <AuthStack />}
     </NavigationContainer>
   );

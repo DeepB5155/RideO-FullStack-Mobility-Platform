@@ -4,6 +4,10 @@ import * as signalR from '@microsoft/signalr';
 import { SIGNALR_HUB_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axiosInstance from '../api/axios';
+import Mapbox from '@rnmapbox/maps';
+import { MAPBOX_ACCESS_TOKEN } from '@env';
+
+Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
 
 const LiveTrackingScreen = ({ route, navigation }: any) => {
   const { routeId, driverName, pickup, dropoff, bookingId, trackingId, driverUserId } = route.params;
@@ -161,19 +165,33 @@ const LiveTrackingScreen = ({ route, navigation }: any) => {
       </View>
 
       <View style={styles.mapContainer}>
-        {/* Placeholder for actual @rnmapbox/maps MapView */}
-        <View style={styles.mapMock}>
-          <Text style={styles.mapMockTitle}>Map Tracking Simulation</Text>
-          {driverLocation ? (
-            <>
-              <Text style={styles.coordText}>Driver Lat: {driverLocation.lat.toFixed(6)}</Text>
-              <Text style={styles.coordText}>Driver Lng: {driverLocation.lng.toFixed(6)}</Text>
-              <View style={styles.pulsingDot} />
-            </>
-          ) : (
+        {driverLocation ? (
+          <Mapbox.MapView 
+            style={styles.mapMock} 
+            logoEnabled={false} 
+            attributionEnabled={false} 
+            styleURL={Mapbox.StyleURL.Dark}
+          >
+            <Mapbox.Camera
+              zoomLevel={15}
+              centerCoordinate={[driverLocation.lng, driverLocation.lat]}
+              animationMode="flyTo"
+              animationDuration={2000}
+            />
+            <Mapbox.PointAnnotation
+              id="driverMarker"
+              coordinate={[driverLocation.lng, driverLocation.lat]}
+            >
+              <View style={styles.driverMarkerContainer}>
+                <View style={styles.pulsingDot} />
+              </View>
+            </Mapbox.PointAnnotation>
+          </Mapbox.MapView>
+        ) : (
+          <View style={styles.mapMock}>
             <Text style={styles.waitingText}>Waiting for driver to start sharing location...</Text>
-          )}
-        </View>
+          </View>
+        )}
       </View>
 
       <TouchableOpacity style={styles.floatingSosBtn} onPress={() => {
@@ -279,9 +297,13 @@ const styles = StyleSheet.create({
   sosBtnText: { color: theme.colors.text.light, fontWeight: 'bold', fontSize: 16 },
   mapContainer: { flex: 1, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, overflow: 'hidden', ...theme.shadows.medium, borderWidth: 1, borderColor: theme.colors.border },
   mapMock: { flex: 1, backgroundColor: theme.colors.surface, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  mapMockTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: theme.colors.text.main },
-  coordText: { fontSize: 16, color: theme.colors.text.muted, marginBottom: 5 },
-  pulsingDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: theme.colors.primary, marginTop: 15 },
+  driverMarkerContainer: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  pulsingDot: { width: 16, height: 16, backgroundColor: theme.colors.primary, borderRadius: 8, borderWidth: 2, borderColor: '#fff' },
   waitingText: { color: theme.colors.text.muted, fontStyle: 'italic', textAlign: 'center' },
   floatingSosBtn: {
     position: 'absolute',

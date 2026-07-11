@@ -29,6 +29,8 @@ const VehicleDetailsScreen = ({ navigation, route }: any) => {
   const [year, setYear] = useState('');
   const [vehicleType, setVehicleType] = useState('sedan');
   const [licensePlate, setLicensePlate] = useState('');
+  const [color, setColor] = useState('');
+  const [totalSeats, setTotalSeats] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -37,9 +39,7 @@ const VehicleDetailsScreen = ({ navigation, route }: any) => {
     const checkStatus = async () => {
       try {
         const res = await axiosInstance.get('/kyc/status');
-        if (res.data.status === 'Approved' && !fromProfile) {
-          navigation.replace('MainTabs');
-        } else if ((res.data.status === 'Pending' || res.data.status === 'Rejected') && !fromProfile) {
+        if ((res.data.status === 'Pending' || res.data.status === 'Rejected') && !fromProfile) {
           navigation.replace('KYC'); // KYC screen handles pending and rejected state UI
         }
       } catch (e) {
@@ -52,7 +52,7 @@ const VehicleDetailsScreen = ({ navigation, route }: any) => {
   }, [navigation, fromProfile]);
 
   const handleNext = () => {
-    if (!makeModel || !year || !vehicleType || !licensePlate) {
+    if (!makeModel || !year || !vehicleType || !licensePlate || !color || !totalSeats) {
       alert('Please fill in all fields.');
       return;
     }
@@ -69,8 +69,8 @@ const VehicleDetailsScreen = ({ navigation, route }: any) => {
         year: parseInt(year) || new Date().getFullYear(),
         vehicleType,
         licensePlate: licensePlate.toUpperCase(),
-        color: 'White', // Defaulting as it's not in the new UI mockup
-        totalSeats: vehicleType === 'xl' ? 7 : 4
+        color: color.trim(),
+        totalSeats: parseInt(totalSeats) || 4
       }
     });
   };
@@ -177,6 +177,38 @@ const VehicleDetailsScreen = ({ navigation, route }: any) => {
                 />
               </View>
               <Text style={styles.hintText}>Make sure your license plate matches your physical vehicle.</Text>
+            </View>
+
+            <View style={styles.row}>
+              <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                <Text style={styles.label}>Color</Text>
+                <View style={styles.inputWrapper}>
+                  <MaterialIcons name="palette" size={20} color={localColors.outline} style={styles.icon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. White"
+                    placeholderTextColor={localColors.outline}
+                    value={color}
+                    onChangeText={setColor}
+                  />
+                </View>
+              </View>
+              
+              <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+                <Text style={styles.label}>Total Seats</Text>
+                <View style={styles.inputWrapper}>
+                  <MaterialIcons name="event-seat" size={20} color={localColors.outline} style={styles.icon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 4"
+                    placeholderTextColor={localColors.outline}
+                    keyboardType="numeric"
+                    maxLength={2}
+                    value={totalSeats}
+                    onChangeText={setTotalSeats}
+                  />
+                </View>
+              </View>
             </View>
 
             {/* Quick Tips Card */}

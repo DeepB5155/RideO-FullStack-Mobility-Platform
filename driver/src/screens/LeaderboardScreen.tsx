@@ -47,14 +47,6 @@ const LeaderboardScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Top Drivers</Text>
-        <Icon name="emoji-events" size={24} color="#fbbf24" />
-      </View>
-
       <View style={styles.banner}>
         <Text style={styles.bannerText}>Keep providing excellent service to climb the ranks!</Text>
       </View>

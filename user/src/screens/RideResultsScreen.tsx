@@ -39,8 +39,7 @@ const RideResultsScreen = ({ route, navigation }: any) => {
   const [selectedRoute, setSelectedRoute] = useState<any>(null);
   const [subscriptionPlan, setSubscriptionPlan] = useState<'Daily' | 'Weekly'>('Daily');
 
-  const [routeCoordinates, setRouteCoordinates] = useState<any[]>([]);
-  const [mockDrivers, setMockDrivers] = useState<{id: number, lng: number, lat: number}[]>([]);
+  const [routeCoordinates, setRouteCoordinates] = useState<any>(null);
 
   const windowHeight = Dimensions.get('window').height;
   const SHEET_PEEK_HEIGHT = 200; // Increased to fit the filter chips cleanly
@@ -99,12 +98,6 @@ const RideResultsScreen = ({ route, navigation }: any) => {
       }
     };
     fetchRoute();
-
-    setMockDrivers([
-      { id: 1, lng: pickupLng + 0.002, lat: pickupLat + 0.002 },
-      { id: 2, lng: pickupLng - 0.003, lat: pickupLat + 0.001 },
-      { id: 3, lng: pickupLng + 0.001, lat: pickupLat - 0.002 },
-    ]);
   }, []);
 
   const handleRequestSeat = async (item: any) => {
@@ -223,34 +216,35 @@ const RideResultsScreen = ({ route, navigation }: any) => {
     <View style={styles.container}>
       {/* Map View */}
       <View style={styles.mapBg}>
-        <Mapbox.MapView style={{ flex: 1 }} styleURL={Mapbox.StyleURL.Street} compassEnabled={false}>
+        <Mapbox.MapView style={styles.mapMock} logoEnabled={false} attributionEnabled={false} styleURL={Mapbox.StyleURL.Dark}>
           <Mapbox.Camera
-            defaultSettings={{
-              centerCoordinate: [pickupLng, pickupLat],
-              zoomLevel: 12,
-            }}
+            zoomLevel={13}
+            centerCoordinate={[pickupLng, pickupLat]}
+            animationMode="flyTo"
           />
-          {routeCoordinates.length > 0 && (
-            <Mapbox.ShapeSource id="routeSource" shape={{ type: 'LineString', coordinates: routeCoordinates }}>
-              <Mapbox.LineLayer
-                id="routeFill"
-                style={{ lineColor: '#006a61', lineWidth: 5, lineCap: 'round', lineJoin: 'round' }}
-              />
+          {routeCoordinates && (
+            <Mapbox.ShapeSource id="routeSource" shape={{ type: 'Feature', geometry: { type: 'LineString', coordinates: routeCoordinates } }}>
+              <Mapbox.LineLayer id="routeLayer" style={{ lineColor: localColors.secondary, lineWidth: 5 }} />
             </Mapbox.ShapeSource>
           )}
-          
+          {/* Pickup Marker */}
           <Mapbox.PointAnnotation id="pickup" coordinate={[pickupLng, pickupLat]}>
-            <View style={styles.markerPickup}><View style={styles.markerPickupInner}/></View>
+            <View style={styles.markerContainer}>
+              <MaterialIcons name="person-pin-circle" size={30} color={localColors.primary} />
+            </View>
           </Mapbox.PointAnnotation>
-          
-          <Mapbox.PointAnnotation id="dropoff" coordinate={[dropLng, dropLat]}>
-            <View style={styles.markerDropoff}><View style={styles.markerDropoffInner}/></View>
+          {/* Drop Marker */}
+          <Mapbox.PointAnnotation id="drop" coordinate={[dropLng, dropLat]}>
+            <View style={styles.markerContainer}>
+              <MaterialIcons name="location-on" size={30} color={localColors.secondary} />
+            </View>
           </Mapbox.PointAnnotation>
-          
-          {mockDrivers.map((driver) => (
-            <Mapbox.PointAnnotation key={driver.id.toString()} id={`driver-${driver.id}`} coordinate={[driver.lng, driver.lat]}>
+
+          {/* Actual Driver Markers */}
+          {results.filter(r => r.driverLat && r.driverLng).map((r, index) => (
+            <Mapbox.PointAnnotation key={`driver-${r.routeId || index}`} id={`driver-${r.routeId || index}`} coordinate={[r.driverLng, r.driverLat]}>
               <View style={styles.carMarker}>
-                <MaterialIcons name="local-taxi" size={16} color="#ffffff" />
+                <MaterialIcons name="directions-car" size={20} color="#fff" />
               </View>
             </Mapbox.PointAnnotation>
           ))}

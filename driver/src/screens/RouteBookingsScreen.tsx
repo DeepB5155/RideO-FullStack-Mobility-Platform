@@ -221,17 +221,6 @@ const RouteBookingsScreen = ({ route, navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.appBar}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={28} color="#000000" />
-        </TouchableOpacity>
-        <Text style={styles.appTitle}>RideO</Text>
-        <TouchableOpacity style={styles.profileAvatarBtn}>
-          <Icon name="person" size={20} color="#0b1c30" />
-        </TouchableOpacity>
-      </View>
-
       <FlatList
         data={bookings}
         keyExtractor={(item) => item.id}

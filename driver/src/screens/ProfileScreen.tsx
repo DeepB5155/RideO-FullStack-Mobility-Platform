@@ -106,20 +106,6 @@ const ProfileScreen = () => {
 
           {/* Grid Quick Actions */}
           <View style={styles.grid}>
-            {/* Earnings */}
-            <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Earnings')} activeOpacity={0.8}>
-              <View style={styles.gridCardHeader}>
-                <View style={styles.iconBoxDark}>
-                  <MaterialIcon name="account-balance-wallet" size={20} color="#ffffff" />
-                </View>
-                <MaterialIcon name="arrow-forward" size={20} color="#76777d" />
-              </View>
-              <View>
-                <Text style={styles.gridCardLabel}>THIS WEEK</Text>
-                <Text style={styles.gridCardValue}>₹{earnings.toFixed(2)}</Text>
-              </View>
-            </TouchableOpacity>
-
             {/* Insights */}
             <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Insights')} activeOpacity={0.8}>
               <View style={styles.gridCardHeader}>

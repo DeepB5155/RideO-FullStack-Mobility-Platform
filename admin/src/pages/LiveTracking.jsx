@@ -2,6 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { MapPin, Navigation, Car, AlertTriangle } from 'lucide-react';
 import * as signalR from '@microsoft/signalr';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet's default icon path issues with Webpack/Vite
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Custom Car Icon
+const carIcon = new L.Icon({
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/744/744426.png', // Fallback simple car icon
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  popupAnchor: [0, -16]
+});
 
 const LiveTracking = () => {
   const { trackingId } = useParams();
@@ -100,22 +119,26 @@ const LiveTracking = () => {
 
       {/* Main Content */}
       <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
-        {/* Map Area (Mock) */}
-        <div style={{ flex: 1, backgroundColor: '#e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
-           <div style={{ position: 'absolute', top: 20, right: 20, backgroundColor: 'white', padding: '10px 15px', borderRadius: '20px', fontWeight: 'bold', zIndex: 10, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ flex: 1, backgroundColor: '#e2e8f0', position: 'relative', zIndex: 0 }}>
+           <div style={{ position: 'absolute', top: 20, right: 20, backgroundColor: 'white', padding: '10px 15px', borderRadius: '20px', fontWeight: 'bold', zIndex: 1000, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ width: '10px', height: '10px', backgroundColor: '#10b981', borderRadius: '50%', animation: 'pulse 2s infinite' }}></div>
               Live Map
            </div>
 
            {trackingData.CurrentLocation ? (
-             <div style={{ textAlign: 'center' }}>
-               <Car size={64} color="#3b82f6" />
-               <div style={{ marginTop: '10px', backgroundColor: '#1e293b', color: 'white', padding: '5px 10px', borderRadius: '4px', fontSize: '14px' }}>
-                 {trackingData.CurrentLocation.Latitude.toFixed(5)}, {trackingData.CurrentLocation.Longitude.toFixed(5)}
-               </div>
-             </div>
+             <MapContainer center={[trackingData.CurrentLocation.Latitude, trackingData.CurrentLocation.Longitude]} zoom={15} style={{ height: '100%', width: '100%' }}>
+               <TileLayer
+                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+               />
+               <Marker position={[trackingData.CurrentLocation.Latitude, trackingData.CurrentLocation.Longitude]} icon={carIcon}>
+                 <Popup>
+                   Vehicle is here
+                 </Popup>
+               </Marker>
+             </MapContainer>
            ) : (
-             <div style={{ textAlign: 'center', color: '#64748b' }}>
+             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#64748b' }}>
                 <MapPin size={48} color="#94a3b8" />
                 <p>Waiting for driver location...</p>
              </div>

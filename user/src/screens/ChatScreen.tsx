@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, Alert, Image, SafeAreaView, ScrollView } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import * as signalR from '@microsoft/signalr';
 import { SIGNALR_HUB_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/axios';
+import { AuthContext } from '../context/AuthContext';
 
 const localColors = {
   primary: '#000000',
@@ -24,13 +25,10 @@ const localColors = {
 };
 
 const ChatScreen = ({ route, navigation }: any) => {
-  const { bookingId, targetName } = route.params || { bookingId: 'mock-booking', targetName: 'Marcus' };
+  const { bookingId, targetName } = route.params || { bookingId: 'mock-booking', targetName: 'Chat' };
+  const { user } = useContext(AuthContext);
   
-  const [messages, setMessages] = useState<any[]>([
-    { id: '1', content: "Hi, I'm waiting outside the main entrance.", isFromDriver: true, sentAt: new Date(Date.now() - 120000).toISOString() },
-    { id: '2', content: "Great, I'm heading down now. Be there in a minute!", isFromDriver: false, sentAt: new Date(Date.now() - 60000).toISOString() },
-    { id: '3', content: "Take your time. I'm parked next to the blue hydrant.", isFromDriver: true, sentAt: new Date(Date.now() - 30000).toISOString() }
-  ]);
+  const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
   
@@ -68,11 +66,11 @@ const ChatScreen = ({ route, navigation }: any) => {
     const fetchHistory = async () => {
       try {
         const res = await api.get(`/chat/${bookingId}`);
-        if (res.data && res.data.length > 0) {
-           setMessages(res.data);
+        if (res.data && res.data.messages) {
+           setMessages(res.data.messages);
         }
       } catch (err) {
-        console.log('No chat history found or error fetching, using mock');
+        console.log('No chat history found or error fetching');
       }
     };
 
@@ -92,21 +90,14 @@ const ChatScreen = ({ route, navigation }: any) => {
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
 
+    setNewMessage('');
+
     if (connection && bookingId !== 'mock-booking') {
       try {
         await connection.invoke('SendMessage', bookingId, newMessage);
       } catch (err) {
         Alert.alert('Error', 'Failed to send message.');
-        return;
       }
-    } else {
-      // Mock sending
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
-        content: newMessage,
-        isFromDriver: false,
-        sentAt: new Date().toISOString()
-      }]);
     }
     
     setNewMessage('');
@@ -122,7 +113,7 @@ const ChatScreen = ({ route, navigation }: any) => {
   };
 
   const renderItem = ({ item }: any) => {
-    const isMine = !item.isFromDriver; 
+    const isMine = item.senderId === user?.id; 
     const timeString = new Date(item.sentAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     
     if (isMine) {

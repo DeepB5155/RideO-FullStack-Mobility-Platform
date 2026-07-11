@@ -45,16 +45,6 @@ const SupportScreen = ({ navigation }: any) => {
         style={styles.backgroundMap}
         imageStyle={{ opacity: 0.3 }}
       >
-        <View style={styles.appBar}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Icon name="arrow-back" size={28} color="#000000" />
-          </TouchableOpacity>
-          <Text style={styles.appTitle}>Support</Text>
-          <View style={styles.profileAvatarBtn}>
-            <Icon name="person" size={20} color="#0b1c30" />
-          </View>
-        </View>
-
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <TouchableOpacity 
             style={styles.historyBtn} 

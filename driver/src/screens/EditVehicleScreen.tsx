@@ -125,18 +125,9 @@ const EditVehicleScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView 
-        style={styles.container} 
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <MaterialIcons name="arrow-back" size={24} color={localColors.onSurfaceVariant} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Vehicle</Text>
-          <View style={{ width: 40 }} />
-        </View>
-
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Info Text */}
           <Text style={styles.infoText}>

@@ -46,13 +46,6 @@ const MyComplaintsScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.title}>My Support Tickets</Text>
-      </View>
-
       {loading ? (
         <ActivityIndicator size="large" color="#000" style={{ marginTop: 40 }} />
       ) : (

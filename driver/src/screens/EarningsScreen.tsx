@@ -17,6 +17,19 @@ const EarningsScreen = ({ navigation }: any) => {
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+    const R = 6371;
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+    return R * c;
+  };
+
   useEffect(() => {
     const fetchEarnings = async () => {
       try {
@@ -26,18 +39,31 @@ const EarningsScreen = ({ navigation }: any) => {
         
         let totalEarnings = 0;
         let totalRides = 0;
+        let totalOnlineMinutes = 0;
 
         historyRides.forEach((r: any) => {
           if (r.status === 'Completed') {
-            totalEarnings += (r.pricePerSeat * (r.totalSeats - r.availableSeats)) * 0.9; // Mock 90% payout
+            const platformFeeMultiplier = 0.90; // Driver keeps 90%
+            totalEarnings += (r.pricePerSeat * (r.totalSeats - r.availableSeats)) * platformFeeMultiplier;
             totalRides += 1;
+            
+            if (r.startTime && r.estimatedEndTime) {
+              const start = new Date(r.startTime).getTime();
+              const end = new Date(r.estimatedEndTime).getTime();
+              const diffMins = (end - start) / 60000;
+              if (diffMins > 0) totalOnlineMinutes += diffMins;
+            }
           }
         });
+
+        const hours = Math.floor(totalOnlineMinutes / 60);
+        const mins = Math.floor(totalOnlineMinutes % 60);
+        const formattedOnlineHours = `${hours}h ${mins}m`;
 
         setStats({
           balance: totalEarnings,
           recentRides: totalRides,
-          onlineHours: '36h 15m', // Mocked as per design
+          onlineHours: formattedOnlineHours,
           rides: historyRides.sort((a: any, b: any) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
         });
       } catch (err) {
@@ -59,16 +85,22 @@ const EarningsScreen = ({ navigation }: any) => {
     const total = ride.pricePerSeat * (ride.totalSeats - ride.availableSeats);
     const earning = isCancelled ? 0 : (total * 0.9);
     
-    // Mock trip ID for UI
-    const tripId = `#${8829 - idx}`; 
+    const tripId = `#${ride.id ? ride.id.substring(0, 5).toUpperCase() : (8829 - idx)}`; 
 
     const startDate = new Date(ride.startTime);
     const dateStr = startDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
     const timeStr = startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Mock distance/time for UI completeness
-    const mockKm = Math.floor(Math.random() * 20) + 5;
-    const mockMins = Math.floor(Math.random() * 40) + 15;
+    const calculatedKm = Math.floor(getDistanceFromLatLonInKm(ride.startLat, ride.startLng, ride.endLat, ride.endLng));
+    const distanceKm = calculatedKm > 0 ? calculatedKm : 0;
+    
+    let durationMins = 0;
+    if (ride.startTime && ride.estimatedEndTime) {
+      const start = new Date(ride.startTime).getTime();
+      const end = new Date(ride.estimatedEndTime).getTime();
+      durationMins = Math.floor((end - start) / 60000);
+    }
+    const finalMins = durationMins > 0 ? durationMins : 0;
 
     return (
       <View key={ride.id || idx} style={[styles.rideCard, isCancelled && styles.rideCardCancelled]}>
@@ -97,8 +129,8 @@ const EarningsScreen = ({ navigation }: any) => {
 
         <View style={styles.cardFooterRow}>
           <View style={styles.metricsContainer}>
-            <Text style={styles.metricChip}>{mockKm} km</Text>
-            <Text style={styles.metricChip}>{mockMins} mins</Text>
+            <Text style={styles.metricChip}>{distanceKm} km</Text>
+            <Text style={styles.metricChip}>{finalMins} mins</Text>
           </View>
           {isCancelled ? (
             <View style={styles.badgeCancelled}>

@@ -44,6 +44,12 @@ const LoginScreen = ({ navigation }: any) => {
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Validation Error', 'Please enter a valid email address.');
+      return;
+    }
+
     if (!isForgotPassword && password.length < 6) {
       Alert.alert('Validation Error', 'Password must be at least 6 characters.');
       return;
@@ -219,25 +225,7 @@ const LoginScreen = ({ navigation }: any) => {
               </Text>
             )}
           </TouchableOpacity>
-
-              {/* Divider */}
-              <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>OR CONTINUE WITH</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              {/* Social Logins */}
-              <View style={styles.socialGroup}>
-                <TouchableOpacity style={styles.googleBtn}>
-                  <Text style={styles.googleBtnText}>Google</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.facebookBtn}>
-                  <Text style={styles.facebookBtnText}>Facebook</Text>
-                </TouchableOpacity>
-              </View>
-
-        </View>
+          </View>
 
         {/* Footer Toggle */}
         <TouchableOpacity 

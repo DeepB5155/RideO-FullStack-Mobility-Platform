@@ -25,7 +25,7 @@ const localColors = {
 
 const WithdrawScreen = ({ navigation }: any) => {
   const [balance, setBalance] = useState(0);
-  const [amount, setAmount] = useState('500.00');
+  const [amount, setAmount] = useState('');
   const [selectedBank, setSelectedBank] = useState('chase');
   const [isLoading, setIsLoading] = useState(true);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
@@ -39,11 +39,10 @@ const WithdrawScreen = ({ navigation }: any) => {
     try {
       setIsLoading(true);
       const balanceRes = await api.get('/wallet/balance');
-      setBalance(balanceRes.data.balance || 1245.50); // Mock fallback for UI testing
+      setBalance(balanceRes.data.balance || 0);
     } catch (err) {
       console.error('Error fetching wallet:', err);
-      // Fallback for UI if API fails
-      setBalance(1245.50); 
+      setBalance(0); 
     } finally {
       setIsLoading(false);
     }
@@ -93,17 +92,6 @@ const WithdrawScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={localColors.surface} />
-      
-      {/* Top AppBar */}
-      <View style={styles.appBar}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={24} color={localColors.onSurfaceVariant} />
-        </TouchableOpacity>
-        <Text style={styles.appTitle}>Withdraw</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
