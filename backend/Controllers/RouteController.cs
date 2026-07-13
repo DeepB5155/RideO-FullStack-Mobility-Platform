@@ -89,7 +89,7 @@ namespace RideO.API.Controllers
             {
                 routeId = route.Id,
                 driverName = route.Driver?.User?.FullName,
-                driverRating = route.Driver?.Rating,
+                driverRating = route.Driver?.Rating, startLat = route.StartLat, startLng = route.StartLng, endLat = route.EndLat, endLng = route.EndLng,
                 vehicleInfo = new
                 {
                     color = route.Vehicle?.Color,

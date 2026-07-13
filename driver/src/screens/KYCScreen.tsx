@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, StatusBar, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, StatusBar, Modal, TextInput, Alert, DeviceEventEmitter } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axiosInstance from '../api/axios';
@@ -87,6 +87,15 @@ const KYCScreen = ({ route, navigation }: any) => {
 
   useEffect(() => {
     checkStatus();
+    
+    // Listen for SignalR refresh events from AppNavigator
+    const sub = DeviceEventEmitter.addListener('KYCRefresh', () => {
+      checkStatus();
+    });
+    
+    return () => {
+      sub.remove();
+    };
   }, []);
 
 
@@ -147,7 +156,7 @@ const KYCScreen = ({ route, navigation }: any) => {
         updateUser({ isVerified: true });
       }, 500);
     }
-  }, [status, fromProfile, updateUser]);
+  }, [status, fromProfile]);
 
   const allRequiredApproved = licenseUrl && rcUrl && insuranceUrl && vehicleImageUrl && driverFaceUrl && licenseNumber.trim() !== '';
 

@@ -1,8 +1,8 @@
 
-.payout-container {
-  padding: 24px;
-  max-width: 1200px;
-  margin: 0 auto;
+.profile-edits-page {
+  padding: 20px 40px;
+  background-color: transparent;
+  min-height: calc(100vh - 60px);
 }
 
 .page-header {
@@ -16,12 +16,12 @@
 }
 
 .page-header p {
+  font-size: 14px;
   color: var(--text-secondary);
-  font-size: 16px;
   margin: 0;
 }
 
-.table-container {
+.requests-table-container {
   background: var(--bg-panel);
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.2);
@@ -29,52 +29,38 @@
   border: 1px solid var(--border);
 }
 
-.data-table {
+.requests-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.data-table th, .data-table td {
+.requests-table th, .requests-table td {
   padding: 16px 20px;
   text-align: left;
   border-bottom: 1px solid var(--border);
-}
-
-.data-table th {
-  background-color: rgba(0,0,0,0.2);
-  color: var(--text-secondary);
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 12px;
-  letter-spacing: 0.5px;
-}
-
-.data-table td {
   color: var(--text-primary);
 }
 
-.driver-name {
-  font-weight: 500;
-}
-
-.amount-value {
-  font-weight: 700;
-  color: #10b981;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 12px;
-  border: 2px dashed var(--border);
+.requests-table th {
+  background-color: rgba(0,0,0,0.2);
+  font-weight: 600;
   color: var(--text-secondary);
 }
 
-.actions-cell {
+.details-col div {
+  margin-bottom: 4px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.highlight-change {
+  color: #f57c00;
+  font-weight: 600;
+}
+
+.actions-col {
   display: flex;
   gap: 10px;
-  justify-content: center;
 }
 
 .action-btn {
@@ -83,28 +69,34 @@
   border: none;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.1s;
+  transition: opacity 0.2s;
 }
 
 .action-btn:hover {
   opacity: 0.8;
-  transform: translateY(-1px);
-}
-
-.action-btn:active {
-  transform: translateY(0);
 }
 
 .action-btn.approve {
   background-color: #10b981;
   color: white;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
 .action-btn.reject {
   background-color: #ef4444;
   color: white;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.empty-state {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.loading-state {
+  padding: 100px;
+  text-align: center;
+  font-size: 18px;
+  color: var(--text-secondary);
 }
 
 /* Modal Styles */
@@ -138,7 +130,26 @@
 .modal-content p {
   color: var(--text-secondary);
   font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.reject-textarea {
+  width: 100%;
+  height: 100px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 12px;
+  font-family: inherit;
+  resize: vertical;
   margin-bottom: 20px;
+  box-sizing: border-box;
+}
+
+.reject-textarea:focus {
+  outline: none;
+  border-color: #ef4444;
 }
 
 .modal-actions {
@@ -158,6 +169,11 @@
 
 .modal-btn:hover {
   opacity: 0.8;
+}
+
+.modal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .modal-btn.cancel {

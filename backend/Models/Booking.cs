@@ -28,6 +28,9 @@ namespace RideO.API.Models
 
         [MaxLength(255)]
         public string? PickupLocationName { get; set; }
+        
+        public double? PickupLat { get; set; }
+        public double? PickupLng { get; set; }
 
         public Guid? DropoffStopId { get; set; }
 
@@ -36,6 +39,9 @@ namespace RideO.API.Models
 
         [MaxLength(255)]
         public string? DropoffLocationName { get; set; }
+        
+        public double? DropoffLat { get; set; }
+        public double? DropoffLng { get; set; }
 
         [Required]
         public int SeatsBooked { get; set; } = 1;

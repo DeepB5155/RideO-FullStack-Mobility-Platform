@@ -100,21 +100,19 @@ const RideResultsScreen = ({ route, navigation }: any) => {
     fetchRoute();
   }, []);
 
-  const handleRequestSeat = async (item: any) => {
-    try {
-      await axiosInstance.post('/booking/request', {
-        routeId: item.routeId,
-        pickupLocationName: item.matchedPickup,
-        dropoffLocationName: item.matchedDropoff,
-        seatsBooked: seats,
-        paymentMethod: paymentMethod
-      });
-      Alert.alert('Success', item.autoApprove ? 'Booking Confirmed!' : 'Request sent to driver.');
-      navigation.navigate('My Rides'); 
-    } catch (err: any) {
-      Alert.alert('Error', err.response?.data || 'Failed to request seat.');
-    }
+  const handleRequestSeat = (item: any) => {
+    navigation.navigate('RideDetail', {
+      item,
+      seats,
+      pickupText,
+      dropoffText,
+      pickupLat,
+      pickupLng,
+      dropLat,
+      dropLng
+    });
   };
+
 
   const [onDemandLoading, setOnDemandLoading] = useState(false);
   const handleRequestOnDemand = async () => {

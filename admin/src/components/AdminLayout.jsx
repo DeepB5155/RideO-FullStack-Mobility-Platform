@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Users, Car, MapPin, ShieldCheck, ShieldAlert, Menu, X, LogOut, Navigation, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Users, Car, MapPin, ShieldCheck, ShieldAlert, Menu, X, LogOut, Navigation, AlertTriangle, UserCog } from 'lucide-react';
 import * as signalR from '@microsoft/signalr';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +10,8 @@ const AdminLayout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sosAlert, setSosAlert] = useState(null);
     const [sosCount, setSosCount] = useState(0);
+    const [kycCount, setKycCount] = useState(0);
+    const [profileEditsCount, setProfileEditsCount] = useState(0);
     const navigate = useNavigate();
 
     const fetchSosCount = async () => {
@@ -22,6 +24,30 @@ const AdminLayout = () => {
             setSosCount(openAlerts.length);
         } catch (error) {
             console.error('Failed to fetch SOS count', error);
+        }
+    };
+
+    const fetchKycCount = async () => {
+        try {
+            const token = localStorage.getItem('adminToken');
+            const res = await axios.get('http://localhost:5248/api/admin/kyc-pending', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setKycCount(res.data.length);
+        } catch (error) {
+            console.error('Failed to fetch KYC count', error);
+        }
+    };
+
+    const fetchProfileEditsCount = async () => {
+        try {
+            const token = localStorage.getItem('adminToken');
+            const res = await axios.get('http://localhost:5248/api/admin/profile-edits/pending', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setProfileEditsCount(res.data.length);
+        } catch (error) {
+            console.error('Failed to fetch profile edits count', error);
         }
     };
 
@@ -47,6 +73,22 @@ const AdminLayout = () => {
                     audio.play().catch(e => console.log('Audio play blocked:', e));
                 });
 
+                hubConnection.on('KYCSubmitted', () => {
+                    setKycCount(prev => prev + 1);
+                });
+
+                hubConnection.on('KYCProcessed', () => {
+                    setKycCount(prev => Math.max(0, prev - 1));
+                });
+
+                hubConnection.on('ProfileEditSubmitted', () => {
+                    setProfileEditsCount(prev => prev + 1);
+                });
+
+                hubConnection.on('ProfileUpdateProcessed', () => {
+                    setProfileEditsCount(prev => Math.max(0, prev - 1));
+                });
+
                 await hubConnection.start();
                 await hubConnection.invoke('JoinAdminMonitors');
                 console.log('AdminLayout connected to RideHub for SOS alerts');
@@ -56,6 +98,8 @@ const AdminLayout = () => {
         };
 
         fetchSosCount();
+        fetchKycCount();
+        fetchProfileEditsCount();
         connectSignalR();
 
         return () => {
@@ -71,7 +115,8 @@ const AdminLayout = () => {
         { name: 'Users', icon: <Users size={20} />, path: '/users' },
         { name: 'Drivers', icon: <Car size={20} />, path: '/drivers' },
         { name: 'Payouts', icon: <LayoutDashboard size={20} />, path: '/payouts' },
-        { name: 'KYC Auth', icon: <ShieldCheck size={20} />, path: '/kyc' },
+        { name: 'KYC Auth', icon: <ShieldCheck size={20} />, path: '/kyc', badge: kycCount > 0 ? kycCount : null },
+        { name: 'Profile Edits', icon: <UserCog size={20} />, path: '/profile-edits', badge: profileEditsCount > 0 ? profileEditsCount : null },
         { name: 'Complaints', icon: <ShieldAlert size={20} />, path: '/complaints' },
         { name: 'Safety Alerts', icon: <AlertTriangle size={20} />, path: '/safety-alerts', badge: sosCount > 0 ? sosCount : null },
     ];

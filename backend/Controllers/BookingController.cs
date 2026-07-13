@@ -33,7 +33,11 @@ namespace RideO.API.Controllers
         {
             public Guid RouteId { get; set; }
             public string PickupLocationName { get; set; } = string.Empty;
+            public double? PickupLat { get; set; }
+            public double? PickupLng { get; set; }
             public string DropoffLocationName { get; set; } = string.Empty;
+            public double? DropLat { get; set; }
+            public double? DropLng { get; set; }
             public int SeatsBooked { get; set; }
             public string PaymentMethod { get; set; } = "Cash";
         }
@@ -194,13 +198,20 @@ namespace RideO.API.Controllers
             if (route.Status != "Published") return BadRequest("Route is not published.");
             if (route.AvailableSeats < request.SeatsBooked) return BadRequest("Not enough available seats.");
 
+            var existingBooking = await _context.Bookings.FirstOrDefaultAsync(b => b.RouteId == request.RouteId && b.UserId == userId.Value && (b.Status == "Pending" || b.Status == "Approved" || b.Status == "Started"));
+            if (existingBooking != null) return BadRequest("You already have an active booking for this route.");
+
             var booking = new Booking
             {
                 Id = Guid.NewGuid(),
                 RouteId = route.Id,
                 UserId = userId.Value,
                 PickupLocationName = request.PickupLocationName,
+                PickupLat = request.PickupLat,
+                PickupLng = request.PickupLng,
                 DropoffLocationName = request.DropoffLocationName,
+                DropoffLat = request.DropLat,
+                DropoffLng = request.DropLng,
                 SeatsBooked = request.SeatsBooked,
                 TotalFare = route.PricePerSeat * request.SeatsBooked,
                 PaymentMethod = request.PaymentMethod,
@@ -335,7 +346,7 @@ namespace RideO.API.Controllers
                     b.TotalFare,
                     PickupLocationName = string.IsNullOrEmpty(b.PickupLocationName) ? b.Route!.StartLocation : b.PickupLocationName,
                     DropoffLocationName = string.IsNullOrEmpty(b.DropoffLocationName) ? b.Route!.EndLocation : b.DropoffLocationName,
-                    b.BookedAt,
+                    b.BookedAt, b.Otp,
                     Route = new {
                         b.Route!.StartTime,
                         DriverName = b.Route.Driver!.User!.FullName,
@@ -802,7 +813,11 @@ namespace RideO.API.Controllers
                     b.SeatsBooked,
                     b.TotalFare,
                     b.PickupLocationName,
+                    b.PickupLat,
+                    b.PickupLng,
                     b.DropoffLocationName,
+                    b.DropoffLat,
+                    b.DropoffLng,
                     UserName = b.User!.FullName,
                     UserPhone = b.User.PhoneNumber
                 })

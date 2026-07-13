@@ -8,6 +8,8 @@ import { AuthContext } from '../context/AuthContext';
 import HomeScreen from '../screens/HomeScreen';
 import SearchRideScreen from '../screens/SearchRideScreen';
 import RideResultsScreen from '../screens/RideResultsScreen';
+import RideDetailScreen from '../screens/RideDetailScreen';
+import AwaitingApprovalScreen from '../screens/AwaitingApprovalScreen';
 import MyRidesScreen from '../screens/MyRidesScreen';
 import LiveTrackingScreen from '../screens/LiveTrackingScreen';
 import RatingScreen from '../screens/RatingScreen';
@@ -24,10 +26,11 @@ import SettingsScreen from '../screens/SettingsScreen';
 import ProfileInformationScreen from '../screens/ProfileInformationScreen';
 import SecurityScreen from '../screens/SecurityScreen';
 import PaymentMethodsScreen from '../screens/PaymentMethodsScreen';
-import RegisterScreen from '../screens/RegisterScreen';
 import ModalsShowcaseScreen from '../screens/ModalsShowcaseScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import RideHistoryScreen from '../screens/RideHistoryScreen';
+import CommuteSetupScreen from '../screens/CommuteSetupScreen';
+import CommuteConfirmScreen from '../screens/CommuteConfirmScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -156,7 +159,11 @@ const AppNavigator = () => {
           <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
           <Stack.Screen name="Home" component={HomeScreen} options={{ headerTransparent: true }} />
           <Stack.Screen name="SearchRide" component={SearchRideScreen} options={{ title: 'Search Ride' }} />
-          <Stack.Screen name="RideResults" component={RideResultsScreen} options={{ title: 'Available Rides' }} />
+          <Stack.Screen name="RideResults" component={RideResultsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="RideDetail" component={RideDetailScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="AwaitingApproval" component={AwaitingApprovalScreen} options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="CommuteSetup" component={CommuteSetupScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="CommuteConfirm" component={CommuteConfirmScreen} options={{ title: 'Confirm Pass' }} />
           <Stack.Screen name="My Rides" component={MyRidesScreen} />
           <Stack.Screen name="Live Tracking" component={LiveTrackingScreen} options={{ headerTransparent: true }} />
           <Stack.Screen name="Rating" component={RatingScreen} />
@@ -178,7 +185,6 @@ const AppNavigator = () => {
       ) : (
         <>
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
           <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} options={{ headerShown: false }} />
         </>
       )}

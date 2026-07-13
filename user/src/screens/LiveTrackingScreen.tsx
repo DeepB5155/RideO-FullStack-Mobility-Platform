@@ -10,7 +10,7 @@ import { MAPBOX_ACCESS_TOKEN } from '@env';
 Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
 
 const LiveTrackingScreen = ({ route, navigation }: any) => {
-  const { routeId, driverName, pickup, dropoff, bookingId, trackingId, driverUserId } = route.params;
+  const { routeId, driverName, pickup, dropoff, bookingId, trackingId, driverUserId, otp } = route.params;
   const [driverLocation, setDriverLocation] = useState<{lat: number, lng: number} | null>(null);
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
 
@@ -138,6 +138,13 @@ const LiveTrackingScreen = ({ route, navigation }: any) => {
         <Text style={styles.infoText}>Driver: <Text style={{fontWeight: 'bold'}}>{driverName}</Text></Text>
         <Text style={styles.infoText}>Pickup: {pickup}</Text>
         <Text style={styles.infoText}>Dropoff: {dropoff}</Text>
+        {otp && (
+          <View style={styles.otpContainer}>
+            <Text style={styles.otpLabel}>Your Ride PIN</Text>
+            <Text style={styles.otpValue}>{otp}</Text>
+            <Text style={styles.otpSubtext}>Give this PIN to {driverName} to start your ride</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.actionRow}>
@@ -305,6 +312,10 @@ const styles = StyleSheet.create({
   },
   pulsingDot: { width: 16, height: 16, backgroundColor: theme.colors.primary, borderRadius: 8, borderWidth: 2, borderColor: '#fff' },
   waitingText: { color: theme.colors.text.muted, fontStyle: 'italic', textAlign: 'center' },
+  otpContainer: { marginTop: 15, padding: 15, backgroundColor: 'rgba(26, 115, 232, 0.1)', borderRadius: theme.radius.md, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.primary },
+  otpLabel: { fontSize: 14, color: theme.colors.primary, fontWeight: '600', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 1 },
+  otpValue: { fontSize: 32, fontWeight: 'bold', color: theme.colors.primary, letterSpacing: 8, marginBottom: 5 },
+  otpSubtext: { fontSize: 12, color: theme.colors.text.muted, textAlign: 'center' },
   floatingSosBtn: {
     position: 'absolute',
     bottom: 30,

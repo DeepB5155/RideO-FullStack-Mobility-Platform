@@ -6,7 +6,9 @@ import { MAPBOX_ACCESS_TOKEN, SIGNALR_HUB_URL } from '@env';
 import * as signalR from '@microsoft/signalr';
 import { AuthContext } from '../context/AuthContext';
 import Icon from 'react-native-vector-icons/Ionicons';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import messaging from '@react-native-firebase/messaging';
+import BookRideSheet from './BookRideSheet';
 
 // Split token to bypass GitHub secret scan
 const MAPBOX_TOKEN = MAPBOX_ACCESS_TOKEN;
@@ -23,6 +25,7 @@ const HomeScreen = ({ navigation }: any) => {
   const [driverLocation, setDriverLocation] = useState<[number, number] | null>(null);
   const [isDriverReconnecting, setIsDriverReconnecting] = useState(false);
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [bookSheetVisible, setBookSheetVisible] = useState(false);
 
   const cameraRef = useRef<Mapbox.Camera>(null);
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
@@ -188,20 +191,24 @@ const HomeScreen = ({ navigation }: any) => {
         </TouchableOpacity>
       )}
 
-      {/* Floating Search / Where to? */}
+      {/* Floating Action Buttons */}
       {rideStatus === 'idle' && (
-        <View style={styles.floatingSearchContainer} pointerEvents="box-none">
-          <TouchableOpacity 
-            style={styles.searchBox} 
-            activeOpacity={0.9} 
-            onPress={() => navigation.navigate('SearchRide')}
+        <View style={styles.floatingActionBar}>
+          <TouchableOpacity
+            style={styles.bookRideBtn}
+            onPress={() => setBookSheetVisible(true)}
+            activeOpacity={0.85}
           >
-            <Icon name="search-outline" size={24} color="#000000" />
-            <Text style={styles.searchText}>Where to?</Text>
-            <View style={styles.searchDivider} />
-            <TouchableOpacity style={styles.scheduleBtn}>
-              <Icon name="time-outline" size={20} color="#45464d" />
-            </TouchableOpacity>
+            <MaterialIcons name="directions-car" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.bookRideBtnText}>Book a Ride</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.commuteBtn}
+            onPress={() => navigation.navigate('CommuteSetup')}
+            activeOpacity={0.85}
+          >
+            <MaterialIcons name="event-repeat" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.commuteBtnText}>Commute Pass</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -217,14 +224,14 @@ const HomeScreen = ({ navigation }: any) => {
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             {/* Suggestions Row */}
             <View style={styles.suggestionsRow}>
-              <TouchableOpacity style={styles.suggestionItem} onPress={() => navigation.navigate('SearchRide')}>
+              <TouchableOpacity style={styles.suggestionItem} onPress={() => setBookSheetVisible(true)}>
                 <View style={styles.suggestionIconBox}>
                   <Icon name="home" size={28} color="#000000" />
                 </View>
                 <Text style={styles.suggestionLabel}>Home</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.suggestionItem} onPress={() => navigation.navigate('SearchRide')}>
+              <TouchableOpacity style={styles.suggestionItem} onPress={() => setBookSheetVisible(true)}>
                 <View style={styles.suggestionIconBox}>
                   <Icon name="briefcase" size={28} color="#000000" />
                 </View>
@@ -242,7 +249,7 @@ const HomeScreen = ({ navigation }: any) => {
             {/* Recent Locations */}
             <Text style={styles.recentTitle}>Recent Locations</Text>
             
-            <TouchableOpacity style={styles.recentItem} onPress={() => navigation.navigate('SearchRide')}>
+            <TouchableOpacity style={styles.recentItem} onPress={() => setBookSheetVisible(true)}>
               <View style={styles.recentIconBox}>
                 <Icon name="time" size={20} color="#45464d" />
               </View>
@@ -254,7 +261,7 @@ const HomeScreen = ({ navigation }: any) => {
             
             <View style={styles.recentDivider} />
 
-            <TouchableOpacity style={styles.recentItem} onPress={() => navigation.navigate('SearchRide')}>
+            <TouchableOpacity style={styles.recentItem} onPress={() => setBookSheetVisible(true)}>
               <View style={styles.recentIconBox}>
                 <Icon name="time" size={20} color="#45464d" />
               </View>
@@ -336,6 +343,20 @@ const HomeScreen = ({ navigation }: any) => {
           </View>
         )}
       </View>
+
+      {/* BookRide Bottom Sheet */}
+      <BookRideSheet
+        visible={bookSheetVisible}
+        onClose={() => setBookSheetVisible(false)}
+        onSearch={(params) => {
+          setBookSheetVisible(false);
+          navigation.navigate('RideResults', {
+            ...params,
+            isRecurring: false,
+            recurringDays: ''
+          });
+        }}
+      />
     </View>
   );
 };
@@ -865,7 +886,55 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
     fontSize: 14,
-  }
+  },
+  floatingActionBar: {
+    position: 'absolute',
+    bottom: 84,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    zIndex: 20,
+  },
+  bookRideBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+    borderRadius: 16,
+    height: 52,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  bookRideBtnText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  commuteBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#006a61',
+    borderRadius: 16,
+    height: 52,
+    marginLeft: 12,
+    shadowColor: '#006a61',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  commuteBtnText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
 });
+
 
 export default HomeScreen;

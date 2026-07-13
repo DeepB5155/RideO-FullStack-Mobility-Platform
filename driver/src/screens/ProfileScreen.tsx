@@ -74,7 +74,12 @@ const ProfileScreen = () => {
             <View style={styles.largeAvatar}>
               <Text style={styles.largeAvatarText}>{initials}</Text>
             </View>
-            <Text style={styles.profileName}>{name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={styles.profileName}>{name}</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('EditProfile')} style={{ padding: 4, marginLeft: 4 }}>
+                <MaterialIcon name="edit" size={20} color="#005049" />
+              </TouchableOpacity>
+            </View>
             <View style={styles.pillRow}>
               <View style={styles.tierPill}>
                 <Text style={styles.tierPillText}>Gold Tier</Text>
@@ -99,7 +104,7 @@ const ProfileScreen = () => {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.kycDetailsBtn} onPress={() => navigation.navigate('KYC', { fromProfile: true })}>
+            <TouchableOpacity style={styles.kycDetailsBtn} onPress={() => navigation.navigate('ProfileKYC', { fromProfile: true })}>
               <Text style={[styles.kycDetailsText, kycStatus !== 'Verified' && { color: '#f57c00' }]}>Details</Text>
             </TouchableOpacity>
           </View>

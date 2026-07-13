@@ -169,6 +169,11 @@ namespace RideO.API.Controllers
                 return Conflict("Email is already registered.");
             }
 
+            if (!string.IsNullOrWhiteSpace(request.PhoneNumber) && await _context.Users.AnyAsync(u => u.PhoneNumber == request.PhoneNumber))
+            {
+                return Conflict("Phone number is already registered.");
+            }
+
             Guid? referredByUserId = null;
             if (!string.IsNullOrWhiteSpace(request.ReferralCode))
             {

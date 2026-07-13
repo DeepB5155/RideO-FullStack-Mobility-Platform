@@ -275,7 +275,15 @@ const MyRoutesScreen = ({ navigation }: any) => {
                     }
 
                     updateStatus(selectedRoute?.id, 'Started');
-                    navigation.navigate('Active Ride', { routeId: selectedRoute?.id, startLoc: selectedRoute?.startLocation, endLoc: selectedRoute?.endLocation });
+                    navigation.navigate('Active Ride', { 
+                      routeId: selectedRoute?.id, 
+                      startLoc: selectedRoute?.startLocation, 
+                      endLoc: selectedRoute?.endLocation,
+                      startLat: selectedRoute?.startLat,
+                      startLng: selectedRoute?.startLng,
+                      endLat: selectedRoute?.endLat,
+                      endLng: selectedRoute?.endLng
+                    });
                   } else {
                     updateStatus(selectedRoute?.id, 'Completed');
                   }

@@ -22,6 +22,19 @@ import Mapbox from '@rnmapbox/maps';
 
 Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
 
+const getManeuverIcon = (modifier: string) => {
+  switch (modifier) {
+    case 'left': return 'turn-left';
+    case 'right': return 'turn-right';
+    case 'sharp left': return 'turn-left-variant';
+    case 'sharp right': return 'turn-right-variant';
+    case 'slight left': return 'arrow-top-left';
+    case 'slight right': return 'arrow-top-right';
+    case 'u-turn': return 'u-turn-left';
+    default: return 'arrow-up';
+  }
+};
+
 const ActiveRideScreen = ({ route, navigation }: any) => {
   const { routeId, startLoc, endLoc } = route.params;
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
@@ -31,6 +44,97 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
   const [ridePhase, setRidePhase] = useState<'heading_to_pickup' | 'in_progress'>('heading_to_pickup');
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otpInput, setOtpInput] = useState('');
+  
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [isLoadingBookings, setIsLoadingBookings] = useState(true);
+
+  const [routeDestination, setRouteDestination] = useState<{lat: number, lng: number} | null>(null);
+  const [routeGeometry, setRouteGeometry] = useState<any>(null);
+  const [currentManeuver, setCurrentManeuver] = useState<any>(null);
+
+  useEffect(() => {
+    let target = null;
+    
+    // 1. Find any approved booking to pick up
+    const approvedBooking = bookings.find(b => b.status === 'Approved');
+    if (approvedBooking && approvedBooking.pickupLat && approvedBooking.pickupLng) {
+      target = { lat: approvedBooking.pickupLat, lng: approvedBooking.pickupLng, label: `Pickup: ${approvedBooking.userName}` };
+    } 
+    // 2. Otherwise find any started booking to drop off
+    else {
+      const startedBooking = bookings.find(b => b.status === 'Started');
+      if (startedBooking && startedBooking.dropoffLat && startedBooking.dropoffLng) {
+        target = { lat: startedBooking.dropoffLat, lng: startedBooking.dropoffLng, label: `Dropoff: ${startedBooking.userName}` };
+      }
+    }
+
+    if (target) {
+      setRouteDestination({ lat: target.lat, lng: target.lng });
+      // Reset geometry to force refetch when destination changes
+      setRouteGeometry(null);
+    } else {
+      // Fallback to route end location
+      const fetchRouteInfo = async () => {
+        try {
+          const res = await axiosInstance.get(`/route/${routeId}/public`);
+          if (res.data.endLat && res.data.endLng) {
+            setRouteDestination({ lat: res.data.endLat, lng: res.data.endLng });
+            setRouteGeometry(null);
+          }
+        } catch (err) {
+          console.error('Failed to fetch route info', err);
+        }
+      };
+      fetchRouteInfo();
+    }
+  }, [routeId, bookings]);
+
+  useEffect(() => {
+    if (currentCoords && routeDestination) {
+      const fetchDirections = async () => {
+        try {
+          const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${currentCoords.lng},${currentCoords.lat};${routeDestination.lng},${routeDestination.lat}?steps=true&geometries=geojson&access_token=${MAPBOX_ACCESS_TOKEN}`;
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.routes && data.routes.length > 0) {
+            setRouteGeometry(data.routes[0].geometry);
+            
+            if (data.routes[0].legs && data.routes[0].legs.length > 0) {
+              const steps = data.routes[0].legs[0].steps;
+              if (steps && steps.length > 1) {
+                setCurrentManeuver(steps[1]);
+              } else if (steps && steps.length > 0) {
+                setCurrentManeuver(steps[0]);
+              }
+            }
+          }
+        } catch (err) {
+          console.log('Directions error', err);
+        }
+      };
+      
+      // Throttle - only fetch initially or if manually refreshed (for MVP)
+      if (!routeGeometry) {
+        fetchDirections();
+      }
+    }
+  }, [currentCoords, routeDestination]);
+
+  const fetchBookings = async () => {
+    try {
+      const response = await axiosInstance.get(`/booking/route/${routeId}`);
+      setBookings(response.data);
+    } catch (error) {
+      console.error('Failed to fetch bookings:', error);
+    } finally {
+      setIsLoadingBookings(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBookings();
+  }, [routeId]);
 
   useEffect(() => {
     let hubConnection: signalR.HubConnection;
@@ -120,15 +224,22 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
       return;
     }
     
+    if (!selectedBookingId) {
+      Alert.alert('Error', 'No passenger selected.');
+      return;
+    }
+    
     try {
-      // routeId is passed from the navigation params. Wait, routeId is used for StartWithOtp but the endpoint expects Booking Id. 
-      // If we only have routeId, we must adapt this. Wait, in RequestOnDemand we passed the Booking object to driver.
-      // So `routeId` here might actually be the booking id. Let's assume it's the booking ID because `/route/{id}/status` was called earlier.
-      // Actually earlier it called `PUT /route/${routeId}/status`, but now we should call `PUT /api/booking/${routeId}/start-with-otp`
-      await axiosInstance.put(`/booking/${routeId}/start-with-otp`, { otp: otpInput });
+      await axiosInstance.put(`/booking/${selectedBookingId}/start-with-otp`, { otp: otpInput });
       setShowOtpModal(false);
+      setOtpInput('');
+      
+      // Update local state to reflect the started ride
+      setBookings(prev => prev.map(b => b.id === selectedBookingId ? { ...b, status: 'Started' } : b));
+      
+      // If all passengers are started, you might transition phase, but for carpool, driver just continues dropping off
       setRidePhase('in_progress');
-      Alert.alert('Success', 'Ride Started successfully!');
+      Alert.alert('Success', 'Passenger picked up successfully!');
     } catch (e: any) {
       Alert.alert('Verification Failed', e.response?.data || 'Invalid OTP');
     }
@@ -177,6 +288,14 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
               animationDuration={2000}
             />
             <Mapbox.UserLocation visible showsUserHeadingIndicator />
+            {routeGeometry && (
+              <Mapbox.ShapeSource id="routeSource" shape={routeGeometry}>
+                <Mapbox.LineLayer 
+                  id="routeFill" 
+                  style={{ lineColor: '#006a61', lineWidth: 6, lineCap: 'round', lineJoin: 'round' }} 
+                />
+              </Mapbox.ShapeSource>
+            )}
           </Mapbox.MapView>
         ) : (
           <View style={[styles.mapImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#dce9ff' }]}>
@@ -190,15 +309,17 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
       <SafeAreaView style={styles.topOverlayArea}>
         <View style={styles.topRow}>
           {/* Turn Instruction */}
+          {currentManeuver && (
           <View style={styles.turnCard}>
             <View style={styles.turnIconBox}>
-              <Icon name="turn-right" size={28} color="#ffffff" />
+              <Icon name={getManeuverIcon(currentManeuver.maneuver.modifier)} size={28} color="#ffffff" />
             </View>
             <View style={styles.turnTexts}>
-              <Text style={styles.turnDistance}>300 ft</Text>
-              <Text style={styles.turnStreet} numberOfLines={1}>Turn right onto Market St</Text>
+              <Text style={styles.turnDistance}>{Math.round(currentManeuver.distance * 3.28084)} ft</Text>
+              <Text style={styles.turnStreet} numberOfLines={1}>{currentManeuver.maneuver.instruction}</Text>
             </View>
           </View>
+          )}
 
           {/* SOS Button */}
           <TouchableOpacity style={styles.sosButton} activeOpacity={0.8}>
@@ -251,53 +372,63 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
-        {/* Passenger Info */}
-        <View style={styles.passengerCard}>
-          <View style={styles.passengerHeader}>
-            <View style={styles.passengerAvatarRow}>
-              <Image 
-                source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA1-TTEVW3Mq-YGwNlHdBjzZf7653QKL1Y2RXDtUB90ys2ac-4UVhcLShr1kjAA_3UM_Z9CnqT8WRhbVJ8Ku2Mfe0cv6AI-M7V8o9w_81DQ2b4-OZCTYqAnYJei2BovMQC6pR5qg1FJ_BMgwmad8dPjsvwS3DH6p-_yVY1Sc4hzKyJdCaFDxwmlrY_zRRu-N4FRtVNjHkkWPM6fgA47CfD7ou_yE3g-3IvvqxIZIdX-IIT28uQMOlwAxAYTTsaKRW_3zzz0RAk6Gz4Y' }} 
-                style={styles.avatarImage} 
-              />
-              <View style={styles.passengerNameCol}>
-                <Text style={styles.passengerName}>Michael Chen</Text>
-                <View style={styles.ratingRow}>
-                  <Icon name="star" size={14} color="#45464d" />
-                  <Text style={styles.ratingText}>4.9</Text>
+        {/* Passengers List */}
+        <Text style={{ fontSize: 16, fontWeight: '700', color: '#0b1c30', marginBottom: 12 }}>Passengers</Text>
+        {isLoadingBookings ? (
+          <ActivityIndicator size="small" color="#006a61" />
+        ) : bookings.filter(b => b.status === 'Approved' || b.status === 'Started').length === 0 ? (
+          <Text style={{ color: '#45464d', marginBottom: 24 }}>No active passengers for this route.</Text>
+        ) : (
+          bookings.filter(b => b.status === 'Approved' || b.status === 'Started').map((booking) => (
+            <View key={booking.id} style={styles.passengerCard}>
+              <View style={styles.passengerHeader}>
+                <View style={styles.passengerAvatarRow}>
+                  <View style={styles.avatarImagePlaceholder}>
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>{booking.userName?.charAt(0)}</Text>
+                  </View>
+                  <View style={styles.passengerNameCol}>
+                    <Text style={styles.passengerName}>{booking.userName}</Text>
+                    <Text style={{ fontSize: 12, color: '#45464d' }}>{booking.pickupLocationName} → {booking.dropoffLocationName}</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.quickActions}>
+                  <TouchableOpacity style={styles.actionBtn}>
+                    <Icon name="phone-outline" size={20} color="#0b1c30" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.actionBtn}>
+                    <Icon name="message-outline" size={20} color="#0b1c30" />
+                  </TouchableOpacity>
                 </View>
               </View>
-            </View>
-            
-            {/* Quick Actions */}
-            <View style={styles.quickActions}>
-              <TouchableOpacity style={styles.actionBtn}>
-                <Icon name="phone-outline" size={20} color="#0b1c30" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionBtn}>
-                <Icon name="message-outline" size={20} color="#0b1c30" />
-                <View style={styles.chatBadge} />
-              </TouchableOpacity>
-            </View>
-          </View>
 
-          <View style={styles.verifiedChip}>
-            <MaterialIcon name="verified" size={16} color="#006f66" />
-            <Text style={styles.verifiedText}>Passenger Verified</Text>
-          </View>
-        </View>
-
-        {/* Bottom Button */}
-        {ridePhase === 'heading_to_pickup' ? (
-          <TouchableOpacity style={styles.startBtn} activeOpacity={0.9} onPress={() => setShowOtpModal(true)}>
-            <Text style={styles.completeBtnText}>Verify OTP & Start Ride</Text>
-            <Icon name="shield-check" size={24} color="#ffffff" style={{ marginLeft: 8 }} />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.completeBtn} activeOpacity={0.9} onPress={handleCompleteRide}>
-            <Text style={styles.completeBtnText}>Complete Dropoff</Text>
-            <Icon name="arrow-right" size={24} color="#ffffff" style={{ marginLeft: 8 }} />
-          </TouchableOpacity>
+              {booking.status === 'Approved' ? (
+                <TouchableOpacity 
+                  style={styles.startBtn} 
+                  activeOpacity={0.9} 
+                  onPress={() => {
+                    setSelectedBookingId(booking.id);
+                    setShowOtpModal(true);
+                  }}
+                >
+                  <Text style={styles.completeBtnText}>Verify OTP & Pick Up</Text>
+                  <Icon name="shield-check" size={20} color="#ffffff" style={{ marginLeft: 8 }} />
+                </TouchableOpacity>
+              ) : (
+                <View style={[styles.verifiedChip, { backgroundColor: '#e2f5ee', alignSelf: 'stretch', justifyContent: 'center' }]}>
+                  <MaterialIcon name="check-circle" size={18} color="#006f66" />
+                  <Text style={styles.verifiedText}>Picked Up (In Transit)</Text>
+                </View>
+              )}
+            </View>
+          ))
         )}
+
+        {/* Complete Route Button */}
+        <TouchableOpacity style={styles.completeBtn} activeOpacity={0.9} onPress={handleCompleteRide}>
+          <Text style={styles.completeBtnText}>Complete Entire Route</Text>
+          <Icon name="check-all" size={24} color="#ffffff" style={{ marginLeft: 8 }} />
+        </TouchableOpacity>
 
       </View>
 
@@ -614,15 +745,20 @@ const styles = StyleSheet.create({
   passengerAvatarRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
-  avatarImage: {
+  avatarImagePlaceholder: {
     width: 48,
     height: 48,
     borderRadius: 24,
     marginRight: 12,
+    backgroundColor: '#006a61',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   passengerNameCol: {
     justifyContent: 'center',
+    flex: 1,
   },
   passengerName: {
     fontSize: 18,
@@ -696,21 +832,17 @@ const styles = StyleSheet.create({
   },
   completeBtnText: {
     color: '#ffffff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
   },
   startBtn: {
     flexDirection: 'row',
     backgroundColor: '#005049', // darker teal for start
     borderRadius: 9999,
-    paddingVertical: 16,
+    paddingVertical: 12,
+    marginTop: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#005049',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
   },
 
   // Modal Styles

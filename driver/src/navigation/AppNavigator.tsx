@@ -1,5 +1,5 @@
 import React, { useContext, useEffect } from 'react';
-import { ActivityIndicator, View, Text, Alert } from 'react-native';
+import { ActivityIndicator, View, Text, Alert, DeviceEventEmitter } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as signalR from '@microsoft/signalr';
@@ -30,6 +30,7 @@ import MyComplaintsScreen from '../screens/MyComplaintsScreen';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
 import DailyCommuteSetupScreen from '../screens/DailyCommuteSetupScreen';
 import EditVehicleScreen from '../screens/EditVehicleScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 import VehicleDetailsScreen from '../screens/VehicleDetailsScreen';
 import WithdrawScreen from '../screens/WithdrawScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
@@ -192,7 +193,8 @@ const MainStack = () => {
       <Stack.Screen name="Leaderboard" component={LeaderboardScreen} options={{ title: 'Leaderboard' }} />
       <Stack.Screen name="DailyCommuteSetup" component={DailyCommuteSetupScreen} options={{ title: 'Commute Setup' }} />
       <Stack.Screen name="EditVehicle" component={EditVehicleScreen} options={{ title: 'Edit Vehicle' }} />
-      <Stack.Screen name="KYC" component={KYCScreen} options={{ title: 'KYC Details' }} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ProfileKYC" component={KYCScreen} options={{ title: 'KYC Details' }} />
     </Stack.Navigator>
   );
 };
@@ -226,6 +228,7 @@ const AppNavigator = () => {
                   text: "OK", 
                   onPress: () => {
                     updateUser({ isVerified: false });
+                    DeviceEventEmitter.emit('KYCRefresh');
                     if (navigationRef.isReady()) {
                       navigationRef.navigate('KYCScreen');
                     }
@@ -235,6 +238,26 @@ const AppNavigator = () => {
             );
           } else if (newStatus === 'Approved') {
              updateUser({ isVerified: true });
+          }
+        });
+
+        connection.on("ProfileUpdateProcessed", (status: string, message: string, updatedUser?: any) => {
+          if (status === 'Approved') {
+            Alert.alert("Profile Updated", message);
+            if (updatedUser) {
+              updateUser({
+                fullName: updatedUser.fullName,
+                phoneNumber: updatedUser.phoneNumber,
+                email: updatedUser.email
+              });
+            }
+          } else if (status === 'Rejected') {
+            Alert.alert("Profile Update Rejected", message);
+          }
+
+          // If the user is currently looking at the "Update Under Review" screen, automatically close it
+          if (navigationRef.current?.getCurrentRoute()?.name === 'EditProfile') {
+            navigationRef.current?.goBack();
           }
         });
 

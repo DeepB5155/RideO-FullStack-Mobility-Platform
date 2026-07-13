@@ -1,124 +1,226 @@
 import React, { useState, useContext } from 'react';
-import { 
-  View, Text, TextInput, TouchableOpacity, StyleSheet, 
-  Alert, ActivityIndicator, KeyboardAvoidingView, Platform, 
-  ScrollView, SafeAreaView
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, SafeAreaView, KeyboardAvoidingView, Platform, StatusBar, ScrollView, Modal } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api/axios';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 const localColors = {
   background: '#f8f9ff',
   primary: '#000000',
+  secondary: '#006a61',
   onSurfaceVariant: '#45464d',
   surfaceContainerLowest: '#ffffff',
-  surfaceContainerLow: '#eff4ff',
   outlineVariant: '#c6c6cd',
   outline: '#76777d',
   onSurface: '#0b1c30',
   surfaceContainer: '#e5eeff',
   surfaceVariant: '#d3e4fe',
-  surface: '#f8f9ff',
-  secondary: '#006a61',
-  googleBtnBg: '#e5eeff',
-  facebookBtnBg: '#1877F2',
 };
 
-const LoginScreen = ({ navigation }: any) => {
-  const { login } = useContext(AuthContext);
+const LoginScreen = () => {
+  // Toggle between Login and Register
+  const [isRegistering, setIsRegistering] = useState(false);
+  
+  // Tabs for Login: 'phone' or 'email'
+  const [loginMethod, setLoginMethod] = useState<'phone' | 'email'>('phone');
+  
+  // Form State
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
-  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // Custom Error Modal State
+  const [errorVisible, setErrorVisible] = useState(false);
+  const [errorTitle, setErrorTitle] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  
+  const { login } = useContext(AuthContext);
+
+  const showError = (title: string, msg: string) => {
+    setErrorTitle(title);
+    setErrorMessage(msg);
+    setErrorVisible(true);
+  };
+
+  const renderErrorModal = () => (
+    <Modal
+      transparent={true}
+      visible={errorVisible}
+      animationType="fade"
+      onRequestClose={() => setErrorVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <Icon name="error-outline" size={48} color="#ef4444" style={{ marginBottom: 16 }} />
+          <Text style={styles.modalTitle}>{errorTitle}</Text>
+          <Text style={styles.modalMessage}>{errorMessage}</Text>
+          <TouchableOpacity style={styles.modalBtn} onPress={() => setErrorVisible(false)}>
+            <Text style={styles.modalBtnText}>OK</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   const handleAuth = async () => {
-    if (isForgotPassword && !email) {
-      Alert.alert('Error', 'Please enter your email to reset password.');
-      return;
-    }
-    
-    if (!isForgotPassword && (!email || !password)) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (isRegistering) {
+      if (!fullName || !email || !phone || !password) {
+        showError('Error', 'Please fill in all fields');
+        return;
+      }
+      
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        showError('Error', 'Please enter a valid email address.');
+        return;
+      }
+
+      const phoneRegex = /^[0-9]{10}$/;
+      if (!phoneRegex.test(phone.replace(/\D/g, ''))) {
+        showError('Error', 'Please enter a valid 10-digit phone number.');
+        return;
+      }
+
+      const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+      if (!strongPasswordRegex.test(password)) {
+        showError('Error', 'Password must be at least 8 characters long and contain uppercase, lowercase, number, and special character.');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        await api.post('/Auth/register', {
+          fullName,
+          email,
+          phoneNumber: phone,
+          password,
+          role: 'User'
+        });
+        // After successful registration, log them in
+        const response = await api.post('/Auth/login', { email, password });
+        const { token, user } = response.data;
+        await login({ token, user });
+      } catch (error: any) {
+        const data = error.response?.data;
+        const message = data?.message || (typeof data === 'string' ? data : error.message) || 'Registration failed';
+        showError('Registration Error', message);
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Validation Error', 'Please enter a valid email address.');
+    // Login Flow
+    const identifier = loginMethod === 'phone' ? phone : email;
+
+    if (!identifier || !password) {
+      showError('Error', 'Please fill in all fields');
       return;
     }
 
-    if (!isForgotPassword && password.length < 6) {
-      Alert.alert('Validation Error', 'Password must be at least 6 characters.');
-      return;
+    if (loginMethod === 'phone') {
+      if (phone.length !== 10) {
+        showError('Error', 'Phone number must be exactly 10 digits.');
+        return;
+      }
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        showError('Error', 'Please enter a valid email address.');
+        return;
+      }
     }
 
     setLoading(true);
     try {
-      if (isForgotPassword) {
-        const response = await api.post('/auth/forgot-password', { email });
-        
-        if (response.data.debug_token) {
-          Alert.alert(
-            'Reset Link Sent', 
-            `Your debug token is: ${response.data.debug_token}\n\nUse this to test the reset password flow.`,
-            [{ text: 'OK', onPress: () => navigation.navigate('ResetPassword') }]
-          );
-        } else {
-          Alert.alert('Reset Link Sent', response.data.message);
-        }
-        
-        setIsForgotPassword(false);
+      // The API currently expects { email, password } for login.
+      const response = await api.post('/Auth/login', { email: identifier, password });
+      
+      const { token, user } = response.data;
+      
+      if (user.role !== 'User') {
+        showError('Error', 'Account not found. Please Register as a User first.');
         return;
       }
-
-
       
-      const response = await api.post('/auth/login', { email, password });
-      await login(response.data);
+      await login({ token, user });
     } catch (error: any) {
-      Alert.alert('Authentication Failed', error.response?.data || error.message);
+      const data = error.response?.data;
+      const message = data?.message || (typeof data === 'string' ? data : error.message) || 'Login failed';
+      const title = message.toLowerCase().includes('suspended') ? 'Account Suspended 🚫' : 'Login Error';
+      showError(title, message);
     } finally {
       setLoading(false);
     }
   };
 
-  // --- FORGOT PASSWORD UI ---
-  if (isForgotPassword) {
-    return (
-      <View style={styles.fpContainer}>
-        <SafeAreaView style={styles.fpHeaderSafe}>
-          <View style={styles.fpHeader}>
-            <TouchableOpacity onPress={() => setIsForgotPassword(false)} style={styles.fpIconBtn}>
-              <MaterialIcons name="arrow-back" size={24} color={localColors.onSurfaceVariant} />
-            </TouchableOpacity>
-            <Text style={styles.fpHeaderTitle}>RideO</Text>
-            <View style={{ width: 40 }} />
-          </View>
-        </SafeAreaView>
+  const handleForgotPassword = async () => {
+    const identifier = loginMethod === 'phone' ? phone : email;
+    if (!identifier) {
+      showError('Error', 'Please enter your email or phone to reset password.');
+      return;
+    }
 
-        <KeyboardAvoidingView 
-          style={styles.keyboardView}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <ScrollView contentContainerStyle={styles.fpScrollInner} showsVerticalScrollIndicator={false}>
-            <View style={styles.fpTitleSection}>
-              <Text style={styles.fpTitle}>Reset Password</Text>
-              <Text style={styles.fpSubtitle}>
-                Enter your email or phone number and we'll send you a link to reset your password.
-              </Text>
+    try {
+      setLoading(true);
+      const response = await api.post('/auth/forgot-password', { email: identifier });
+      
+      if (response.data.debug_token) {
+        showError(
+          'Reset Link Sent', 
+          `Your debug token is: ${response.data.debug_token}\n\nUse this to test the reset password flow.`
+        );
+      } else {
+        showError('Reset Link Sent', response.data.message);
+      }
+    } catch (error: any) {
+      const data = error.response?.data;
+      const message = data?.message || (typeof data === 'string' ? data : error.message) || 'Failed to send reset link.';
+      showError('Error', message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- REGISTRATION UI ---
+  if (isRegistering) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor="#f8f9ff" />
+        {renderErrorModal()}
+        <KeyboardAvoidingView style={styles.keyboardAvoid} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView contentContainerStyle={styles.regScrollInner} showsVerticalScrollIndicator={false}>
+            
+            <View style={styles.regHeader}>
+              <Text style={styles.regTitle}>Create your profile</Text>
+              <Text style={styles.regSubtitle}>Enter your basic information to get started.</Text>
             </View>
 
-            <View style={styles.fpForm}>
+            <View style={styles.regForm}>
               <View style={styles.inputGroup}>
-                <Text style={styles.fpLabel}>EMAIL OR PHONE</Text>
-                <View style={styles.inputWrapper}>
-                  <MaterialIcons name="mail" size={20} color={localColors.onSurfaceVariant} style={styles.inputIcon} />
+                <Text style={styles.regLabel}>Full Name</Text>
+                <View style={styles.regInputWrapper}>
+                  <Icon name="person" size={20} color={localColors.outline} style={styles.icon} />
                   <TextInput
-                    style={styles.fpInput}
-                    placeholder="name@example.com"
+                    style={styles.regInput}
+                    placeholder="Jane Doe"
+                    placeholderTextColor={localColors.outline}
+                    value={fullName}
+                    onChangeText={setFullName}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.regLabel}>Email Address</Text>
+                <View style={styles.regInputWrapper}>
+                  <Icon name="mail" size={20} color={localColors.outline} style={styles.icon} />
+                  <TextInput
+                    style={styles.regInput}
+                    placeholder="jane@example.com"
                     placeholderTextColor={localColors.outline}
                     autoCapitalize="none"
                     keyboardType="email-address"
@@ -128,377 +230,516 @@ const LoginScreen = ({ navigation }: any) => {
                 </View>
               </View>
 
+              <View style={styles.inputGroup}>
+                <Text style={styles.regLabel}>Phone Number</Text>
+                <View style={styles.regInputWrapper}>
+                  <Icon name="phone-iphone" size={20} color={localColors.outline} style={styles.icon} />
+                  <TextInput
+                    style={styles.regInput}
+                    placeholder="9876543210"
+                    placeholderTextColor={localColors.outline}
+                    keyboardType="numeric"
+                    maxLength={10}
+                    value={phone}
+                    onChangeText={(text) => setPhone(text.replace(/[^0-9]/g, ''))}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.regLabel}>Password</Text>
+                <View style={styles.regInputWrapper}>
+                  <Icon name="lock" size={20} color={localColors.outline} style={styles.icon} />
+                  <TextInput
+                    style={styles.regInput}
+                    placeholder="••••••••"
+                    placeholderTextColor={localColors.outline}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                  />
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                    <Icon name={showPassword ? "visibility" : "visibility-off"} size={20} color={localColors.outline} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.regPasswordHint}>Must be at least 8 characters.</Text>
+              </View>
+
+              <View style={styles.regDivider} />
+
               <TouchableOpacity 
-                style={styles.fpSubmitBtn} 
+                style={styles.regSubmitBtn} 
                 onPress={handleAuth}
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color="#ffffff" />
                 ) : (
-                  <Text style={styles.fpSubmitBtnText}>Send Reset Link</Text>
+                  <>
+                    <Text style={styles.regSubmitBtnText}>Create Account</Text>
+                    <Icon name="person-add" size={20} color="#ffffff" />
+                  </>
                 )}
               </TouchableOpacity>
+
+              <View style={styles.regFooter}>
+                <Text style={styles.regFooterText}>Already have an account? </Text>
+                <TouchableOpacity onPress={() => setIsRegistering(false)}>
+                  <Text style={styles.regFooterLink}>Sign In</Text>
+                </TouchableOpacity>
+              </View>
+
             </View>
 
-            <TouchableOpacity style={styles.fpBackBtn} onPress={() => setIsForgotPassword(false)}>
-              <MaterialIcons name="arrow-back" size={20} color={localColors.secondary} />
-              <Text style={styles.fpBackBtnText}>Back to Login</Text>
-            </TouchableOpacity>
+            <View style={styles.regTermsSection}>
+              <Text style={styles.regTermsText}>
+                By proceeding, you agree to RideO's{' '}
+                <Text style={styles.regTermsLink}>Terms of Service</Text> and{' '}
+                <Text style={styles.regTermsLink}>Privacy Policy</Text>.
+              </Text>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
-      </View>
+      </SafeAreaView>
     );
   }
 
-  // --- STANDARD LOGIN / REGISTER UI ---
+  // --- STANDARD LOGIN UI ---
   return (
-    <KeyboardAvoidingView 
-      style={styles.keyboardView}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>RideO</Text>
-          <Text style={styles.subtitle}>
-            Your reliable ride, anytime.
-          </Text>
-        </View>
-
-        {/* Form Card */}
-        <View style={styles.card}>
-          
-
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Phone or Email</Text>
-            <View style={styles.inputWrapper}>
-              <MaterialIcons name="person" size={20} color={localColors.outline} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your phone or email"
-                placeholderTextColor={localColors.outline}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                value={email}
-                onChangeText={setEmail}
-              />
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Password</Text>
-            <View style={styles.inputWrapper}>
-              <MaterialIcons name="lock" size={20} color={localColors.outline} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your password"
-                placeholderTextColor={localColors.outline}
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
-            </View>
-            
-            <TouchableOpacity 
-              style={styles.forgotPassBtn}
-              onPress={() => setIsForgotPassword(true)}
-            >
-              <Text style={styles.forgotPassText}>Forgot password?</Text>
-            </TouchableOpacity>
-          </View>
-
-
-
-          <TouchableOpacity 
-            style={styles.submitBtn} 
-            onPress={handleAuth}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.submitBtnText}>
-                Login
-              </Text>
-            )}
-          </TouchableOpacity>
-          </View>
-
-        {/* Footer Toggle */}
-        <TouchableOpacity 
-          style={styles.footerToggle} 
-          onPress={() => navigation.navigate('Register')}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9ff" />
+      {renderErrorModal()}
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoid} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollGrow}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.footerText}>
-            Don't have an account? 
-            <Text style={styles.footerActionText}> Sign Up</Text>
-          </Text>
-        </TouchableOpacity>
+          <View style={styles.mainContainer}>
+            {/* Header Section */}
+            <View style={styles.header}>
+              <Text style={styles.title}>RideO</Text>
+              <Text style={styles.subtitle}>Passenger App</Text>
+            </View>
 
-      </ScrollView>
-    </KeyboardAvoidingView>
+            {/* Form Section */}
+            <View style={styles.formContainer}>
+              
+              {/* Login Method Tabs */}
+              <View style={styles.tabContainer}>
+                <TouchableOpacity 
+                  style={[styles.tabButton, loginMethod === 'phone' && styles.tabButtonActive]}
+                  onPress={() => setLoginMethod('phone')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.tabText, loginMethod === 'phone' && styles.tabTextActive]}>Phone</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.tabButton, loginMethod === 'email' && styles.tabButtonActive]}
+                  onPress={() => setLoginMethod('email')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.tabText, loginMethod === 'email' && styles.tabTextActive]}>Email</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Dynamic Input based on Tab */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{loginMethod === 'phone' ? 'PHONE NUMBER' : 'EMAIL ADDRESS'}</Text>
+                <View style={styles.inputWrapper}>
+                  <Icon name={loginMethod === 'phone' ? "call" : "email"} size={20} color="#76777d" style={styles.icon} />
+                  {loginMethod === 'phone' ? (
+                    <TextInput
+                      style={styles.input}
+                      placeholder="+91 98765 43210"
+                      placeholderTextColor="#76777d"
+                      value={phone}
+                      onChangeText={setPhone}
+                      keyboardType="numeric"
+                      maxLength={10}
+                    />
+                  ) : (
+                    <TextInput
+                      style={styles.input}
+                      placeholder="name@example.com"
+                      placeholderTextColor="#76777d"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  )}
+                </View>
+              </View>
+
+              {/* Password Input */}
+              <View style={styles.inputGroup}>
+                <View style={styles.labelRow}>
+                  <Text style={styles.label}>PASSWORD</Text>
+                  <TouchableOpacity onPress={handleForgotPassword}>
+                    <Text style={styles.forgotText}>Forgot?</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.inputWrapper}>
+                  <Icon name="lock-outline" size={20} color="#76777d" style={styles.icon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="••••••••"
+                    placeholderTextColor="#76777d"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                  />
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                    <Icon name={showPassword ? "visibility" : "visibility-off"} size={20} color="#76777d" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Login Button */}
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity 
+                  style={styles.button} 
+                  onPress={handleAuth}
+                  disabled={loading}
+                  activeOpacity={0.8}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text style={styles.buttonText}>Login</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Footer Section */}
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>
+                New to RideO?{' '}
+              </Text>
+              <TouchableOpacity onPress={() => setIsRegistering(true)}>
+                <Text style={styles.footerLink}>Create a profile</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  keyboardView: {
+  safeArea: {
     flex: 1,
-    backgroundColor: localColors.background,
+    backgroundColor: '#f8f9ff',
   },
-  container: {
+  keyboardAvoid: {
+    flex: 1,
+  },
+  scrollGrow: {
     flexGrow: 1,
-    justifyContent: 'center',
-    padding: 16,
+  },
+  mainContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginTop: 60,
   },
   title: {
     fontSize: 48,
     fontWeight: '700',
-    color: localColors.primary,
+    color: '#000000',
     letterSpacing: -1,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
-    color: localColors.onSurfaceVariant,
-    marginTop: 8,
-    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#45464d',
   },
-  card: {
-    backgroundColor: localColors.surfaceContainerLowest,
-    borderRadius: 12,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(198, 198, 205, 0.3)',
+  formContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    width: '100%',
+    maxWidth: 400,
+    alignSelf: 'center',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#eaf1ff',
+    borderRadius: 9999,
+    padding: 4,
+    marginBottom: 24,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 9999,
+    alignItems: 'center',
+  },
+  tabButtonActive: {
+    backgroundColor: '#ffffff',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#76777d',
+  },
+  tabTextActive: {
+    color: '#000000',
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 24,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   label: {
     fontSize: 12,
+    fontWeight: '600',
+    color: '#0b1c30',
+    letterSpacing: 1.5,
+  },
+  forgotText: {
+    fontSize: 14,
     fontWeight: '500',
-    color: localColors.onSurfaceVariant,
-    marginBottom: 4,
-    letterSpacing: 0.5,
+    color: '#000000',
   },
   inputWrapper: {
-    position: 'relative',
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#c6c6cd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 52,
   },
-  inputIcon: {
-    position: 'absolute',
-    left: 12,
-    zIndex: 1,
+  icon: {
+    marginRight: 10,
   },
   input: {
-    backgroundColor: localColors.surfaceContainerLow,
-    borderWidth: 1,
-    borderColor: localColors.outlineVariant,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingLeft: 40,
-    paddingRight: 16,
-    fontSize: 16,
-    color: localColors.onSurface,
-    minHeight: 48,
-  },
-  forgotPassBtn: {
-    alignSelf: 'flex-end',
-    marginTop: 4,
-  },
-  forgotPassText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: localColors.primary,
-  },
-  submitBtn: {
-    backgroundColor: localColors.primary,
-    paddingVertical: 14,
-    borderRadius: 24,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  submitBtnText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 16,
-  },
-  dividerLine: {
     flex: 1,
-    height: 1,
-    backgroundColor: localColors.outlineVariant,
+    fontSize: 16,
+    color: '#0b1c30',
+    height: '100%',
   },
-  dividerText: {
-    marginHorizontal: 12,
-    fontSize: 12,
-    fontWeight: '500',
-    color: localColors.onSurfaceVariant,
+  eyeIcon: {
+    padding: 8,
   },
-  socialGroup: {
-    gap: 8,
+  buttonContainer: {
+    marginTop: 16,
   },
-  googleBtn: {
-    flexDirection: 'row',
+  button: {
+    backgroundColor: '#000000',
+    borderRadius: 9999,
+    height: 56,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: localColors.googleBtnBg,
-    borderWidth: 1,
-    borderColor: localColors.outlineVariant,
-    borderRadius: 8,
-    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  googleBtnText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: localColors.onSurface,
-    marginLeft: 8,
-  },
-  facebookBtn: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: localColors.facebookBtnBg,
-    borderRadius: 8,
-    paddingVertical: 12,
-  },
-  facebookBtnText: {
-    fontSize: 18,
-    fontWeight: '600',
+  buttonText: {
     color: '#ffffff',
-    marginLeft: 8,
+    fontSize: 18,
+    fontWeight: '600',
   },
-  footerToggle: {
-    marginTop: 32,
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 48,
   },
   footerText: {
     fontSize: 16,
-    color: localColors.onSurfaceVariant,
+    color: '#45464d',
   },
-  footerActionText: {
-    color: localColors.primary,
+  footerLink: {
+    fontSize: 16,
     fontWeight: '600',
+    color: '#000000',
   },
 
-  // --- FORGOT PASSWORD STYLES ---
-  fpContainer: {
-    flex: 1,
-    backgroundColor: localColors.background,
-  },
-  fpHeaderSafe: {
-    backgroundColor: localColors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(198, 198, 205, 0.2)',
-    zIndex: 50,
-  },
-  fpHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    height: 60,
-  },
-  fpIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -8,
-  },
-  fpHeaderTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: localColors.primary,
-    letterSpacing: -0.5,
-  },
-  fpScrollInner: {
+  // --- REGISTRATION STYLES ---
+  regScrollInner: {
     flexGrow: 1,
-    padding: 16,
-    paddingTop: 32,
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingBottom: 40,
   },
-  fpTitleSection: {
+  regHeader: {
     marginBottom: 32,
   },
-  fpTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: localColors.onSurface,
+  regStepBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  fpSubtitle: {
+  regStepText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: localColors.secondary,
+    letterSpacing: 1,
+  },
+  regTitle: {
+    fontSize: 32,
+    fontWeight: '600',
+    color: localColors.onSurface,
+    letterSpacing: -0.5,
+    marginBottom: 8,
+  },
+  regSubtitle: {
     fontSize: 16,
     color: localColors.onSurfaceVariant,
     lineHeight: 24,
   },
-  fpForm: {
+  regForm: {
     flex: 1,
   },
-  fpLabel: {
-    fontSize: 12,
-    fontWeight: '500',
+  regLabel: {
+    fontSize: 14,
+    fontWeight: '600',
     color: localColors.onSurface,
     marginBottom: 8,
-    letterSpacing: 0.5,
   },
-  fpInput: {
-    backgroundColor: localColors.surface,
+  regInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: localColors.surfaceContainerLowest,
     borderWidth: 1,
     borderColor: localColors.outlineVariant,
     borderRadius: 8,
-    paddingVertical: 14,
-    paddingLeft: 40,
-    paddingRight: 16,
+    paddingHorizontal: 12,
+    height: 52,
+  },
+  regInput: {
+    flex: 1,
     fontSize: 16,
     color: localColors.onSurface,
+    height: '100%',
   },
-  fpSubmitBtn: {
+  regPasswordHint: {
+    fontSize: 12,
+    color: localColors.outline,
+    marginTop: 6,
+  },
+  regDivider: {
+    height: 1,
+    backgroundColor: 'rgba(198, 198, 205, 0.3)',
+    marginVertical: 32,
+  },
+  regSubmitBtn: {
     backgroundColor: localColors.primary,
-    paddingVertical: 16,
-    borderRadius: 30,
-    alignItems: 'center',
+    flexDirection: 'row',
+    borderRadius: 9999,
+    height: 56,
     justifyContent: 'center',
-    marginTop: 'auto', // pushes to bottom if space is available
-    marginBottom: 32,
+    alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: 24,
   },
-  fpSubmitBtnText: {
+  regSubmitBtnText: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '600',
+    marginRight: 8,
   },
-  fpBackBtn: {
+  regFooter: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    marginBottom: Platform.OS === 'ios' ? 40 : 20,
+    alignItems: 'center',
+    marginBottom: 32,
   },
-  fpBackBtnText: {
+  regFooterText: {
     fontSize: 16,
+    color: localColors.onSurfaceVariant,
+  },
+  regFooterLink: {
+    fontSize: 16,
+    fontWeight: '600',
     color: localColors.secondary,
-    fontWeight: '500',
+  },
+  regTermsSection: {
+    alignItems: 'center',
+    marginTop: 'auto',
+  },
+  regTermsText: {
+    fontSize: 12,
+    color: localColors.outline,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  regTermsLink: {
+    textDecorationLine: 'underline',
+    color: localColors.onSurface,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '85%',
+    backgroundColor: localColors.surfaceContainerLowest,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: localColors.onSurface,
+    marginBottom: 12,
+  },
+  modalMessage: {
+    fontSize: 15,
+    color: localColors.outline,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  modalBtn: {
+    backgroundColor: localColors.secondary,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalBtnText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
   }
 });
 
 export default LoginScreen;
+

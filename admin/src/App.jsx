@@ -13,6 +13,7 @@ import LiveTracking from './pages/LiveTracking';
 import RidePlayback from './pages/RidePlayback';
 import SafetyAlerts from './pages/SafetyAlerts';
 import PayoutRequests from './pages/PayoutRequests';
+import ProfileEdits from './pages/ProfileEdits';
 import './App.css';
 
 // Protected Route Wrapper
@@ -43,6 +44,7 @@ function App() {
           <Route path="users" element={<Users />} />
           <Route path="drivers" element={<Drivers />} />
           <Route path="kyc" element={<KYCManagement />} />
+          <Route path="profile-edits" element={<ProfileEdits />} />
           <Route path="payouts" element={<PayoutRequests />} />
           <Route path="complaints" element={<Complaints />} />
           <Route path="safety-alerts" element={<SafetyAlerts />} />

@@ -241,7 +241,7 @@ const Drivers = () => {
                                                 <li>Model: <strong>{driverDetails.vehicle.model} ({driverDetails.vehicle.year})</strong></li>
                                                 <li>Plate: <strong>{driverDetails.vehicle.licensePlate}</strong></li>
                                                 <li>Color: <strong>{driverDetails.vehicle.color}</strong></li>
-                                                <li>Seats: <strong>{driverDetails.vehicle.seatCapacity}</strong></li>
+                                                <li>Seats: <strong>{driverDetails.vehicle.totalSeats}</strong></li>
                                             </ul>
                                         ) : (
                                             <p style={{ color: '#94a3b8' }}>No vehicle registered.</p>

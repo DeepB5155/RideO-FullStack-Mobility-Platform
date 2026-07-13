@@ -126,6 +126,7 @@ const KYCManagement = () => {
                 <th>Driver Name</th>
                 <th>Email</th>
                 <th>License Number</th>
+                <th>Submitted</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
@@ -136,6 +137,7 @@ const KYCManagement = () => {
                   <td><strong>{d.user?.fullName || 'Unknown'}</strong></td>
                   <td>{d.user?.email || 'N/A'}</td>
                   <td>{d.licenseNumber}</td>
+                  <td>{d.uploadedAt ? new Date(d.uploadedAt).toLocaleDateString() : 'N/A'}</td>
                   <td><span className="badge badge-warning">Pending</span></td>
                   <td>
                     <button className="text-btn" onClick={() => viewDetails(d.id)} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -146,7 +148,7 @@ const KYCManagement = () => {
               ))}
               {pendingDrivers.length === 0 && (
                 <tr>
-                  <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No pending KYC requests</td>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No pending KYC requests</td>
                 </tr>
               )}
             </tbody>

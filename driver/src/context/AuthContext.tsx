@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/axios';
 import { PushNotificationService } from '../services/PushNotificationService';
@@ -70,12 +70,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateUser = async (data: Partial<User>) => {
-    if (!user) return;
-    const updated = { ...user, ...data };
-    setUser(updated);
-    await AsyncStorage.setItem('userData', JSON.stringify(updated));
-  };
+  const updateUser = useCallback(async (data: Partial<User>) => {
+    setUser((prevUser) => {
+      if (!prevUser) return prevUser;
+      const updated = { ...prevUser, ...data };
+      AsyncStorage.setItem('userData', JSON.stringify(updated)).catch(e => console.error(e));
+      return updated;
+    });
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, isLoading, login, logout, updateUser }}>

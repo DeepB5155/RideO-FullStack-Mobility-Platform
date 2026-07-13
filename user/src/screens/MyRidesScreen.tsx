@@ -176,7 +176,8 @@ const MyRidesScreen = ({ navigation }: any) => {
                 pickup: item.pickupLocationName,
                 dropoff: item.dropoffLocationName,
                 bookingId: item.id,
-                trackingId: item.trackingId
+                trackingId: item.trackingId,
+                otp: item.otp
               })}
             >
               <MaterialIcons name="my-location" size={18} color={localColors.onPrimary} />

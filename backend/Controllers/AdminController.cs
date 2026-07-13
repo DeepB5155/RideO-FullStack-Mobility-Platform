@@ -183,7 +183,21 @@ namespace RideO.API.Controllers
                 if (status == "suspended") query = query.Where(d => d.IsSuspended);
             }
 
-            var drivers = await query.OrderByDescending(d => d.Id).ToListAsync();
+            var drivers = await query.OrderByDescending(d => d.Id)
+                .Select(d => new 
+                {
+                    d.Id,
+                    d.UserId,
+                    User = new { d.User.FullName, d.User.Email, d.User.PhoneNumber },
+                    d.LicenseNumber,
+                    d.IsAvailable,
+                    d.Rating,
+                    d.IsVerified,
+                    d.IsSuspended,
+                    d.Balance,
+                    VehicleType = _context.Vehicles.Where(v => v.DriverId == d.Id).Select(v => v.VehicleType).FirstOrDefault() ?? d.VehicleType
+                })
+                .ToListAsync();
             return Ok(drivers);
         }
 
@@ -345,7 +359,10 @@ namespace RideO.API.Controllers
                     d.UserId,
                     d.LicenseNumber,
                     User = new { d.User.FullName, d.User.Email, d.User.PhoneNumber },
-                    HasDocuments = _context.DriverDocuments.Any(doc => doc.DriverId == d.Id && doc.Status == "Pending")
+                    HasDocuments = _context.DriverDocuments.Any(doc => doc.DriverId == d.Id && doc.Status == "Pending"),
+                    UploadedAt = _context.DriverDocuments
+                        .Where(doc => doc.DriverId == d.Id && doc.Status == "Pending")
+                        .Max(doc => (DateTime?)doc.UploadedAt)
                 })
                 .Where(d => d.HasDocuments)
                 .ToListAsync();
@@ -402,6 +419,9 @@ namespace RideO.API.Controllers
             // Realtime Update via SignalR
             await _hubContext.Clients.User(driver.UserId.ToString()).SendAsync("KYCStatusUpdated", "Approved");
             
+            // Notify AdminMonitors
+            await _hubContext.Clients.Group("AdminMonitors").SendAsync("KYCProcessed");
+            
             var notification = new Notification
             {
                 UserId = driver.UserId,
@@ -438,8 +458,10 @@ namespace RideO.API.Controllers
 
             await _context.SaveChangesAsync();
             
-            // Realtime Update via SignalR
             await _hubContext.Clients.User(driver.UserId.ToString()).SendAsync("KYCStatusUpdated", "Rejected", reason);
+            
+            // Notify AdminMonitors
+            await _hubContext.Clients.Group("AdminMonitors").SendAsync("KYCProcessed");
             
             if (!string.IsNullOrEmpty(driver.User?.FcmDeviceToken))
             {
@@ -575,6 +597,77 @@ namespace RideO.API.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Database has been reset successfully. All non-admin data is cleared." });
+        }
+        [HttpGet("profile-edits/pending")]
+        public async Task<IActionResult> GetPendingProfileEdits()
+        {
+            var pending = await _context.ProfileEditRequests
+                .Where(r => r.Status == "Pending")
+                .Join(_context.Users, 
+                      r => r.UserId, 
+                      u => u.Id, 
+                      (r, u) => new {
+                          r.Id,
+                          r.UserId,
+                          r.RequestedFullName,
+                          r.RequestedPhoneNumber,
+                          r.RequestedEmail,
+                          r.CreatedAt,
+                          CurrentFullName = u.FullName,
+                          CurrentPhoneNumber = u.PhoneNumber,
+                          CurrentEmail = u.Email
+                      })
+                .ToListAsync();
+            
+            return Ok(pending);
+        }
+
+        [HttpPost("profile-edits/{id}/approve")]
+        public async Task<IActionResult> ApproveProfileEdit(Guid id)
+        {
+            var request = await _context.ProfileEditRequests.FindAsync(id);
+            if (request == null || request.Status != "Pending") return NotFound();
+
+            var user = await _context.Users.FindAsync(request.UserId);
+            if (user == null) return NotFound();
+
+            // Update user details
+            if (!string.IsNullOrWhiteSpace(request.RequestedFullName)) user.FullName = request.RequestedFullName;
+            if (!string.IsNullOrWhiteSpace(request.RequestedPhoneNumber)) user.PhoneNumber = request.RequestedPhoneNumber;
+            if (!string.IsNullOrWhiteSpace(request.RequestedEmail)) user.Email = request.RequestedEmail;
+
+            request.Status = "Approved";
+            await _context.SaveChangesAsync();
+
+            await _hubContext.Clients.User(user.Id.ToString()).SendAsync("ProfileUpdateProcessed", "Approved", "Your profile update has been approved.", user);
+            
+            // Notify AdminMonitors
+            await _hubContext.Clients.Group("AdminMonitors").SendAsync("ProfileUpdateProcessed");
+
+            return Ok(new { message = "Profile update approved successfully" });
+        }
+
+        public class ProfileEditRejectDto
+        {
+            public string Reason { get; set; } = string.Empty;
+        }
+
+        [HttpPost("profile-edits/{id}/reject")]
+        public async Task<IActionResult> RejectProfileEdit(Guid id, [FromBody] ProfileEditRejectDto dto)
+        {
+            var request = await _context.ProfileEditRequests.FindAsync(id);
+            if (request == null || request.Status != "Pending") return NotFound();
+
+            request.Status = "Rejected";
+            request.RejectionReason = dto.Reason;
+            await _context.SaveChangesAsync();
+
+            await _hubContext.Clients.User(request.UserId.ToString()).SendAsync("ProfileUpdateProcessed", "Rejected", dto.Reason);
+            
+            // Notify AdminMonitors
+            await _hubContext.Clients.Group("AdminMonitors").SendAsync("ProfileUpdateProcessed");
+
+            return Ok(new { message = "Profile update rejected" });
         }
     }
 }

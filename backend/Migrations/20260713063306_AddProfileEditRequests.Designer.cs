@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RideO.API.Data;
@@ -11,9 +12,11 @@ using RideO.API.Data;
 namespace RideO.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260713063306_AddProfileEditRequests")]
+    partial class AddProfileEditRequests
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -37,12 +40,6 @@ namespace RideO.API.Migrations
                     b.Property<string>("CancellationReason")
                         .HasColumnType("text");
 
-                    b.Property<double?>("DropoffLat")
-                        .HasColumnType("double precision");
-
-                    b.Property<double?>("DropoffLng")
-                        .HasColumnType("double precision");
-
                     b.Property<string>("DropoffLocationName")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
@@ -58,12 +55,6 @@ namespace RideO.API.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
-
-                    b.Property<double?>("PickupLat")
-                        .HasColumnType("double precision");
-
-                    b.Property<double?>("PickupLng")
-                        .HasColumnType("double precision");
 
                     b.Property<string>("PickupLocationName")
                         .HasMaxLength(255)
