@@ -138,6 +138,8 @@ namespace RideO.API.Controllers
             var user = await _context.Users.FindAsync(id);
             if (user == null) return NotFound();
 
+            var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == id);
+            
             var bookings = await _context.Bookings
                 .Include(b => b.Route).ThenInclude(r => r.Driver).ThenInclude(d => d.User)
                 .Where(b => b.UserId == id)
@@ -213,7 +215,7 @@ namespace RideO.API.Controllers
             {
                 driver.IsAvailable = false;
                 await _hubContext.Clients.User(driver.UserId.ToString()).SendAsync("AccountSuspended");
-                await _hubContext.Clients.All.SendAsync("DriverLocationUpdated", driver.Id, null, null, false);
+                await _hubContext.Clients.All.SendAsync("DriverAvailabilityChanged", driver.Id, false);
             }
             
             await _context.SaveChangesAsync();
@@ -573,8 +575,52 @@ namespace RideO.API.Controllers
                 messages 
             });
         }
+
+        public class WalletAdjustmentRequest
+        {
+            public decimal Amount { get; set; }
+            public string Reason { get; set; } = string.Empty;
+        }
+
+        [HttpPost("wallet/{userId}/adjust")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> AdjustWalletBalance(Guid userId, [FromBody] WalletAdjustmentRequest request)
+        {
+            if (request.Amount == 0) return BadRequest("Adjustment amount must not be zero.");
+            if (string.IsNullOrWhiteSpace(request.Reason)) return BadRequest("Adjustment reason is required.");
+
+            var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
+            if (wallet == null)
+            {
+                wallet = new Wallet { UserId = userId, Balance = 0 };
+                _context.Wallets.Add(wallet);
+            }
+
+            // Ensure we don't drop balance below zero if withdrawing unless intended
+            if (wallet.Balance + request.Amount < 0)
+            {
+                return BadRequest("Adjustment would result in negative balance.");
+            }
+
+            wallet.Balance += request.Amount;
+            wallet.UpdatedAt = System.DateTime.UtcNow;
+
+            var transaction = new WalletTransaction
+            {
+                WalletId = wallet.Id,
+                Amount = request.Amount,
+                Type = "Adjustment",
+                Description = $"Administrative adjustment: {request.Reason}",
+                ReferenceId = $"ADJ_{System.Guid.NewGuid().ToString().Substring(0, 8)}"
+            };
+
+            _context.WalletTransactions.Add(transaction);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Wallet balance adjusted successfully", balance = wallet.Balance, transaction });
+        }
+
         [HttpDelete("reset-database")]
-        [AllowAnonymous]
         public async Task<IActionResult> ResetDatabase()
         {
             _context.ChatMessages.RemoveRange(await _context.ChatMessages.ToListAsync());

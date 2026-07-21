@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { CheckCircle2 } from 'lucide-react';
+import api from '../api';
+import { User, Mail, Phone, Calendar, Check, X, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import '../styles/Pages.css';
 import './ProfileEdits.css';
 
 const API_URL = 'http://localhost:5248/api/admin';
@@ -20,10 +21,7 @@ const ProfileEdits = () => {
 
   const fetchRequests = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
-      const res = await axios.get(`${API_URL}/profile-edits/pending`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await api.get('/admin/profile-edits/pending');
       setRequests(res.data);
     } catch (error) {
       console.error('Error fetching profile edits:', error);
@@ -35,12 +33,9 @@ const ProfileEdits = () => {
 
   const handleApprove = async (id) => {
     try {
-      const token = localStorage.getItem('adminToken');
-      await axios.post(`${API_URL}/profile-edits/${id}/approve`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post(`/admin/profile-edits/${id}/approve`);
       alert('Profile edit approved!');
-      setRequests(requests.filter(r => r.id !== id));
+      setRequests(prev => prev.filter(r => r.id !== id));
     } catch (error) {
       console.error('Approve error:', error);
       alert('Failed to approve profile edit');
@@ -54,15 +49,14 @@ const ProfileEdits = () => {
   };
 
   const handleRejectSubmit = async () => {
-    if (!rejectReason.trim()) return;
-
+    if (!rejectReason.trim()) {
+      alert("Please provide a rejection reason.");
+      return;
+    }
     try {
-      const token = localStorage.getItem('adminToken');
-      await axios.post(`${API_URL}/profile-edits/${selectedRequestId}/reject`, { reason: rejectReason }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post(`/admin/profile-edits/${selectedRequestId}/reject`, { reason: rejectReason });
       alert('Profile edit rejected');
-      setRequests(requests.filter(r => r.id !== selectedRequestId));
+      setRequests(prev => prev.filter(r => r.id !== selectedRequestId));
       setRejectModalOpen(false);
     } catch (error) {
       console.error('Reject error:', error);

@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PushNotificationService } from '../services/PushNotificationService';
+import { TokenHelper } from '../utils/tokenHelper';
 
 interface User {
   id: string;
@@ -36,8 +37,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadToken = async () => {
     try {
-      const storedUser = await AsyncStorage.getItem('userData');
-      const storedToken = await AsyncStorage.getItem('jwtToken');
+      const storedUser = await TokenHelper.getUserData();
+      const storedToken = await TokenHelper.getToken();
       if (storedUser && storedToken) {
         const userData = JSON.parse(storedUser);
         if (userData && userData.role === 'User') {
@@ -71,10 +72,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (userData && userData.role === 'User') {
       if (token) {
-        await AsyncStorage.setItem('jwtToken', token);
+        await TokenHelper.setToken(token);
         setToken(token);
       }
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      await TokenHelper.setUserData(JSON.stringify(userData));
       setUser({
         id: userData.id,
         email: userData.email,
@@ -90,8 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem('userData');
-    await AsyncStorage.removeItem('jwtToken');
+    await TokenHelper.clearTokens();
     setUser(null);
     setToken(null);
   };
@@ -103,19 +103,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Also update in AsyncStorage
     try {
-      const stored = await AsyncStorage.getItem('userData');
+      const stored = await TokenHelper.getUserData();
       if (stored) {
         const parsed = JSON.parse(stored);
         parsed.fullName = updatedUser.name;
         parsed.phoneNumber = updatedUser.phoneNumber;
         parsed.email = updatedUser.email;
         parsed.profilePicture = updatedUser.profilePicture;
-        await AsyncStorage.setItem('userData', JSON.stringify(parsed));
+        await TokenHelper.setUserData(JSON.stringify(parsed));
       }
       
       if (newToken) {
         setToken(newToken);
-        await AsyncStorage.setItem('jwtToken', newToken);
+        await TokenHelper.setToken(newToken);
       }
     } catch (e) {
       console.error('Failed to update local storage', e);

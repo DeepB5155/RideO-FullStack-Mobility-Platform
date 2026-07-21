@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Search, Filter, ShieldAlert, ShieldCheck, Eye, Loader2, X, Car, DollarSign } from 'lucide-react';
 import * as signalR from '@microsoft/signalr';
 import api from '../api';
 import '../styles/Pages.css';
+import { TokenHelper } from '../utils/tokenHelper';
+import { SignalRContext } from '../context/SignalRContext';
 
 const Drivers = () => {
     const [drivers, setDrivers] = useState([]);
@@ -14,6 +16,7 @@ const Drivers = () => {
     const [selectedDriverId, setSelectedDriverId] = useState(null);
     const [driverDetails, setDriverDetails] = useState(null);
     const [modalLoading, setModalLoading] = useState(false);
+    const { connection } = useContext(SignalRContext);
 
     const fetchDrivers = async () => {
         try {
@@ -32,47 +35,35 @@ const Drivers = () => {
     }, [searchTerm, statusFilter]);
 
     useEffect(() => {
-        let hubConnection;
-        const connectSignalR = async () => {
-            try {
-                const token = localStorage.getItem('adminToken');
-                hubConnection = new signalR.HubConnectionBuilder()
-                    .withUrl(import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5248/ridehub', {
-                        accessTokenFactory: () => token || ''
-                    })
-                    .withAutomaticReconnect()
-                    .build();
+        let cleanupSignalR;
 
-                hubConnection.on('DriverStatusChanged', (driverId, isAvailable) => {
-                    setDrivers(prevDrivers => 
-                        prevDrivers.map(d => 
-                            d.id === driverId ? { ...d, isAvailable } : d
-                        )
-                    );
-                    setDriverDetails(prevDetails => {
-                        if (prevDetails && prevDetails.driver && prevDetails.driver.id === driverId) {
-                            return { ...prevDetails, driver: { ...prevDetails.driver, isAvailable } };
-                        }
-                        return prevDetails;
-                    });
+        if (connection) {
+            const handleDriverStatusChanged = (driverId, isAvailable) => {
+                setDrivers(prevDrivers => 
+                    prevDrivers.map(d => 
+                        d.id === driverId ? { ...d, isAvailable } : d
+                    )
+                );
+                setDriverDetails(prevDetails => {
+                    if (prevDetails && prevDetails.driver && prevDetails.driver.id === driverId) {
+                        return { ...prevDetails, driver: { ...prevDetails.driver, isAvailable } };
+                    }
+                    return prevDetails;
                 });
+            };
 
-                await hubConnection.start();
-                await hubConnection.invoke('JoinAdminMonitors');
-                console.log('Drivers page connected to RideHub');
-            } catch (err) {
-                console.error('SignalR Drivers Connection Error: ', err);
-            }
-        };
+            connection.on('DriverStatusChanged', handleDriverStatusChanged);
+            connection.invoke('JoinAdminMonitors').catch(console.error);
 
-        connectSignalR();
+            cleanupSignalR = () => {
+                connection.off('DriverStatusChanged', handleDriverStatusChanged);
+            };
+        }
 
         return () => {
-            if (hubConnection) {
-                hubConnection.stop();
-            }
+            if (cleanupSignalR) cleanupSignalR();
         };
-    }, []);
+    }, [connection]);
 
     const handleToggleSuspend = async (driverId) => {
         if (!window.confirm("Are you sure you want to toggle the suspension status for this driver?")) return;

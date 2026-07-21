@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using RideO.API.Data;
 using RideO.API.Models;
@@ -13,6 +14,9 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.SignalR;
 using RideO.API.Hubs;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
+using System.Security.Cryptography;
 
 namespace RideO.API.Controllers
 {
@@ -23,17 +27,23 @@ namespace RideO.API.Controllers
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
         private readonly IHubContext<RideHub> _hubContext;
+        private readonly IWebHostEnvironment _env;
 
-        public AuthController(AppDbContext context, IConfiguration configuration, IHubContext<RideHub> hubContext)
+        public AuthController(AppDbContext context, IConfiguration configuration, IHubContext<RideHub> hubContext, IWebHostEnvironment env)
         {
             _context = context;
             _configuration = configuration;
             _hubContext = hubContext;
+            _env = env;
         }
 
         private string GenerateJwtToken(User user)
         {
-            var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? "FallbackSecretIfMissing2026!@#$";
+            var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET");
+            if (string.IsNullOrEmpty(jwtSecret))
+            {
+                throw new Exception("JWT_SECRET environment variable is missing.");
+            }
             var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "RideO_Backend";
             var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "RideO_MobileApp";
 
@@ -69,6 +79,7 @@ namespace RideO.API.Controllers
         }
 
         [HttpPost("login")]
+        [EnableRateLimiting("AuthLimit")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
@@ -120,6 +131,7 @@ namespace RideO.API.Controllers
         }
 
         [HttpPost("admin-login")]
+        [EnableRateLimiting("AuthLimit")]
         public async Task<IActionResult> AdminLogin([FromBody] LoginRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
@@ -157,6 +169,7 @@ namespace RideO.API.Controllers
         }
 
         [HttpPost("register")]
+        [EnableRateLimiting("AuthLimit")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password) || string.IsNullOrWhiteSpace(request.FullName))
@@ -243,18 +256,39 @@ namespace RideO.API.Controllers
             public string Email { get; set; } = string.Empty;
         }
 
+        private string ComputeSha256Hash(string rawData)
+        {
+            using (SHA256 sha256Hash = SHA256.Create())
+            {
+                byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
+                StringBuilder builder = new StringBuilder();
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    builder.Append(bytes[i].ToString("x2"));
+                }
+                return builder.ToString();
+            }
+        }
+
         [HttpPost("forgot-password")]
+        [EnableRateLimiting("OtpLimit")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
             if (user == null) return Ok(new { message = "If the email exists, a reset link was sent." });
 
-            user.ResetToken = Guid.NewGuid().ToString().Replace("-", "");
+            var rawToken = Guid.NewGuid().ToString().Replace("-", "");
+            user.ResetToken = ComputeSha256Hash(rawToken);
             user.ResetTokenExpiry = DateTime.UtcNow.AddHours(1);
             await _context.SaveChangesAsync();
 
             // In production, send an email here.
-            return Ok(new { message = "If the email exists, a reset link was sent.", debug_token = user.ResetToken });
+            if (_env.IsDevelopment())
+            {
+                return Ok(new { message = "If the email exists, a reset link was sent.", debug_token = rawToken });
+            }
+            
+            return Ok(new { message = "If the email exists, a reset link was sent." });
         }
 
         public class ResetPasswordRequest
@@ -264,9 +298,11 @@ namespace RideO.API.Controllers
         }
 
         [HttpPost("reset-password")]
+        [EnableRateLimiting("OtpLimit")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.ResetToken == request.Token && u.ResetTokenExpiry > DateTime.UtcNow);
+            var hashedToken = ComputeSha256Hash(request.Token);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.ResetToken == hashedToken && u.ResetTokenExpiry > DateTime.UtcNow);
             if (user == null) return BadRequest("Invalid or expired reset token.");
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
@@ -408,6 +444,7 @@ namespace RideO.API.Controllers
 
         [Authorize]
         [HttpPost("verify-password")]
+        [EnableRateLimiting("OtpLimit")]
         public async Task<IActionResult> VerifyPassword([FromBody] VerifyPasswordRequest request)
         {
             var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -431,6 +468,7 @@ namespace RideO.API.Controllers
 
         [Authorize]
         [HttpPost("change-password")]
+        [EnableRateLimiting("OtpLimit")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
         {
             var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

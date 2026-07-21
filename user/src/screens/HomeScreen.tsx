@@ -2,9 +2,11 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView, ScrollView, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Mapbox from '@rnmapbox/maps';
+import { TokenHelper } from '../utils/tokenHelper';
 import { MAPBOX_ACCESS_TOKEN, SIGNALR_HUB_URL } from '@env';
 import * as signalR from '@microsoft/signalr';
 import { AuthContext } from '../context/AuthContext';
+import { SignalRContext } from '../context/SignalRContext';
 import Icon from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import messaging from '@react-native-firebase/messaging';
@@ -28,54 +30,46 @@ const HomeScreen = ({ navigation }: any) => {
   const [bookSheetVisible, setBookSheetVisible] = useState(false);
 
   const cameraRef = useRef<Mapbox.Camera>(null);
-  const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
+  const { connection } = useContext(SignalRContext);
 
   useEffect(() => {
-    const setupSignalR = async () => {
-      const token = await AsyncStorage.getItem('jwtToken');
-      const newConnection = new signalR.HubConnectionBuilder()
-        .withUrl(SIGNALR_HUB_URL || 'http://10.0.2.2:5248/ridehub', {
-          accessTokenFactory: () => token || '',
-          transport: signalR.HttpTransportType.WebSockets
-        })
-        .withAutomaticReconnect()
-        .build();
+    let cleanupSignalR: (() => void) | undefined;
 
-      newConnection.on("RideAccepted", (rideDetails: any) => {
-        setRideStatus('accepted');
-        setDriverInfo(rideDetails);
-        
-        // Initial Driver Location
-        if (rideDetails.driverLongitude && rideDetails.driverLatitude) {
-          setDriverLocation([rideDetails.driverLongitude, rideDetails.driverLatitude]);
+    if (user && connection) {
+      const handleBookingStatusUpdated = (update: any) => {
+        if (update.Status === 'Approved') {
+          // Fallback handling if payload includes driver details
+          setRideStatus('accepted');
+          if (update.Driver) {
+            setDriverInfo(update.Driver);
+            if (update.Driver.longitude && update.Driver.latitude) {
+               setDriverLocation([update.Driver.longitude, update.Driver.latitude]);
+            }
+          }
         }
+      };
 
-        fetchRoute(rideDetails.pickupLongitude, rideDetails.pickupLatitude, rideDetails.driverLongitude, rideDetails.driverLatitude);
-      });
+      const handleRideStarted = (booking: any) => {
+        setRideStatus('started');
+        Alert.alert('Ride Started', 'Your driver has started the ride!');
+      };
 
-      newConnection.on("DriverLocationUpdated", (driverId: string, lat: number, lng: number) => {
-        setDriverLocation([lng, lat]);
-        setIsDriverReconnecting(false);
-
-        if (reconnectTimeout.current) {
-          clearTimeout(reconnectTimeout.current);
+      const handleNewNotification = (notification: any) => {
+        // Just show an alert or toast for new notifications
+        if (notification && notification.message) {
+           Alert.alert('Notification', notification.message);
         }
+      };
 
-        reconnectTimeout.current = setTimeout(() => {
-          setIsDriverReconnecting(true);
-        }, 15000);
-      });
+      connection.on("BookingStatusUpdated", handleBookingStatusUpdated);
+      connection.on("RideStarted", handleRideStarted);
+      connection.on("NewNotification", handleNewNotification);
 
-      try {
-        await newConnection.start();
-        setConnection(newConnection);
-      } catch (err) {
-        console.error("SignalR Connection Error: ", err);
-      }
-    };
-
-    if (user) {
-      setupSignalR();
+      cleanupSignalR = () => {
+        connection.off("BookingStatusUpdated", handleBookingStatusUpdated);
+        connection.off("RideStarted", handleRideStarted);
+        connection.off("NewNotification", handleNewNotification);
+      };
     }
 
     // Push notification handler
@@ -106,9 +100,27 @@ const HomeScreen = ({ navigation }: any) => {
     messaging().getInitialNotification().then(handleNotification);
 
     return () => {
-      connection?.stop();
+      if (cleanupSignalR) {
+        cleanupSignalR();
+      }
     };
-  }, [user]);
+  }, [user, connection]);
+
+  useEffect(() => {
+    // Check if we were waiting for approval before app crash/restart
+    const checkPendingBooking = async () => {
+      try {
+        const pendingData = await AsyncStorage.getItem('pendingBookingData');
+        if (pendingData) {
+          const parsed = JSON.parse(pendingData);
+          navigation.navigate('AwaitingApproval', parsed);
+        }
+      } catch (e) {
+        console.error('Failed to read pending booking data', e);
+      }
+    };
+    checkPendingBooking();
+  }, [navigation]);
 
   const onRegionDidChange = (e: any) => {
     setRegion(e.geometry.coordinates);

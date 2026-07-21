@@ -10,8 +10,12 @@ namespace RideO.API.Data
 
         public MongoDbContext(IConfiguration configuration)
         {
-            var connectionString = configuration.GetConnectionString("MongoDb");
-            var client = new MongoClient(connectionString ?? "mongodb://rideo_admin:rideo_password@localhost:27017/rideo_mongo?authSource=admin");
+            var connectionString = Environment.GetEnvironmentVariable("MONGO_CONNECTION_STRING") ?? configuration.GetConnectionString("MongoDb");
+            if (string.IsNullOrEmpty(connectionString))
+            {
+                throw new Exception("MongoDb connection string is missing.");
+            }
+            var client = new MongoClient(connectionString);
             _database = client.GetDatabase("rideo_mongo");
         }
 

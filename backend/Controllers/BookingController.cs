@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using RideO.API.Data;
 using RideO.API.Models;
@@ -66,6 +67,7 @@ namespace RideO.API.Controllers
 
         [HttpPost("ondemand")]
         [Authorize(Roles = "User")]
+        [EnableRateLimiting("BookingLimit")]
         public async Task<IActionResult> RequestOnDemand([FromBody] OnDemandRequestDto request)
         {
             var userId = GetCurrentUserId();
@@ -139,14 +141,21 @@ namespace RideO.API.Controllers
             };
             _context.Bookings.Add(booking);
             
+            var userWallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId.Value);
+            
+            // Block if user has accumulated too much cancellation debt
+            if (userWallet != null && userWallet.Balance < -5.00m)
+            {
+                return BadRequest("Your account has an outstanding balance from previous cancellations. Please top up your wallet to book new rides.");
+            }
+
             if (request.PaymentMethod == "Wallet")
             {
-                var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId.Value);
-                if (wallet == null || wallet.Balance < booking.TotalFare)
+                if (userWallet == null || userWallet.Balance < booking.TotalFare)
                     return BadRequest("Insufficient wallet balance.");
-                wallet.Balance -= booking.TotalFare;
-                wallet.UpdatedAt = DateTime.UtcNow;
-                _context.WalletTransactions.Add(new WalletTransaction { WalletId = wallet.Id, Amount = -booking.TotalFare, Type = "Payment", Description = "On-Demand Ride", ReferenceId = booking.Id.ToString() });
+                userWallet.Balance -= booking.TotalFare;
+                userWallet.UpdatedAt = DateTime.UtcNow;
+                _context.WalletTransactions.Add(new WalletTransaction { WalletId = userWallet.Id, Amount = -booking.TotalFare, Type = "Payment", Description = "On-Demand Ride", ReferenceId = booking.Id.ToString() });
             }
 
             var payment = new Payment { BookingId = booking.Id, Amount = booking.TotalFare, Status = "Pending", Method = request.PaymentMethod };
@@ -187,6 +196,7 @@ namespace RideO.API.Controllers
 
         [HttpPost("request")]
         [Authorize(Roles = "User")]
+        [EnableRateLimiting("BookingLimit")]
         public async Task<IActionResult> RequestBooking([FromBody] BookingRequestDto request)
         {
             var userId = GetCurrentUserId();
@@ -219,21 +229,28 @@ namespace RideO.API.Controllers
                 TrackingId = Guid.NewGuid()
             };
 
+            var userWallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId.Value);
+
+            // Block if user has accumulated too much cancellation debt
+            if (userWallet != null && userWallet.Balance < -5.00m)
+            {
+                return BadRequest("Your account has an outstanding balance from previous cancellations. Please top up your wallet to book new rides.");
+            }
+
             // Process Wallet Payment
             if (request.PaymentMethod == "Wallet")
             {
-                var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId.Value);
-                if (wallet == null || wallet.Balance < booking.TotalFare)
+                if (userWallet == null || userWallet.Balance < booking.TotalFare)
                 {
                     return BadRequest("Insufficient wallet balance.");
                 }
 
-                wallet.Balance -= booking.TotalFare;
-                wallet.UpdatedAt = DateTime.UtcNow;
+                userWallet.Balance -= booking.TotalFare;
+                userWallet.UpdatedAt = DateTime.UtcNow;
 
                 var walletTx = new WalletTransaction
                 {
-                    WalletId = wallet.Id,
+                    WalletId = userWallet.Id,
                     Amount = -booking.TotalFare,
                     Type = "Payment",
                     Description = $"Payment for ride from {request.PickupLocationName} to {request.DropoffLocationName}",
@@ -369,6 +386,7 @@ namespace RideO.API.Controllers
 
         [HttpPost("subscribe")]
         [Authorize(Roles = "User")]
+        [EnableRateLimiting("BookingLimit")]
         public async Task<IActionResult> Subscribe([FromBody] SubscribeRequestDto request)
         {
             var userId = GetCurrentUserId();
@@ -629,6 +647,7 @@ namespace RideO.API.Controllers
 
         [HttpPost("{id}/pay")]
         [Authorize(Roles = "User")]
+        [EnableRateLimiting("WalletLimit")]
         public async Task<IActionResult> PayBooking(Guid id, [FromBody] PaymentSubmissionDto dto)
         {
             var userId = GetCurrentUserId();
@@ -855,15 +874,53 @@ namespace RideO.API.Controllers
                 return Forbid("Only the assigned driver can start this ride.");
             }
 
+            // Make it idempotent: if already started, just return current state without error (and without side effects)
+            if (booking.Status == "Started")
+            {
+                return Ok(booking);
+            }
+
+            // Any other status apart from Approved must be rejected with Conflict
+            if (booking.Status != "Approved")
+            {
+                return Conflict(new { message = $"Booking cannot be started because it is in '{booking.Status}' state." });
+            }
+
             if (booking.Otp != request.Otp)
             {
                 return BadRequest("Invalid OTP. Please check with the passenger.");
             }
 
-            booking.Status = "Started";
-            await _context.SaveChangesAsync();
+            // Atomically update the status
+            int rowsAffected;
+            try
+            {
+                rowsAffected = await _context.Bookings
+                    .Where(b => b.Id == id && b.Status == "Approved")
+                    .ExecuteUpdateAsync(s => s.SetProperty(b => b.Status, "Started"));
+            }
+            catch (InvalidOperationException)
+            {
+                // Fallback for InMemory test provider which does not support ExecuteUpdateAsync
+                if (booking.Status == "Approved")
+                {
+                    booking.Status = "Started";
+                    rowsAffected = await _context.SaveChangesAsync();
+                }
+                else
+                {
+                    rowsAffected = 0;
+                }
+            }
 
-            // Notify passenger
+            if (rowsAffected == 0)
+            {
+                return Conflict(new { message = "Booking state changed during processing." });
+            }
+
+            booking.Status = "Started"; // Update local object for response
+            
+            // Notify passenger only once due to atomic check
             await _hubContext.Clients.User(booking.UserId.ToString()).SendAsync("RideStarted", booking);
 
             return Ok(booking);

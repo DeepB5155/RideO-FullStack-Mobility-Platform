@@ -202,35 +202,25 @@ const MainStack = () => {
 // ─── Root ────────────────────────────────────────────────────────────────
 const AppNavigator = () => {
   const { user, isLoading, updateUser, logout } = useContext(AuthContext);
+  const { connection } = useContext(SignalRContext);
 
   useEffect(() => {
-    let connection: signalR.HubConnection | null = null;
+    let cleanupSignalR: (() => void) | undefined;
     
-    const setupGlobalSignalR = async () => {
-      try {
-        const token = await AsyncStorage.getItem('userToken');
-        if (!token || !user) return;
-        
-        const hubUrl = axiosInstance.defaults.baseURL?.replace('/api', '/rideHub') || 'http://localhost:5000/rideHub';
-        
-        connection = new signalR.HubConnectionBuilder()
-          .withUrl(hubUrl, { accessTokenFactory: () => token })
-          .withAutomaticReconnect()
-          .build();
-
-        connection.on("KYCStatusUpdated", (newStatus: string, reason?: string) => {
+    if (connection && user) {
+        const handleKYCStatus = (newStatus: string, reason?: string) => {
           if (newStatus === 'Rejected') {
             Alert.alert(
-              "KYC Rejected ⚠️",
+              'KYC Rejected ⚠️',
               `Your documents were rejected.\n\nReason: ${reason || 'Invalid documents'}\n\nPlease update your details.`,
               [
                 { 
-                  text: "OK", 
+                  text: 'OK', 
                   onPress: () => {
                     updateUser({ isVerified: false });
                     DeviceEventEmitter.emit('KYCRefresh');
                     if (navigationRef.isReady()) {
-                      navigationRef.navigate('KYCScreen');
+                      navigationRef.navigate('ProfileKYC' as never);
                     }
                   } 
                 }
@@ -239,11 +229,11 @@ const AppNavigator = () => {
           } else if (newStatus === 'Approved') {
              updateUser({ isVerified: true });
           }
-        });
+        };
 
-        connection.on("ProfileUpdateProcessed", (status: string, message: string, updatedUser?: any) => {
+        const handleProfileUpdate = (status: string, message: string, updatedUser?: any) => {
           if (status === 'Approved') {
-            Alert.alert("Profile Updated", message);
+            Alert.alert('Profile Updated', message);
             if (updatedUser) {
               updateUser({
                 fullName: updatedUser.fullName,
@@ -252,58 +242,64 @@ const AppNavigator = () => {
               });
             }
           } else if (status === 'Rejected') {
-            Alert.alert("Profile Update Rejected", message);
+            Alert.alert('Profile Update Rejected', message);
           }
 
-          // If the user is currently looking at the "Update Under Review" screen, automatically close it
           if (navigationRef.current?.getCurrentRoute()?.name === 'EditProfile') {
             navigationRef.current?.goBack();
           }
-        });
+        };
 
-        connection.on("AccountSuspended", () => {
-          console.log("RECEIVED AccountSuspended EVENT FROM SIGNALR!");
+        const handleAccountSuspended = () => {
           Alert.alert(
-            "Account Suspended 🚫",
-            "Your driver account has been suspended by an administrator. You will be logged out. Contact support for assistance.",
+            'Account Suspended 🚫',
+            'Your driver account has been suspended by an administrator. You will be logged out. Contact support for assistance.',
             [
               { 
-                text: "OK", 
+                text: 'OK', 
                 onPress: () => {
                   logout();
                 } 
               }
             ]
           );
-        });
+        };
 
-        await connection.start();
-        console.log("Global SignalR Connected Successfully in AppNavigator!");
-      } catch (err) {
-        console.log("Global SignalR Connection Error:", err);
-      }
-    };
+        connection.on('KYCStatusUpdated', handleKYCStatus);
+        connection.on('ProfileUpdateProcessed', handleProfileUpdate);
+        connection.on('AccountSuspended', handleAccountSuspended);
 
-    setupGlobalSignalR();
+        cleanupSignalR = () => {
+          connection.off('KYCStatusUpdated', handleKYCStatus);
+          connection.off('ProfileUpdateProcessed', handleProfileUpdate);
+          connection.off('AccountSuspended', handleAccountSuspended);
+        };
+    }
 
     return () => {
-      if (connection) {
-        connection.stop();
+      if (cleanupSignalR) {
+        cleanupSignalR();
       }
     };
-  }, [user?.id]);
+  }, [user, connection, updateUser, logout]);
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8f9ff' }}>
+        <ActivityIndicator size="large" color="#006a61" />
       </View>
     );
   }
 
   return (
     <NavigationContainer ref={navigationRef}>
-      {user ? (user.isVerified ? <MainStack /> : <OnboardingStack />) : <AuthStack />}
+      {user ? (
+        <MainStack />
+      ) : (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Login" component={LoginScreen} />
+        </Stack.Navigator>
+      )}
     </NavigationContainer>
   );
 };

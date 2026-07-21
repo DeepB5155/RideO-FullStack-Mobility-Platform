@@ -1,9 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useContext } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Alert, Platform
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import * as signalR from '@microsoft/signalr';
+import { TokenHelper } from '../utils/tokenHelper';
+import { SignalRContext } from '../context/SignalRContext';
 import { SIGNALR_HUB_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axiosInstance from '../api/axios';
@@ -19,8 +21,19 @@ const colors = {
   onBackground: '#0b1c30',
 };
 
+interface AwaitingApprovalRouteParams {
+  bookingId: string;
+  driverName: string;
+  routeId: string;
+  pickupLocation?: string;
+  dropoffLocation?: string;
+  seatCount?: number;
+  fare?: number;
+}
+
 const AwaitingApprovalScreen = ({ route, navigation }: any) => {
-  const { bookingId, driverName, routeId } = route.params;
+  const { bookingId, driverName, routeId, pickupLocation, dropoffLocation, seatCount, fare } = route.params as AwaitingApprovalRouteParams;
+  const { connection } = useContext(SignalRContext);
 
   const [elapsed, setElapsed] = useState(0);
   const pulseAnims = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
@@ -61,31 +74,36 @@ const AwaitingApprovalScreen = ({ route, navigation }: any) => {
 
   // SignalR
   useEffect(() => {
-    let connection: signalR.HubConnection;
-    const connect = async () => {
-      const token = await AsyncStorage.getItem('userToken');
-      connection = new signalR.HubConnectionBuilder()
-        .withUrl(SIGNALR_HUB_URL || 'http://192.168.1.182:5248/rideHub', { accessTokenFactory: () => token || '' })
-        .withAutomaticReconnect()
-        .build();
-      connection.on('BookingStatusUpdated', (data: any) => {
+    let cleanupSignalR: (() => void) | undefined;
+
+    if (connection) {
+      const handleBookingStatus = (data: any) => {
         const id = (data.bookingId || data.BookingId || '').toLowerCase();
         const status = data.status || data.Status;
         if (id === bookingId.toLowerCase()) {
           if (status === 'Approved') {
+            AsyncStorage.removeItem('pendingBookingData').catch(() => {});
             Alert.alert('🎉 Confirmed!', `${driverName} has accepted your ride!`);
             navigation.replace('Live Tracking', { bookingId, routeId, driverName });
           } else if (status === 'Rejected') {
+            AsyncStorage.removeItem('pendingBookingData').catch(() => {});
             Alert.alert('Ride Unavailable', `${driverName} couldn\'t accept your request. Please try another ride.`);
             navigation.goBack();
           }
         }
-      });
-      try { await connection.start(); } catch (e) { console.error('SignalR error', e); }
+      };
+
+      connection.on('BookingStatusUpdated', handleBookingStatus);
+
+      cleanupSignalR = () => {
+        connection.off('BookingStatusUpdated', handleBookingStatus);
+      };
+    }
+
+    return () => {
+      if (cleanupSignalR) cleanupSignalR();
     };
-    connect();
-    return () => { connection?.stop(); };
-  }, []);
+  }, [connection, bookingId, driverName, routeId, navigation]);
 
   const handleCancel = () => {
     Alert.alert('Cancel Booking', 'Are you sure you want to cancel this request?', [
@@ -96,6 +114,7 @@ const AwaitingApprovalScreen = ({ route, navigation }: any) => {
           try {
             await axiosInstance.put(`/booking/${bookingId}/cancel`, { reason: 'Cancelled by user' });
           } catch (e) { /* ignore */ }
+          await AsyncStorage.removeItem('pendingBookingData').catch(() => {});
           navigation.goBack();
         }
       }

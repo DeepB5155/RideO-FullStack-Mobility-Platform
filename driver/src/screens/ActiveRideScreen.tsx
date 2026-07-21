@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { 
   View, 
   Text, 
@@ -15,6 +15,8 @@ import * as signalR from '@microsoft/signalr';
 import { SIGNALR_HUB_URL, MAPBOX_ACCESS_TOKEN } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
+import { TokenHelper } from '../utils/tokenHelper';
+import { SignalRContext } from '../context/SignalRContext';
 import axiosInstance from '../api/axios';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
@@ -37,7 +39,8 @@ const getManeuverIcon = (modifier: string) => {
 
 const ActiveRideScreen = ({ route, navigation }: any) => {
   const { routeId, startLoc, endLoc } = route.params;
-  const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
+  const { connection } = useContext(SignalRContext);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [currentCoords, setCurrentCoords] = useState<{lat: number, lng: number} | null>(null);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   
@@ -47,6 +50,7 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
   
   const [bookings, setBookings] = useState<any[]>([]);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [isStartingRide, setIsStartingRide] = useState(false);
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
 
   const [routeDestination, setRouteDestination] = useState<{lat: number, lng: number} | null>(null);
@@ -137,22 +141,14 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
   }, [routeId]);
 
   useEffect(() => {
-    let hubConnection: signalR.HubConnection;
     let watchId: number;
 
     const startTracking = async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
-        const hubUrl = SIGNALR_HUB_URL || 'http://192.168.1.182:5248/rideHub';
-        hubConnection = new signalR.HubConnectionBuilder()
-          .withUrl(hubUrl, { accessTokenFactory: () => token || '' })
-          .withAutomaticReconnect()
-          .build();
+        if (!connection) return;
 
-        await hubConnection.start();
-        setConnection(hubConnection);
         setIsBroadcasting(true);
-        console.log('Connected to RideHub as Driver');
+        console.log('Using Global RideHub as Driver');
 
         const syncCachedLocations = async () => {
           try {
@@ -170,7 +166,7 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
           }
         };
 
-        hubConnection.onreconnected(async () => {
+        connection.onreconnected(async () => {
           console.log('SignalR Reconnected, syncing cached locations...');
           await syncCachedLocations();
         });
@@ -182,8 +178,8 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
           async (position) => {
             const { latitude, longitude } = position.coords;
             setCurrentCoords({ lat: latitude, lng: longitude });
-            if (hubConnection.state === signalR.HubConnectionState.Connected) {
-              hubConnection.invoke('UpdateRouteLocation', routeId, latitude, longitude).catch(console.error);
+            if (connection.state === signalR.HubConnectionState.Connected) {
+              connection.invoke('UpdateRouteLocation', routeId, latitude, longitude).catch(console.error);
             } else {
               // Cache offline location
               try {
@@ -206,17 +202,42 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
         );
 
       } catch (err) {
-        console.error('SignalR Connection Error: ', err);
+        console.error('SignalR Setup Error: ', err);
       }
     };
 
-    startTracking();
+    let cleanupSignalREvents: (() => void) | undefined;
+
+    if (connection) {
+      startTracking();
+
+      const handleBookingCancelled = (bookingId: number) => {
+        // If a booking is cancelled, refresh bookings
+        Alert.alert('Booking Cancelled', `Booking #${bookingId} was cancelled.`);
+        fetchBookings();
+      };
+      
+      const handleNewNotification = (notification: any) => {
+        if (notification && notification.message) {
+          Alert.alert('Notification', notification.message);
+        }
+      };
+
+      connection.on('BookingCancelled', handleBookingCancelled);
+      connection.on('NewNotification', handleNewNotification);
+
+      cleanupSignalREvents = () => {
+        connection.off('BookingCancelled', handleBookingCancelled);
+        connection.off('NewNotification', handleNewNotification);
+      };
+    }
 
     return () => {
       if (watchId !== undefined) Geolocation.clearWatch(watchId);
-      if (hubConnection) hubConnection.stop();
+      setIsBroadcasting(false);
+      if (cleanupSignalREvents) cleanupSignalREvents();
     };
-  }, [routeId]);
+  }, [routeId, connection]);
 
   const handleVerifyOtp = async () => {
     if (otpInput.length !== 4) {
@@ -229,6 +250,7 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
       return;
     }
     
+    setIsStartingRide(true);
     try {
       await axiosInstance.put(`/booking/${selectedBookingId}/start-with-otp`, { otp: otpInput });
       setShowOtpModal(false);
@@ -242,6 +264,8 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
       Alert.alert('Success', 'Passenger picked up successfully!');
     } catch (e: any) {
       Alert.alert('Verification Failed', e.response?.data || 'Invalid OTP');
+    } finally {
+      setIsStartingRide(false);
     }
   };
 
@@ -451,8 +475,16 @@ const ActiveRideScreen = ({ route, navigation }: any) => {
               <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setShowOtpModal(false)}>
                 <Text style={styles.modalBtnCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalBtnConfirm} onPress={handleVerifyOtp}>
-                <Text style={styles.modalBtnConfirmText}>Verify & Start</Text>
+              <TouchableOpacity 
+                style={[styles.modalBtnConfirm, isStartingRide && { opacity: 0.7 }]} 
+                onPress={handleVerifyOtp}
+                disabled={isStartingRide}
+              >
+                {isStartingRide ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.modalBtnConfirmText}>Verify & Start</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>

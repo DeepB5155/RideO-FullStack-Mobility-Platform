@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useContext } from 'react';
+import api from '../api';
 import { CheckCircle, XCircle, FileSearch } from 'lucide-react';
 import { HubConnectionBuilder } from '@microsoft/signalr';
 import '../styles/Pages.css';
+import { TokenHelper } from '../utils/tokenHelper';
+import { SignalRContext } from '../context/SignalRContext';
 
 const KYCManagement = () => {
   const [pendingDrivers, setPendingDrivers] = useState([]);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [loading, setLoading] = useState(true);
   const [rejectionReason, setRejectionReason] = useState('');
+  const { connection } = useContext(SignalRContext);
 
   const fetchPendingKYC = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
-      const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/admin/kyc-pending`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await api.get('/admin/kyc-pending');
       setPendingDrivers(res.data);
     } catch (err) {
       console.error('Failed to fetch pending KYC', err);
@@ -26,47 +26,30 @@ const KYCManagement = () => {
 
   useEffect(() => {
     fetchPendingKYC();
+    let cleanupSignalR;
 
-    let connection;
-    const setupSignalR = async () => {
-      try {
-        const token = localStorage.getItem('adminToken');
-        if (!token) return;
+    if (connection) {
+      const handleKYCSubmitted = () => {
+        console.log("New KYC submitted, refreshing list...");
+        fetchPendingKYC();
+      };
 
-        const hubUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '/rideHub') || 'http://localhost:5248/rideHub';
-        
-        connection = new HubConnectionBuilder()
-          .withUrl(hubUrl, { accessTokenFactory: () => token })
-          .withAutomaticReconnect()
-          .build();
+      connection.on("KYCSubmitted", handleKYCSubmitted);
+      connection.invoke("JoinAdminMonitors").catch(console.error);
 
-        connection.on("KYCSubmitted", () => {
-          console.log("New KYC submitted, refreshing list...");
-          fetchPendingKYC();
-        });
-
-        await connection.start();
-        await connection.invoke("JoinAdminMonitors");
-      } catch (err) {
-        console.error("SignalR KYC Connection Error", err);
-      }
-    };
-
-    setupSignalR();
+      cleanupSignalR = () => {
+        connection.off("KYCSubmitted", handleKYCSubmitted);
+      };
+    }
 
     return () => {
-      if (connection) {
-        connection.stop();
-      }
+      if (cleanupSignalR) cleanupSignalR();
     };
-  }, []);
+  }, [connection]);
 
   const viewDetails = async (driverId) => {
     try {
-      const token = localStorage.getItem('adminToken');
-      const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/admin/kyc/${driverId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await api.get(`/admin/kyc/${driverId}`);
       setSelectedDriver(res.data);
       setRejectionReason(''); // Reset reason on select
     } catch (err) {
@@ -76,10 +59,7 @@ const KYCManagement = () => {
 
   const handleApprove = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
-      await axios.post(`${import.meta.env.VITE_API_BASE_URL}/admin/kyc/${selectedDriver?.driver?.id || selectedDriver?.id}/approve`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post(`/admin/kyc/${selectedDriver?.driver?.id || selectedDriver?.id}/approve`);
       setSelectedDriver(null);
       fetchPendingKYC();
     } catch (err) {
@@ -93,10 +73,8 @@ const KYCManagement = () => {
       return;
     }
     try {
-      const token = localStorage.getItem('adminToken');
-      await axios.post(`${import.meta.env.VITE_API_BASE_URL}/admin/kyc/${selectedDriver?.driver?.id || selectedDriver?.id}/reject`, JSON.stringify(rejectionReason), {
+      await api.post(`/admin/kyc/${selectedDriver?.driver?.id || selectedDriver?.id}/reject`, JSON.stringify(rejectionReason), {
         headers: { 
-          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });

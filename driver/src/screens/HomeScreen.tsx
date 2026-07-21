@@ -23,6 +23,7 @@ import { AuthContext } from '../context/AuthContext';
 import api, { API_BASE_URL } from '../api/axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { SignalRContext } from '../context/SignalRContext';
 
 Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
 
@@ -33,7 +34,7 @@ const HomeScreen = ({ navigation }: any) => {
     longitude: 72.6369,
   });
   const [isOnline, setIsOnline] = useState(false);
-  const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
+  const { connection, startConnection, stopConnection } = useContext(SignalRContext);
   const locationWatchId = useRef<number | null>(null);
   const [incomingRide, setIncomingRide] = useState<any>(null);
   const [activeRide, setActiveRide] = useState<any>(null);
@@ -63,6 +64,37 @@ const HomeScreen = ({ navigation }: any) => {
       fetchDriverStatus();
     }, [])
   );
+
+  useEffect(() => {
+    let cleanupSignalR: (() => void) | undefined;
+
+    if (connection) {
+      const handleBooking = (rideDetails: any) => setIncomingRide(rideDetails);
+      const handleNewRideRequest = (rideId: string, pickupLocation: any) => {
+        // We could show a toast or notification, but for now we'll just log it
+        console.log('New ride request in area', rideId, pickupLocation);
+      };
+      const handleNewNotification = (notification: any) => {
+        if (notification && notification.message) {
+          Alert.alert('Notification', notification.message);
+        }
+      };
+
+      connection.on('BookingRequested', handleBooking);
+      connection.on('NewRideRequest', handleNewRideRequest);
+      connection.on('NewNotification', handleNewNotification);
+
+      cleanupSignalR = () => {
+        connection.off('BookingRequested', handleBooking);
+        connection.off('NewRideRequest', handleNewRideRequest);
+        connection.off('NewNotification', handleNewNotification);
+      };
+    }
+    
+    return () => {
+      if (cleanupSignalR) cleanupSignalR();
+    };
+  }, [connection]);
 
   useEffect(() => {
     const requestLocationPermission = async () => {
@@ -95,14 +127,6 @@ const HomeScreen = ({ navigation }: any) => {
       );
     };
 
-    const hubUrl = SIGNALR_HUB_URL || API_BASE_URL.replace('/api', '/rideHub');
-    const newConnection = new signalR.HubConnectionBuilder()
-      .withUrl(hubUrl, { accessTokenFactory: async () => (await AsyncStorage.getItem('userToken')) || '' })
-      .withAutomaticReconnect()
-      .build();
-
-    newConnection.on('BookingRequested', (rideDetails) => setIncomingRide(rideDetails));
-    setConnection(newConnection);
     requestLocationPermission();
     fetchPendingSubs();
 
@@ -159,7 +183,6 @@ const HomeScreen = ({ navigation }: any) => {
       pushListener.remove();
       unsubscribeOnOpened();
       if (locationWatchId.current !== null) Geolocation.clearWatch(locationWatchId.current);
-      if (newConnection.state !== signalR.HubConnectionState.Disconnected) newConnection.stop();
     };
   }, []);
 
@@ -170,10 +193,7 @@ const HomeScreen = ({ navigation }: any) => {
       setIsOnline(newStatus);
 
       if (newStatus) {
-        if (connection && connection.state === signalR.HubConnectionState.Disconnected) {
-          await connection.start();
-          await connection.invoke('JoinDriverGroup');
-        }
+        await startConnection();
         locationWatchId.current = Geolocation.watchPosition(
           (position) => {
             const { latitude, longitude } = position.coords;
@@ -190,9 +210,7 @@ const HomeScreen = ({ navigation }: any) => {
           Geolocation.clearWatch(locationWatchId.current);
           locationWatchId.current = null;
         }
-        if (connection && connection.state === signalR.HubConnectionState.Connected) {
-          await connection.stop();
-        }
+        await stopConnection();
       }
     } catch (error) {
       Alert.alert('Error', 'Could not update status. Please try again.');

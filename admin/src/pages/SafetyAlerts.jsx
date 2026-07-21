@@ -1,19 +1,19 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useContext } from 'react';
+import api from '../api';
 import { AlertTriangle, MapPin, CheckCircle, Clock } from 'lucide-react';
 import * as signalR from '@microsoft/signalr';
 import './SafetyAlerts.css';
+import { TokenHelper } from '../utils/tokenHelper';
+import { SignalRContext } from '../context/SignalRContext';
 
 const SafetyAlerts = () => {
     const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { connection } = useContext(SignalRContext);
 
     const fetchAlerts = async () => {
         try {
-            const token = localStorage.getItem('adminToken');
-            const res = await axios.get('http://localhost:5248/api/emergency/sos', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await api.get('/emergency/sos');
             setAlerts(res.data);
         } catch (error) {
             console.error('Failed to fetch SOS alerts', error);
@@ -24,45 +24,31 @@ const SafetyAlerts = () => {
 
     useEffect(() => {
         fetchAlerts();
+        let cleanupSignalR;
 
-        // Listen for real-time SignalR updates
-        let hubConnection;
-        const setupSignalR = async () => {
-            const token = localStorage.getItem('adminToken');
-            hubConnection = new signalR.HubConnectionBuilder()
-                .withUrl('http://localhost:5248/ridehub', {
-                    accessTokenFactory: () => token || ''
-                })
-                .withAutomaticReconnect()
-                .build();
-
-            hubConnection.on('EmergencySOS', () => {
+        if (connection) {
+            const handleEmergencySOS = () => {
                 fetchAlerts(); // Refresh list on new SOS
-            });
+            };
 
-            try {
-                await hubConnection.start();
-                await hubConnection.invoke('JoinAdminMonitors');
-            } catch (e) {
-                console.log('SignalR connection error for SafetyAlerts', e);
-            }
-        };
+            connection.on('EmergencySOS', handleEmergencySOS);
+            connection.invoke('JoinAdminMonitors').catch(console.error);
 
-        setupSignalR();
+            cleanupSignalR = () => {
+                connection.off('EmergencySOS', handleEmergencySOS);
+            };
+        }
 
         return () => {
-            if (hubConnection) hubConnection.stop();
+            if (cleanupSignalR) cleanupSignalR();
         };
-    }, []);
+    }, [connection]);
 
     const handleResolve = async (id) => {
         if (!window.confirm("Are you sure you want to mark this SOS as resolved?")) return;
         
         try {
-            const token = localStorage.getItem('adminToken');
-            await axios.put(`http://localhost:5248/api/emergency/sos/${id}/resolve`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.put(`/emergency/sos/${id}/resolve`);
             fetchAlerts(); // Refresh
         } catch (error) {
             console.error('Failed to resolve SOS', error);

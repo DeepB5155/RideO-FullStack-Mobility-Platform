@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../api/axios';
 import { PushNotificationService } from '../services/PushNotificationService';
+import { TokenHelper } from '../utils/tokenHelper';
 
 // Define the shape of our User
 export interface User {
@@ -31,8 +31,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Check if user is already logged in
     const loadStorageData = async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
-        const userDataString = await AsyncStorage.getItem('userData');
+        const token = await TokenHelper.getToken();
+        const userDataString = await TokenHelper.getUserData();
         
         if (token && userDataString) {
           setUser(JSON.parse(userDataString));
@@ -51,8 +51,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (token: string, userData: User) => {
     try {
-      await AsyncStorage.setItem('userToken', token);
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      await TokenHelper.setToken(token);
+      await TokenHelper.setUserData(JSON.stringify(userData));
       setUser(userData);
       PushNotificationService.registerTokenWithBackend();
     } catch (error) {
@@ -62,8 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     try {
-      await AsyncStorage.removeItem('userToken');
-      await AsyncStorage.removeItem('userData');
+      await TokenHelper.clearTokens();
       setUser(null);
     } catch (error) {
       console.error('Failed to clear auth data:', error);
@@ -74,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser((prevUser) => {
       if (!prevUser) return prevUser;
       const updated = { ...prevUser, ...data };
-      AsyncStorage.setItem('userData', JSON.stringify(updated)).catch(e => console.error(e));
+      TokenHelper.setUserData(JSON.stringify(updated)).catch(e => console.error(e));
       return updated;
     });
   }, []);

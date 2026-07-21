@@ -149,9 +149,11 @@ const WalletScreen = ({ navigation }: any) => {
               </View>
             </View>
             <View style={styles.cardActions}>
-              <TouchableOpacity style={styles.btnPrimary} onPress={() => handleOpenModal('add')}>
-                <Text style={styles.btnPrimaryText}>Add Funds</Text>
-              </TouchableOpacity>
+              {__DEV__ && (
+                <TouchableOpacity style={styles.btnPrimary} onPress={() => handleOpenModal('add')}>
+                  <Text style={styles.btnPrimaryText}>Add Funds</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={styles.btnOutline} onPress={() => handleOpenModal('withdraw')}>
                 <Text style={styles.btnOutlineText}>Withdraw</Text>
               </TouchableOpacity>
@@ -159,29 +161,31 @@ const WalletScreen = ({ navigation }: any) => {
           </View>
 
           {/* Quick Add Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Quick Add</Text>
-            <View style={styles.quickAddGrid}>
-              <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleOpenModal('add', '20')}>
-                <Text style={styles.quickAddText}>₹20</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleOpenModal('add', '50')}>
-                <Text style={styles.quickAddText}>₹50</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleOpenModal('add', '100')}>
-                <Text style={styles.quickAddText}>₹100</Text>
+          {__DEV__ && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Quick Add</Text>
+              <View style={styles.quickAddGrid}>
+                <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleOpenModal('add', '20')}>
+                  <Text style={styles.quickAddText}>₹20</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleOpenModal('add', '50')}>
+                  <Text style={styles.quickAddText}>₹50</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickAddBtn} onPress={() => handleOpenModal('add', '100')}>
+                  <Text style={styles.quickAddText}>₹100</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.labelSmall}>Payment Method</Text>
+              <TouchableOpacity style={styles.paymentMethodBtn} onPress={() => navigation.navigate('PaymentMethods')}>
+                <View style={styles.paymentMethodLeft}>
+                  <MaterialIcons name="account-balance" size={20} color={localColors.primary} />
+                  <Text style={styles.paymentMethodText}>UPI (Google Pay)</Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={20} color={localColors.onSurfaceVariant} />
               </TouchableOpacity>
             </View>
-
-            <Text style={styles.labelSmall}>Payment Method</Text>
-            <TouchableOpacity style={styles.paymentMethodBtn} onPress={() => navigation.navigate('PaymentMethods')}>
-              <View style={styles.paymentMethodLeft}>
-                <MaterialIcons name="account-balance" size={20} color={localColors.primary} />
-                <Text style={styles.paymentMethodText}>UPI (Google Pay)</Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={20} color={localColors.onSurfaceVariant} />
-            </TouchableOpacity>
-          </View>
+          )}
 
           {/* Recent Transactions */}
           <View style={styles.section}>

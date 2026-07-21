@@ -8,9 +8,10 @@ import {
 import Geolocation from '@react-native-community/geolocation';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { MAPBOX_ACCESS_TOKEN } from '@env';
 
-// IMPORTANT: User should replace this with their actual Mapbox token
-const MAPBOX_TOKEN = 'pk.eyJ1IjoiZGVlcC01MTU1Iiwi' + 'YSI6ImNtb2xicG42bzBhcWcyb3BoNW81Ynh4YWgifQ.FvuveCsGrnRfM0VJdGGUXw';
+// Token loaded from .env
+const MAPBOX_TOKEN = MAPBOX_ACCESS_TOKEN;
 
 const localColors = {
   background: '#f8f9ff',

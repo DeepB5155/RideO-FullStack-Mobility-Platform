@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, Alert, Image, SafeAreaView, ScrollView } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import Icon from 'react-native-vector-icons/Feather';
+import { TokenHelper } from '../utils/tokenHelper';
 import * as signalR from '@microsoft/signalr';
 import { SIGNALR_HUB_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
+import { SignalRContext } from '../context/SignalRContext';
 
 const localColors = {
   primary: '#000000',
@@ -30,38 +33,29 @@ const ChatScreen = ({ route, navigation }: any) => {
   
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
+  
+  const { connection } = useContext(SignalRContext);
   
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    let hubConnection: signalR.HubConnection;
+    let cleanupSignalR: (() => void) | undefined;
 
-    const connectChat = async () => {
-      try {
-        const token = await AsyncStorage.getItem('jwtToken');
-        
-        hubConnection = new signalR.HubConnectionBuilder()
-          .withUrl(SIGNALR_HUB_URL || 'http://192.168.1.182:5248/ridehub', {
-            accessTokenFactory: () => token || ''
-          })
-          .withAutomaticReconnect()
-          .build();
+    if (connection) {
+      const handleReceiveMessage = (msg: any) => {
+        if (msg.bookingId === bookingId) {
+          setMessages(prev => [...prev, msg]);
+        }
+      };
 
-        hubConnection.on('ReceiveMessage', (msg: any) => {
-          if (msg.bookingId === bookingId) {
-            setMessages(prev => [...prev, msg]);
-          }
-        });
+      connection.on('ReceiveMessage', handleReceiveMessage);
+      connection.invoke('JoinChat', bookingId).catch(console.error);
 
-        await hubConnection.start();
-        await hubConnection.invoke('JoinChat', bookingId);
-        
-        setConnection(hubConnection);
-      } catch (err) {
-        console.error('Chat Connection Error', err);
-      }
-    };
+      cleanupSignalR = () => {
+        connection.off('ReceiveMessage', handleReceiveMessage);
+        connection.invoke('LeaveChat', bookingId).catch(console.error);
+      };
+    }
 
     const fetchHistory = async () => {
       try {
@@ -75,17 +69,15 @@ const ChatScreen = ({ route, navigation }: any) => {
     };
 
     if (bookingId !== 'mock-booking') {
-       connectChat();
        fetchHistory();
     }
 
     return () => {
-      if (hubConnection) {
-        hubConnection.invoke('LeaveChat', bookingId).catch(console.log);
-        hubConnection.stop();
+      if (cleanupSignalR) {
+        cleanupSignalR();
       }
     };
-  }, [bookingId]);
+  }, [bookingId, connection]);
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return;

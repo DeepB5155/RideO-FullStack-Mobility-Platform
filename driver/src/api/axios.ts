@@ -1,5 +1,6 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TokenHelper } from '../utils/tokenHelper';
 
 // UPDATE THIS to your computer's local Wi-Fi IP address (e.g., 192.168.1.100)
 // Since you are testing on a physical device, localhost or 10.0.2.2 will not work.
@@ -17,7 +18,7 @@ const api = axios.create({
 // Interceptor to inject the token into requests
 api.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('userToken');
+    const token = await TokenHelper.getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

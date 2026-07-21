@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { LayoutDashboard, Users, Car, MapPin, ShieldCheck, ShieldAlert, Menu, X, LogOut, Navigation, AlertTriangle, UserCog } from 'lucide-react';
 import * as signalR from '@microsoft/signalr';
-import axios from 'axios';
+import api from '../api';
 import { useNavigate } from 'react-router-dom';
+import { TokenHelper } from '../utils/tokenHelper';
+import { SignalRContext } from '../context/SignalRContext';
 import './AdminLayout.css';
 
 const AdminLayout = () => {
@@ -13,13 +15,11 @@ const AdminLayout = () => {
     const [kycCount, setKycCount] = useState(0);
     const [profileEditsCount, setProfileEditsCount] = useState(0);
     const navigate = useNavigate();
+    const { connection } = useContext(SignalRContext);
 
     const fetchSosCount = async () => {
         try {
-            const token = localStorage.getItem('adminToken');
-            const res = await axios.get('http://localhost:5248/api/emergency/sos', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await api.get('/emergency/sos');
             const openAlerts = res.data.filter(a => a.status === 'Open');
             setSosCount(openAlerts.length);
         } catch (error) {
@@ -29,10 +29,7 @@ const AdminLayout = () => {
 
     const fetchKycCount = async () => {
         try {
-            const token = localStorage.getItem('adminToken');
-            const res = await axios.get('http://localhost:5248/api/admin/kyc-pending', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await api.get('/admin/kyc-pending');
             setKycCount(res.data.length);
         } catch (error) {
             console.error('Failed to fetch KYC count', error);
@@ -41,10 +38,7 @@ const AdminLayout = () => {
 
     const fetchProfileEditsCount = async () => {
         try {
-            const token = localStorage.getItem('adminToken');
-            const res = await axios.get('http://localhost:5248/api/admin/profile-edits/pending', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await api.get('/admin/profile-edits/pending');
             setProfileEditsCount(res.data.length);
         } catch (error) {
             console.error('Failed to fetch profile edits count', error);
@@ -54,58 +48,48 @@ const AdminLayout = () => {
     const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
     useEffect(() => {
-        let hubConnection;
-        const connectSignalR = async () => {
-            try {
-                const token = localStorage.getItem('adminToken');
-                hubConnection = new signalR.HubConnectionBuilder()
-                    .withUrl(import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5248/ridehub', {
-                        accessTokenFactory: () => token || ''
-                    })
-                    .withAutomaticReconnect()
-                    .build();
+        let cleanupSignalR;
 
-                hubConnection.on('EmergencySOS', (alertData) => {
-                    setSosAlert(alertData);
-                    setSosCount(prev => prev + 1);
-                    // Play a loud sound
-                    const audio = new Audio('/sos-alarm.mp3'); // Mock audio file
-                    audio.play().catch(e => console.log('Audio play blocked:', e));
-                });
+        if (connection) {
+            const handleEmergencySOS = (alertData) => {
+                setSosAlert(alertData);
+                setSosCount(prev => prev + 1);
+                // Play a loud sound
+                const audio = new Audio('/sos-alarm.mp3'); // Mock audio file
+                audio.play().catch(e => console.log('Audio play blocked:', e));
+            };
 
-                hubConnection.on('KYCSubmitted', () => {
-                    setKycCount(prev => prev + 1);
-                });
+            const handleKYCSubmitted = () => setKycCount(prev => prev + 1);
+            const handleKYCProcessed = () => setKycCount(prev => Math.max(0, prev - 1));
+            const handleProfileEditSubmitted = () => setProfileEditsCount(prev => prev + 1);
+            const handleProfileUpdateProcessed = () => setProfileEditsCount(prev => Math.max(0, prev - 1));
 
-                hubConnection.on('KYCProcessed', () => {
-                    setKycCount(prev => Math.max(0, prev - 1));
-                });
+            connection.on('EmergencySOS', handleEmergencySOS);
+            connection.on('KYCSubmitted', handleKYCSubmitted);
+            connection.on('KYCProcessed', handleKYCProcessed);
+            connection.on('ProfileEditSubmitted', handleProfileEditSubmitted);
+            connection.on('ProfileUpdateProcessed', handleProfileUpdateProcessed);
 
-                hubConnection.on('ProfileEditSubmitted', () => {
-                    setProfileEditsCount(prev => prev + 1);
-                });
+            connection.invoke('JoinAdminMonitors').catch(console.error);
 
-                hubConnection.on('ProfileUpdateProcessed', () => {
-                    setProfileEditsCount(prev => Math.max(0, prev - 1));
-                });
-
-                await hubConnection.start();
-                await hubConnection.invoke('JoinAdminMonitors');
-                console.log('AdminLayout connected to RideHub for SOS alerts');
-            } catch (err) {
-                console.error('SignalR AdminLayout Connection Error: ', err);
-            }
-        };
+            cleanupSignalR = () => {
+                connection.off('EmergencySOS', handleEmergencySOS);
+                connection.off('KYCSubmitted', handleKYCSubmitted);
+                connection.off('KYCProcessed', handleKYCProcessed);
+                connection.off('ProfileEditSubmitted', handleProfileEditSubmitted);
+                connection.off('ProfileUpdateProcessed', handleProfileUpdateProcessed);
+                connection.invoke('LeaveAdminMonitors').catch(console.error);
+            };
+        }
 
         fetchSosCount();
         fetchKycCount();
         fetchProfileEditsCount();
-        connectSignalR();
 
         return () => {
-            if (hubConnection) hubConnection.stop();
+            if (cleanupSignalR) cleanupSignalR();
         };
-    }, []);
+    }, [connection]);
 
     const menuItems = [
         { name: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/' },
@@ -122,8 +106,7 @@ const AdminLayout = () => {
     ];
 
     const handleLogout = () => {
-        localStorage.removeItem('adminAuth');
-        localStorage.removeItem('adminToken');
+        TokenHelper.clearTokens();
         window.location.href = '/login';
     };
 

@@ -7,10 +7,22 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Mapbox from '@rnmapbox/maps';
 import { MAPBOX_ACCESS_TOKEN } from '@env';
 import axiosInstance from '../api/axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+interface RideDetailRouteParams {
+  item: any;
+  seats: number;
+  pickupText: string;
+  dropoffText: string;
+  pickupLat: number;
+  pickupLng: number;
+  dropLat: number;
+  dropLng: number;
+}
 
 const colors = {
   background: '#f8f9ff',
@@ -33,7 +45,7 @@ const haversineKm = (lat1: number, lon1: number, lat2: number, lon2: number) => 
 };
 
 const RideDetailScreen = ({ route, navigation }: any) => {
-  const { item, seats, pickupText, dropoffText, pickupLat, pickupLng, dropLat, dropLng } = route.params;
+  const { item, seats, pickupText, dropoffText, pickupLat, pickupLng, dropLat, dropLng } = route.params as RideDetailRouteParams;
   const [paymentMethod, setPaymentMethod] = useState<'Wallet' | 'Cash' | 'UPI'>('Wallet');
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [noteToDriver, setNoteToDriver] = useState('');
@@ -88,14 +100,17 @@ const RideDetailScreen = ({ route, navigation }: any) => {
           otp: booking.otp || booking.Otp,
         });
       } else {
-        navigation.replace('AwaitingApproval', {
+        const pendingData = {
           bookingId: booking.id || booking.Id,
           driverName: item.driver.name,
           routeId: item.routeId,
-        });
+        };
+        await AsyncStorage.setItem('pendingBookingData', JSON.stringify(pendingData));
+        navigation.replace('AwaitingApproval', pendingData);
       }
     } catch (err: any) {
       Alert.alert('Error', err.response?.data || 'Failed to request booking. Please try again.');
+    } finally {
       setIsConfirming(false);
     }
   };

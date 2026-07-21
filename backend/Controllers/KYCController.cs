@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RideO.API.Data;
@@ -31,6 +32,7 @@ namespace RideO.API.Controllers
         }
 
         [HttpPost("upload")]
+        [EnableRateLimiting("UploadLimit")]
         public async Task<IActionResult> UploadDocument(IFormFile file)
         {
             if (file == null || file.Length == 0)

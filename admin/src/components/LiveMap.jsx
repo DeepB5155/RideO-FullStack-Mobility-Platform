@@ -3,8 +3,8 @@ import Map, { Marker, NavigationControl, GeolocateControl } from 'react-map-gl/m
 import 'mapbox-gl/dist/mapbox-gl.css';
 import api from '../api';
 
-// Split token string to bypass overzealous GitHub secret scanning for public keys
-const MAPBOX_TOKEN = 'pk.eyJ1IjoiZGVlcC01MTU1Iiwi' + 'YSI6ImNtb2xicG42bzBhcWcyb3BoNW81Ynh4YWgifQ.FvuveCsGrnRfM0VJdGGUXw';
+// Important: User should replace this with their actual token
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
 const LiveMap = () => {
     const [liveDrivers, setLiveDrivers] = useState([]);

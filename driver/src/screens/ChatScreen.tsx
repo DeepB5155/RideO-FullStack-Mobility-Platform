@@ -18,6 +18,8 @@ import * as signalR from '@microsoft/signalr';
 import { SIGNALR_HUB_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
+import { TokenHelper } from '../utils/tokenHelper';
+import { SignalRContext } from '../context/SignalRContext';
 import api from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 
@@ -27,39 +29,30 @@ const ChatScreen = ({ route, navigation }: any) => {
   
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
+  const { connection } = useContext(SignalRContext);
   
   const flatListRef = useRef<FlatList>(null);
 
   const QUICK_REPLIES = ["I'm here", "Stuck in traffic", "Be right there"];
 
   useEffect(() => {
-    let hubConnection: signalR.HubConnection;
+    let cleanupSignalR: (() => void) | undefined;
 
-    const connectChat = async () => {
-      try {
-        const token = await AsyncStorage.getItem('userToken');
-        
-        const hubUrl = SIGNALR_HUB_URL || 'http://192.168.1.182:5248/rideHub';
-        hubConnection = new signalR.HubConnectionBuilder()
-          .withUrl(hubUrl, { accessTokenFactory: () => token || '' })
-          .withAutomaticReconnect()
-          .build();
+    if (connection) {
+      const handleReceiveMessage = (msg: any) => {
+        if (msg.bookingId === bookingId) {
+          setMessages(prev => [...prev, msg]);
+        }
+      };
 
-        hubConnection.on('ReceiveMessage', (msg: any) => {
-          if (msg.bookingId === bookingId) {
-            setMessages(prev => [...prev, msg]);
-          }
-        });
+      connection.on('ReceiveMessage', handleReceiveMessage);
+      connection.invoke('JoinChat', bookingId).catch(console.error);
 
-        await hubConnection.start();
-        await hubConnection.invoke('JoinChat', bookingId);
-        
-        setConnection(hubConnection);
-      } catch (err) {
-        console.error('Chat Connection Error', err);
-      }
-    };
+      cleanupSignalR = () => {
+        connection.off('ReceiveMessage', handleReceiveMessage);
+        connection.invoke('LeaveChat', bookingId).catch(console.log);
+      };
+    }
 
     const fetchHistory = async () => {
       try {
@@ -70,16 +63,14 @@ const ChatScreen = ({ route, navigation }: any) => {
       }
     };
 
-    connectChat();
     fetchHistory();
 
     return () => {
-      if (hubConnection) {
-        hubConnection.invoke('LeaveChat', bookingId).catch(console.log);
-        hubConnection.stop();
+      if (cleanupSignalR) {
+        cleanupSignalR();
       }
     };
-  }, [bookingId]);
+  }, [bookingId, connection]);
 
   const sendTextMessage = async (text: string) => {
     if (!text.trim()) return;

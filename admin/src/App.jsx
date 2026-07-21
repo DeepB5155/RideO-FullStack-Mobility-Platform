@@ -16,16 +16,34 @@ import PayoutRequests from './pages/PayoutRequests';
 import ProfileEdits from './pages/ProfileEdits';
 import './App.css';
 
+import { SignalRProvider } from './context/SignalRContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
-  const isAuthenticated = localStorage.getItem('adminAuth') === 'true';
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+  const { user, loading, error } = useAuth();
+
+  if (loading) {
+    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '20px' }}>Loading session...</div>;
+  }
+
+  if (error) {
+    return <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <h2 style={{ color: 'red' }}>Access Denied</h2>
+      <p>{error}</p>
+      <a href="/login" style={{ marginTop: '20px', padding: '10px 20px', background: '#007bff', color: 'white', textDecoration: 'none', borderRadius: '5px' }}>Return to Login</a>
+    </div>;
+  }
+
+  return user ? children : <Navigate to="/login" replace />;
 };
 
 function App() {
   return (
-    <Router>
-      <Routes>
+    <AuthProvider>
+      <SignalRProvider>
+        <Router>
+          <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/track/:trackingId" element={<LiveTracking />} />
         
@@ -49,9 +67,11 @@ function App() {
           <Route path="complaints" element={<Complaints />} />
           <Route path="safety-alerts" element={<SafetyAlerts />} />
           <Route path="ride-playback/:id" element={<RidePlayback />} />
-        </Route>
-      </Routes>
-    </Router>
+          </Route>
+          </Routes>
+        </Router>
+      </SignalRProvider>
+    </AuthProvider>
   );
 }
 

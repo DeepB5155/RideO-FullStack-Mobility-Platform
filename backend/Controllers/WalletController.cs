@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using RideO.API.Data;
 using RideO.API.Models;
@@ -7,6 +8,8 @@ using System;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
 
 namespace RideO.API.Controllers
 {
@@ -16,10 +19,12 @@ namespace RideO.API.Controllers
     public class WalletController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IWebHostEnvironment _env;
 
-        public WalletController(AppDbContext context)
+        public WalletController(AppDbContext context, IWebHostEnvironment env)
         {
             _context = context;
+            _env = env;
         }
 
         private Guid? GetCurrentUserId()
@@ -74,8 +79,14 @@ namespace RideO.API.Controllers
         }
 
         [HttpPost("add-funds")]
+        [EnableRateLimiting("WalletLimit")]
         public async Task<IActionResult> AddFunds([FromBody] AddFundsRequest request)
         {
+            if (!_env.IsDevelopment())
+            {
+                return BadRequest(new { message = "Payment top-up unavailable" });
+            }
+
             if (request.Amount <= 0) return BadRequest("Amount must be greater than zero.");
 
             var userId = GetCurrentUserId();
@@ -94,7 +105,7 @@ namespace RideO.API.Controllers
                 WalletId = wallet.Id,
                 Amount = request.Amount,
                 Type = "Deposit",
-                Description = $"Added funds via UPI: {request.UpiId}",
+                Description = $"[DEV TEST] Added funds via UPI: {request.UpiId}",
                 ReferenceId = $"MOCK_UPI_{Guid.NewGuid().ToString().Substring(0, 8)}"
             };
 
@@ -111,6 +122,7 @@ namespace RideO.API.Controllers
         }
 
         [HttpPost("withdraw")]
+        [EnableRateLimiting("WalletLimit")]
         public async Task<IActionResult> WithdrawFunds([FromBody] WithdrawFundsRequest request)
         {
             if (request.Amount <= 0) return BadRequest("Amount must be greater than zero.");

@@ -4,15 +4,15 @@ import { Lock, User } from 'lucide-react';
 import api from '../api';
 import '../styles/Pages.css';
 import '../styles/Login.css';
+import { TokenHelper } from '../utils/tokenHelper';
+import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
+    const { user, login } = useAuth();
     const [credentials, setCredentials] = useState({ username: '', password: '' });
     const [error, setError] = useState('');
-    const [isAuthenticated, setIsAuthenticated] = useState(
-        localStorage.getItem('adminAuth') === 'true'
-    );
 
-    if (isAuthenticated) {
+    if (user) {
         return <Navigate to="/" replace />;
     }
 
@@ -25,8 +25,7 @@ const Login = () => {
                 password: credentials.password 
             });
             
-            localStorage.setItem('adminAuth', 'true');
-            localStorage.setItem('adminToken', response.data.token);
+            await login(response.data.token);
             window.location.href = '/'; 
         } catch (err) {
             setError(err.response?.data || 'Invalid credentials.');

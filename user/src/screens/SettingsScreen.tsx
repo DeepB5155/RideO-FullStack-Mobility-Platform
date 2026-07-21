@@ -2,6 +2,7 @@ import React, { useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, StatusBar, Image, Alert } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TokenHelper } from '../utils/tokenHelper';
 import { AuthContext } from '../context/AuthContext';
 
 const localColors = {
@@ -33,7 +34,7 @@ const SettingsScreen = ({ navigation }: any) => {
             if (logout) {
               await logout();
             } else {
-              await AsyncStorage.removeItem('userToken');
+              await TokenHelper.clearTokens();
               navigation.replace('Login');
             }
           } catch (error) {
@@ -52,7 +53,7 @@ const SettingsScreen = ({ navigation }: any) => {
           if (logout) {
             logout();
           } else {
-            await AsyncStorage.removeItem('userToken');
+            await TokenHelper.clearTokens();
             navigation.replace('Login');
           }
         }

@@ -1,48 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { MapPin, Navigation } from 'lucide-react';
 import * as signalR from '@microsoft/signalr';
+import { TokenHelper } from '../utils/tokenHelper';
+import { SignalRContext } from '../context/SignalRContext';
 
 const LiveRides = () => {
   const [activeDrivers, setActiveDrivers] = useState({});
-  const [connection, setConnection] = useState(null);
+  const { connection } = useContext(SignalRContext);
 
   useEffect(() => {
-    let hubConnection;
+    let cleanupSignalR;
 
-    const connectSignalR = async () => {
-      try {
-        const token = localStorage.getItem('adminToken');
-        
-        hubConnection = new signalR.HubConnectionBuilder()
-          .withUrl(import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5248/ridehub', {
-            accessTokenFactory: () => token || ''
-          })
-          .withAutomaticReconnect()
-          .build();
+    if (connection) {
+      const handleReceiveDriverLocation = (driverId, routeId, lat, lng) => {
+        setActiveDrivers(prev => ({
+          ...prev,
+          [driverId]: { routeId, lat, lng, lastUpdate: new Date() }
+        }));
+      };
 
-        hubConnection.on('ReceiveDriverLocation', (driverId, routeId, lat, lng) => {
-          setActiveDrivers(prev => ({
-            ...prev,
-            [driverId]: { routeId, lat, lng, lastUpdate: new Date() }
-          }));
-        });
+      connection.on('ReceiveDriverLocation', handleReceiveDriverLocation);
+      connection.invoke('JoinAdminMonitors').catch(console.error);
 
-        await hubConnection.start();
-        await hubConnection.invoke('JoinAdminMonitors');
-        
-        setConnection(hubConnection);
-        console.log('Admin connected to RideHub');
-      } catch (err) {
-        console.error('SignalR Admin Connection Error: ', err);
-      }
-    };
-
-    connectSignalR();
+      cleanupSignalR = () => {
+        connection.off('ReceiveDriverLocation', handleReceiveDriverLocation);
+      };
+    }
 
     return () => {
-      if (hubConnection) hubConnection.stop();
+      if (cleanupSignalR) cleanupSignalR();
     };
-  }, []);
+  }, [connection]);
 
   return (
     <div className="page-container">

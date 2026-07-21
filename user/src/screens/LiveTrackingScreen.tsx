@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Share, Modal, FlatList } from 'react-native';
 import * as signalR from '@microsoft/signalr';
 import { SIGNALR_HUB_URL } from '@env';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TokenHelper } from '../utils/tokenHelper';
+import { SignalRContext } from '../context/SignalRContext';
 import axiosInstance from '../api/axios';
 import Mapbox from '@rnmapbox/maps';
 import { MAPBOX_ACCESS_TOKEN } from '@env';
@@ -12,7 +13,8 @@ Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
 const LiveTrackingScreen = ({ route, navigation }: any) => {
   const { routeId, driverName, pickup, dropoff, bookingId, trackingId, driverUserId, otp } = route.params;
   const [driverLocation, setDriverLocation] = useState<{lat: number, lng: number} | null>(null);
-  const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
+  
+  const { connection } = useContext(SignalRContext);
 
   const [sosModalVisible, setSosModalVisible] = useState(false);
   const [sosCountdown, setSosCountdown] = useState(5);
@@ -58,27 +60,23 @@ const LiveTrackingScreen = ({ route, navigation }: any) => {
   };
 
   useEffect(() => {
-    let hubConnection: signalR.HubConnection;
+    let cleanupSignalR: (() => void) | undefined;
 
-    const connectSignalR = async () => {
-      try {
-        const token = await AsyncStorage.getItem('jwtToken');
-        
-        hubConnection = new signalR.HubConnectionBuilder()
-          .withUrl(SIGNALR_HUB_URL || 'http://192.168.1.182:5248/ridehub', {
-            accessTokenFactory: () => token || ''
-          })
-          .withAutomaticReconnect()
-          .build();
+    if (connection) {
+      connection.invoke('JoinRouteGroup', routeId).catch(console.error);
+      
+      const handleRouteLocation = (rId: string, lat: number, lng: number) => {
+        if (rId === routeId) {
+          setDriverLocation({ lat, lng });
+          setRouteCoordinates(prev => [...prev, [lng, lat]]);
+        }
+      };
 
-        hubConnection.on('ReceiveRouteLocation', (rId: string, lat: number, lng: number) => {
-          if (rId === routeId) {
-            setDriverLocation({ lat, lng });
-          }
-        });
-
-        hubConnection.on('BookingStatusUpdated', (data: any) => {
-          if (data.Status === 'Completed') {
+      const handleBookingStatus = (data: any) => {
+        const id = data.bookingId || data.BookingId || '';
+        const status = data.status || data.Status;
+        if (id.toLowerCase() === bookingId.toLowerCase()) {
+          if (status === 'Completed') {
             navigation.replace('Rating', {
               targetUserId: driverUserId || data.DriverUserId || routeId,
               targetRole: 'Driver',
@@ -86,28 +84,25 @@ const LiveTrackingScreen = ({ route, navigation }: any) => {
               targetName: driverName
             });
           }
-        });
+        }
+      };
 
-        await hubConnection.start();
-        await hubConnection.invoke('JoinRouteGroup', routeId);
-        
-        setConnection(hubConnection);
-        console.log('Connected to RideHub for tracking');
-      } catch (err) {
-        console.error('SignalR Connection Error: ', err);
-        Alert.alert('Connection Error', 'Could not connect to live tracking server.');
-      }
-    };
+      connection.on('ReceiveRouteLocation', handleRouteLocation);
+      connection.on('BookingStatusUpdated', handleBookingStatus);
 
-    connectSignalR();
+      cleanupSignalR = () => {
+        connection.invoke('LeaveRouteGroup', routeId).catch(console.error);
+        connection.off('ReceiveRouteLocation', handleRouteLocation);
+        connection.off('BookingStatusUpdated', handleBookingStatus);
+      };
+    }
 
     return () => {
-      if (hubConnection) {
-        hubConnection.invoke('LeaveRouteGroup', routeId).catch(console.error);
-        hubConnection.stop();
+      if (cleanupSignalR) {
+        cleanupSignalR();
       }
     };
-  }, [routeId]);
+  }, [routeId, bookingId, connection]);
 
   const handleCancelRide = async () => {
     if (!cancelReason) {

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using RideO.API.Data;
 using RideO.API.Models;
@@ -39,6 +40,7 @@ namespace RideO.API.Controllers
         }
 
         [HttpPost]
+        [EnableRateLimiting("RatingLimit")]
         public async Task<IActionResult> SubmitRating([FromBody] SubmitRatingDto dto)
         {
             var reviewerId = GetCurrentUserId();
